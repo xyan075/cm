@@ -1267,6 +1267,62 @@ CONTAINS
     RETURN 1
     
   END SUBROUTINE INTERFACE_POINTS_CONNECTIVITY_CREATE_START
+  
+  !
+  !================================================================================================================================
+  !
+  
+  !>Finalises the meshes connectivity and deallocates all memory
+  SUBROUTINE INTERFACE_POINTS_CONNECTIVITY_ELEMENT_NUMBER_SET(POINTS_CON,POINTS_IDX,COUPLED_MESHID,NO_ELEM,ERR,ERROR,*)
+
+    !Argument variables
+    TYPE(INTERFACE_POINTS_CONNECTIVITY_TYPE), POINTER :: POINTS_CON !<A pointer to interface mesh connectivity to set the element number of elements for.
+    TYPE(MESH_TYPE), POINTER :: INTERFACE_MESH !<A pointer to the interface mesh to set the number of elements for
+    INTEGER(INTG), INTENT(IN) :: POINTS_IDX !<The index of the data point.
+    INTEGER(INTG), INTENT(IN) :: COUPLED_MESHID !<The index of the coupled mesh in the interface to set the number of elements for.
+    INTEGER(INTG), INTENT(IN) :: NO_ELEM !<The number of coupled mesh element number
+    INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
+    !Local Variables
+    INTEGER(INTG) :: XI_DIR !<Number of XI directions of the coupled mesh
+    
+    CALL ENTERS("INTERFACE_POINTS_CONNECTIVITY_ELEMENT_NUMBER_SET",ERR,ERROR,*999)
+
+    IF(ASSOCIATED(POINTS_CON)) THEN
+      IF(POINTS_CON%POINTS_CONNECTIVITY_FINISHED) THEN
+        CALL FLAG_ERROR("Interface points connectivity has already been finished.",ERR,ERROR,*999)
+      ELSE
+        IF ((POINTS_IDX > POINTS_CON%NUMBER_OF_DATA_POINTS).OR.(POINTS_IDX < 0)) THEN
+          CALL FLAG_ERROR("Interface data points index number out of range.",ERR,ERROR,*999)
+        ELSE
+          IF ((COUPLED_MESHID > POINTS_CON%NUMBER_INT_DOM).OR.(COUPLED_MESHID < 0)) THEN
+            CALL FLAG_ERROR("Interface coupled mesh index number out of range.",ERR,ERROR,*999)
+          ELSE
+            IF (ALLOCATED(POINTS_CON%POINTS_CONNECTIVITY)) THEN
+              POINTS_CON%POINTS_CONNECTIVITY(POINTS_IDX,COUPLED_MESHID)%COUPLED_MESH_ELEMENT_NUMBER=NO_ELEM
+              XI_DIR=POINTS_CON%INTERFACE_MESH%NUMBER_OF_DIMENSIONS+1
+              IF(.NOT.ALLOCATED(POINTS_CON%POINTS_CONNECTIVITY(POINTS_IDX,COUPLED_MESHID)%XI)) THEN
+                !\todo Update mesh component index to look at the number of mesh components in each element. Currently this defaults to the first mesh component ie %XI(XI_DIR,1)). The interface mesh types will also need to be restructured.
+                ALLOCATE(POINTS_CON%POINTS_CONNECTIVITY(POINTS_IDX,COUPLED_MESHID)%XI(XI_DIR,1))
+              ENDIF
+              POINTS_CON%POINTS_CONNECTIVITY(POINTS_IDX,COUPLED_MESHID)%XI=0.0_DP
+            ELSE
+              CALL FLAG_ERROR("Interface points connectivity array not allocated.",ERR,ERROR,*999)
+            END IF
+          END IF
+        END IF
+      ENDIF
+    ELSE
+      CALL FLAG_ERROR("Interface points connectivity is not associated.",ERR,ERROR,*999)
+    ENDIF
+    
+    CALL EXITS("INTERFACE_POINTS_CONNECTIVITY_ELEMENT_NUMBER_SET")
+    RETURN
+999 CALL ERRORS("INTERFACE_POINTS_CONNECTIVITY_ELEMENT_NUMBER_SET",ERR,ERROR)
+    CALL EXITS("INTERFACE_POINTS_CONNECTIVITY_ELEMENT_NUMBER_SET")
+    RETURN 1
+    
+  END SUBROUTINE INTERFACE_POINTS_CONNECTIVITY_ELEMENT_NUMBER_SET
 
   !
   !================================================================================================================================

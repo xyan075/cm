@@ -278,6 +278,7 @@ MODULE TYPES
     INTEGER(INTG) :: PROJECTION_EXIT_TAG !<The exit tage of the data projection. \See DATA_PROJECTION_ROUTINES. Assigned only if DATA_POINTS_PROJECTED is .TRUE. 
     REAL(DP), ALLOCATABLE :: PROJECTION_XI(:) !<The xi coordinate of the projection. Assigned only if DATA_POINTS_PROJECTED is .TRUE.
   END TYPE DATA_POINT_TYPE
+  
   !>Contains information on the data points defined on a region. \see OPENCMISS::CMISSDataPointsType
   TYPE DATA_POINTS_TYPE
     TYPE(REGION_TYPE), POINTER :: REGION !<A pointer to the region containing the data points. If the data points are in an interface rather than a region then this pointer will be NULL and the interface pointer should be used.
@@ -286,9 +287,12 @@ MODULE TYPES
     INTEGER(INTG) :: NUMBER_OF_DATA_POINTS !<The number of data points defined on the region.
     TYPE(DATA_POINT_TYPE), ALLOCATABLE :: DATA_POINTS(:) !<DATA_POINTS(data_points_idx). The data point information for the data_points_idx'th global data point.
     TYPE(TREE_TYPE), POINTER :: DATA_POINTS_TREE !<The tree for user to global data point mapping.
-    TYPE(DATA_PROJECTION_TYPE), POINTER :: DATA_PROJECTION !<A pointer to the data projection for the data points.
+    !INTEGER(INTG) :: NUMBER_OF_DATA_PROJECTIONS
+    TYPE(DATA_PROJECTION_TYPE), POINTER :: DATA_PROJECTION !<DATA_PROJECTION(data_projection_idx). A pointer to the data projection data_projection_idx'th data projection.
     LOGICAL :: DATA_POINTS_PROJECTED !<Is .TRUE. if the data points have been projected, .FALSE. if not.
   END TYPE DATA_POINTS_TYPE
+  
+ 
   
   !
   !================================================================================================================================
@@ -310,6 +314,11 @@ MODULE TYPES
     REAL(DP) :: ABSOLUTE_TOLERANCE !<The absolute tolerance of the iteration update
     REAL(DP) :: RELATIVE_TOLERANCE !<The relative tolerance of the iteration update
   END TYPE DATA_PROJECTION_TYPE
+  
+  !>A buffer type to allow for an array of pointers to a MESH_TOPOLOGY_TYPE.
+  TYPE DATA_PROJECTION_PTR_TYPE
+    TYPE(DATA_PROJECTION_TYPE), POINTER :: PTR !<The pointer to the data projection.
+  END TYPE DATA_PROJECTION_PTR_TYPE
 
   !
   !================================================================================================================================
