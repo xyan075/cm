@@ -87,8 +87,6 @@ MODULE INTERFACE_ROUTINES
   PUBLIC INTERFACE_LABEL_GET,INTERFACE_LABEL_SET
 
   PUBLIC INTERFACE_MESH_CONNECTIVITY_CREATE_START, INTERFACE_MESH_CONNECTIVITY_CREATE_FINISH
-  
-  PUBLIC INTERFACE_POINTS_CONNECTIVITY_CREATE_START
 
   PUBLIC INTERFACE_USER_NUMBER_FIND
 
@@ -99,6 +97,10 @@ MODULE INTERFACE_ROUTINES
   PUBLIC INTERFACE_MESH_CONNECTIVITY_ELEMENT_XI_CONTACT_SET 
  
   PUBLIC INTERFACE_MESH_CONNECTIVITY_SET_BASIS
+  
+  PUBLIC INTERFACE_POINTS_CONNECTIVITY_CREATE_START
+  
+  PUBLIC INTERFACE_POINTS_CONNECTIVITY_ELEMENT_NUMBER_SET, INTERFACE_POINTS_CONNECTIVITY_ELEMENT_XI_SET
   
   PUBLIC INTERFACE_COORDINATE_SYSTEM_SET,INTERFACE_COORDINATE_SYSTEM_GET
   
@@ -1273,14 +1275,13 @@ CONTAINS
   !
   
   !>Finalises the meshes connectivity and deallocates all memory
-  SUBROUTINE INTERFACE_POINTS_CONNECTIVITY_ELEMENT_NUMBER_SET(POINTS_CON,POINTS_IDX,COUPLED_MESHID,NO_ELEM,ERR,ERROR,*)
+  SUBROUTINE INTERFACE_POINTS_CONNECTIVITY_ELEMENT_NUMBER_SET(POINTS_CON,POINTS_IDX,COUPLED_MESHID,COUPLED_ELEM,ERR,ERROR,*)
 
     !Argument variables
     TYPE(INTERFACE_POINTS_CONNECTIVITY_TYPE), POINTER :: POINTS_CON !<A pointer to interface mesh connectivity to set the element number of elements for.
-    TYPE(MESH_TYPE), POINTER :: INTERFACE_MESH !<A pointer to the interface mesh to set the number of elements for
     INTEGER(INTG), INTENT(IN) :: POINTS_IDX !<The index of the data point.
     INTEGER(INTG), INTENT(IN) :: COUPLED_MESHID !<The index of the coupled mesh in the interface to set the number of elements for.
-    INTEGER(INTG), INTENT(IN) :: NO_ELEM !<The number of coupled mesh element number
+    INTEGER(INTG), INTENT(IN) :: COUPLED_ELEM !<The coupled mesh element number
     INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
     TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
     !Local Variables
@@ -1299,7 +1300,7 @@ CONTAINS
             CALL FLAG_ERROR("Interface coupled mesh index number out of range.",ERR,ERROR,*999)
           ELSE
             IF (ALLOCATED(POINTS_CON%POINTS_CONNECTIVITY)) THEN
-              POINTS_CON%POINTS_CONNECTIVITY(POINTS_IDX,COUPLED_MESHID)%COUPLED_MESH_ELEMENT_NUMBER=NO_ELEM
+              POINTS_CON%POINTS_CONNECTIVITY(POINTS_IDX,COUPLED_MESHID)%COUPLED_MESH_ELEMENT_NUMBER=COUPLED_ELEM
               XI_DIR=POINTS_CON%INTERFACE_MESH%NUMBER_OF_DIMENSIONS+1
               IF(.NOT.ALLOCATED(POINTS_CON%POINTS_CONNECTIVITY(POINTS_IDX,COUPLED_MESHID)%XI)) THEN
                 !\todo Update mesh component index to look at the number of mesh components in each element. Currently this defaults to the first mesh component ie %XI(XI_DIR,1)). The interface mesh types will also need to be restructured.
@@ -1323,6 +1324,71 @@ CONTAINS
     RETURN 1
     
   END SUBROUTINE INTERFACE_POINTS_CONNECTIVITY_ELEMENT_NUMBER_SET
+  
+  !
+  !================================================================================================================================
+  !
+    
+  !>Finalises the meshes connectivity and deallocates all memory
+  SUBROUTINE INTERFACE_POINTS_CONNECTIVITY_ELEMENT_XI_SET(POINTS_CON,POINTS_IDX,COUPLED_MESHID,COUPLED_ELEM, &
+    & COMP_NO,XI,ERR,ERROR,*)
+
+    !Argument variables
+    TYPE(INTERFACE_POINTS_CONNECTIVITY_TYPE), POINTER :: POINTS_CON !<A pointer to interface mesh connectivity to set the element number of elements for.
+    INTEGER(INTG), INTENT(IN) :: POINTS_IDX !<The index of the data point.
+    INTEGER(INTG), INTENT(IN) :: COUPLED_MESHID !<The index of the coupled mesh in the interface to set the number of elements for.
+    INTEGER(INTG), INTENT(IN) :: COUPLED_ELEM !<The coupled mesh element number
+    INTEGER(INTG), INTENT(IN) :: COMP_NO !<Mesh component number
+    REAL(DP), INTENT(IN) :: XI(:) !<XI(xi_idx). The xi value for the xi_idx'th xi direction in the coupled mesh element.
+    INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
+    !Local Variables
+    
+    CALL ENTERS("INTERFACE_POINTS_CONNECTIVITY_ELEMENT_XI_SET",ERR,ERROR,*999)
+
+    ! Preliminary error checks to verify user input information
+    IF(ASSOCIATED(POINTS_CON)) THEN
+      IF(POINTS_CON%POINTS_CONNECTIVITY_FINISHED) THEN
+        CALL FLAG_ERROR("Interface mesh connectivity already been finished.",ERR,ERROR,*999)
+      ELSE
+        IF (ALLOCATED(POINTS_CON%POINTS_CONNECTIVITY)) THEN
+          IF((POINTS_IDX > 0).OR.(POINTS_IDX < POINTS_CON%NUMBER_OF_DATA_POINTS)) THEN
+            IF((COUPLED_MESHID > 0).OR.(COUPLED_MESHID < POINTS_CON%NUMBER_INT_DOM)) THEN
+              IF((COUPLED_ELEM>0).OR.(COUPLED_ELEM<POINTS_CON%INTERFACE%COUPLED_MESHES(COUPLED_MESHID)%PTR%NUMBER_OF_ELEMENTS))THEN
+                IF((COMP_NO>0).OR.(COMP_NO<POINTS_CON%INTERFACE_MESH%NUMBER_OF_COMPONENTS+1)) THEN         
+                  !Core routine 
+                  IF(POINTS_CON%POINTS_CONNECTIVITY(POINTS_IDX,COUPLED_MESHID)%COUPLED_MESH_ELEMENT_NUMBER/=COUPLED_ELEM)THEN
+                    CALL FLAG_ERROR("Coupled mesh element number doesn't match that set to the interface.",ERR,ERROR,*999)
+                  ELSE
+                    POINTS_CON%POINTS_CONNECTIVITY(POINTS_IDX,COUPLED_MESHID)%XI(:,COMP_NO)=XI(:) 
+                  END IF
+                ELSE
+                  CALL FLAG_ERROR("Interface component number is out of range.",ERR,ERROR,*999)
+                ENDIF
+              ELSE
+                CALL FLAG_ERROR("Coupled mesh element number out of range.",ERR,ERROR,*999)
+              END IF
+            ELSE
+              CALL FLAG_ERROR("Interface coupled mesh index number out of range.",ERR,ERROR,*999)
+            ENDIF
+          ELSE
+            CALL FLAG_ERROR("Interface data point index out of range.",ERR,ERROR,*999)
+          ENDIF
+        ELSE
+          CALL FLAG_ERROR("Interface elements connectivity array not allocated.",ERR,ERROR,*999)
+        ENDIF
+      ENDIF
+    ELSE
+      CALL FLAG_ERROR("Interface mesh connectivity is not associated.",ERR,ERROR,*999)
+    ENDIF
+
+    CALL EXITS("INTERFACE_POINTS_CONNECTIVITY_ELEMENT_XI_SET")
+    RETURN
+999 CALL ERRORS("INTERFACE_POINTS_CONNECTIVITY_ELEMENT_XI_SET",ERR,ERROR)
+    CALL EXITS("INTERFACE_POINTS_CONNECTIVITY_ELEMENT_XI_SET")
+    RETURN 1
+    
+  END SUBROUTINE INTERFACE_POINTS_CONNECTIVITY_ELEMENT_XI_SET
 
   !
   !================================================================================================================================

@@ -291,9 +291,7 @@ MODULE TYPES
     TYPE(DATA_PROJECTION_TYPE), POINTER :: DATA_PROJECTION !<DATA_PROJECTION(data_projection_idx). A pointer to the data projection data_projection_idx'th data projection.
     LOGICAL :: DATA_POINTS_PROJECTED !<Is .TRUE. if the data points have been projected, .FALSE. if not.
   END TYPE DATA_POINTS_TYPE
-  
  
-  
   !
   !================================================================================================================================
   !
