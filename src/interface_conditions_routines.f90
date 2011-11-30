@@ -2143,7 +2143,18 @@ CONTAINS
                 ENDIF
               ENDIF ! UPDATE MATRIX
             ENDDO ! coupled_mesh_idx
-                                    
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          !Contact Mechanics starts here.                          
           CASE(INTERFACE_CONDITION_FRICTIONLESS_CONTACT_OPERATOR)
             ELEM=ELEMENT_NUMBER
             INTERFACE_GEOMETRIC_FIELD=>INTERFACE_EQUATIONS%INTERPOLATION%INTERFACE_INTERPOLATION%GEOMETRIC_FIELD
@@ -2208,6 +2219,7 @@ CONTAINS
                   RWG=INTERFACE_EQUATIONS%INTERPOLATION%INTERFACE_INTERPOLATION%GEOMETRIC_INTERPOLATION(1)% &
                     & INTERPOLATED_POINT_METRICS(FIELD_U_VARIABLE_TYPE)%PTR%JACOBIAN * INTERFACE_QUADRATURE_SCHEME%GAUSS_WEIGHTS(ng)
                   dir=SIZE(INTERFACE_CONDITION%INTERFACE%MESH_CONNECTIVITY%ELEMENTS_CONNECTIVITY(ELEM,coupled_mesh_idx)%XI,1)
+                  !Projecting gauss points to the coupled mesh and find the projection xi locations.
                   XI(1:dir)=INTERFACE_TRANSFORM_GPT(INTERFACE_CONDITION%INTERFACE%MESH_CONNECTIVITY,ELEM,coupled_mesh_idx, &
                     & ng,ERR,ERROR)
             
