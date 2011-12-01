@@ -689,21 +689,19 @@ CONTAINS
       IF(DATA_POINTS%DATA_POINTS_FINISHED) THEN
         IF(ASSOCIATED(DATA_POINTS%DATA_PROJECTIONS(GLOBAL_NUMBER)%PTR)) THEN
           IF(DATA_POINTS%DATA_PROJECTIONS(GLOBAL_NUMBER)%PTR%DATA_PROJECTION_FINISHED) THEN
-            DO data_point_idx=1,DATA_POINTS%NUMBER_OF_DATA_POINTS
-              DO data_projection_idx=1,DATA_POINTS%NUMBER_OF_DATA_PROJECTIONS
-                DATA_POINTS%DATA_POINTS(data_point_idx)%DATA_PROJECTIONS_RESULT(data_projection_idx)%DISTANCE=0.0_DP
-                DATA_POINTS%DATA_POINTS(data_point_idx)%DATA_PROJECTIONS_RESULT(data_projection_idx)%ELEMENT_NUMBER=0
-                DATA_POINTS%DATA_POINTS(data_point_idx)%DATA_PROJECTIONS_RESULT(data_projection_idx)%ELEMENT_FACE_NUMBER=0
-                DATA_POINTS%DATA_POINTS(data_point_idx)%DATA_PROJECTIONS_RESULT(data_projection_idx)%ELEMENT_LINE_NUMBER=0
-                DATA_POINTS%DATA_POINTS(data_point_idx)%DATA_PROJECTIONS_RESULT(data_projection_idx)%EXIT_TAG= &
-                  & DATA_PROJECTION_EXIT_TAG_NO_ELEMENT
-                ALLOCATE(DATA_POINTS%DATA_POINTS(data_point_idx)%DATA_PROJECTIONS_RESULT(data_projection_idx)%XI &
-                  & (DATA_POINTS%DATA_PROJECTIONS(data_projection_idx)%PTR%NUMBER_OF_XI),STAT=ERR)
-                IF(ERR/=0) CALL FLAG_ERROR("Could not allocate data points data points "// &
-                  & "("//TRIM(NUMBER_TO_VSTRING (data_point_idx,"*",ERR,ERROR))//").",ERR,ERROR,*999)
-                DATA_POINTS%DATA_POINTS(data_point_idx)%DATA_PROJECTIONS_RESULT(data_projection_idx)%XI=DATA_POINTS% &
-                & DATA_PROJECTIONS(data_projection_idx)%PTR%STARTING_XI
-              ENDDO !data_projection_idx
+            DO data_point_idx=1,DATA_POINTS%NUMBER_OF_DATA_POINTS    
+              DATA_POINTS%DATA_POINTS(data_point_idx)%DATA_PROJECTIONS_RESULT(GLOBAL_NUMBER)%DISTANCE=0.0_DP
+              DATA_POINTS%DATA_POINTS(data_point_idx)%DATA_PROJECTIONS_RESULT(GLOBAL_NUMBER)%ELEMENT_NUMBER=0
+              DATA_POINTS%DATA_POINTS(data_point_idx)%DATA_PROJECTIONS_RESULT(GLOBAL_NUMBER)%ELEMENT_FACE_NUMBER=0
+              DATA_POINTS%DATA_POINTS(data_point_idx)%DATA_PROJECTIONS_RESULT(GLOBAL_NUMBER)%ELEMENT_LINE_NUMBER=0
+              DATA_POINTS%DATA_POINTS(data_point_idx)%DATA_PROJECTIONS_RESULT(GLOBAL_NUMBER)%EXIT_TAG= &
+                & DATA_PROJECTION_EXIT_TAG_NO_ELEMENT
+              ALLOCATE(DATA_POINTS%DATA_POINTS(data_point_idx)%DATA_PROJECTIONS_RESULT(GLOBAL_NUMBER)%XI &
+                & (DATA_POINTS%DATA_PROJECTIONS(GLOBAL_NUMBER)%PTR%NUMBER_OF_XI),STAT=ERR)
+              IF(ERR/=0) CALL FLAG_ERROR("Could not allocate data points data points "// &
+                & "("//TRIM(NUMBER_TO_VSTRING (data_point_idx,"*",ERR,ERROR))//").",ERR,ERROR,*999)
+              DATA_POINTS%DATA_POINTS(data_point_idx)%DATA_PROJECTIONS_RESULT(GLOBAL_NUMBER)%XI=DATA_POINTS% &
+              & DATA_PROJECTIONS(GLOBAL_NUMBER)%PTR%STARTING_XI
             ENDDO !data_point_idx
           ELSE
             CALL FLAG_ERROR("Data points data projection have not been finished.",ERR,ERROR,*999)
@@ -796,7 +794,7 @@ CONTAINS
     REAL(DP), ALLOCATABLE :: PROJECTED_DISTANCE(:,:),PROJECTED_XI(:,:)
     
     INTEGER(INTG) :: ne,nse,ndp,ncn,ni
-    INTEGER(INTG) :: temp_number,start_idx,finish_idx
+    INTEGER(INTG) :: temp_number,start_idx,finish_idx,data_point_idx
     
     LOGICAL :: BOUNDARY_PROJECTION    
     

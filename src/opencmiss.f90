@@ -3885,6 +3885,12 @@ MODULE OPENCMISS
     MODULE PROCEDURE CMISSInterfacePointsConnectivityPointXiContactSetNumber
     MODULE PROCEDURE CMISSInterfacePointsConnectivityPointXiContactSetObj
   END INTERFACE !CMISSInterfacePointsConnectivityPointXiContactSet <<>>
+  
+  !>Set the projection results for the points connectivity in the interface
+  INTERFACE CMISSInterfacePointsConnectivityProjectionResultsSet
+    MODULE PROCEDURE CMISSInterfacePointsConnectivityProjectionResultsSetNumber
+    MODULE PROCEDURE CMISSInterfacePointsConnectivityProjectionResultsSetObj
+  END INTERFACE !CMISSInterfacePointsConnectivityProjectionResultsSet
 
   PUBLIC CMISSInterfaceMeshAdd
   
@@ -3909,6 +3915,8 @@ MODULE OPENCMISS
   PUBLIC CMISSInterfacePointsConnectivityElementNumberSet, CMISSInterfacePointsConnectivityPointXiSet
   
   PUBLIC CMISSInterfacePointsConnectivityPointXiContactSet
+  
+  PUBLIC CMISSInterfacePointsConnectivityProjectionResultsSet
  
 !!==================================================================================================================================
 !!
@@ -33840,6 +33848,80 @@ CONTAINS
     RETURN
     
   END SUBROUTINE CMISSInterfacePointsConnectivityPointXiContactSetObj
+  
+  !  
+  !================================================================================================================================
+  !  
+  
+  !>Sets the xi coordinate mapping between the interface and xi coordinates in a coupled region mesh
+  SUBROUTINE CMISSInterfacePointsConnectivityProjectionResultsSetNumber(RegionUserNumber,InterfaceUserNumber,Err)
+  
+    !Argument variables
+    INTEGER(INTG), INTENT(IN) :: RegionUserNumber !<The user number of the region containing the interface to start the creation of the meshes connectivity.
+    INTEGER(INTG), INTENT(IN) :: InterfaceUserNumber !<The user number of the interface to start the creation of the meshes connectivity for.
+    INTEGER(INTG), INTENT(OUT) :: Err !<The error code.
+    !Local variables
+    TYPE(INTERFACE_TYPE), POINTER :: INTERFACE
+    TYPE(REGION_TYPE), POINTER :: REGION
+    TYPE(VARYING_STRING) :: LOCAL_ERROR
+    
+    CALL ENTERS("CMISSInterfacePointsConnectivityProjectionResultsSetNumber",Err,ERROR,*999)
+ 
+    NULLIFY(REGION)
+    NULLIFY(INTERFACE)
+    CALL REGION_USER_NUMBER_FIND(RegionUserNumber,REGION,Err,ERROR,*999)
+    IF(ASSOCIATED(REGION)) THEN
+      CALL INTERFACE_USER_NUMBER_FIND(InterfaceUserNumber,REGION,INTERFACE,Err,ERROR,*999)
+      IF(ASSOCIATED(INTERFACE)) THEN
+        CALL INTERFACE_POINTS_CONNECTIVITY_PROJECTION_RESULTS_SET(INTERFACE%POINTS_CONNECTIVITY,INTERFACE%DATA_POINTS, &
+          & Err,ERROR,*999)
+      ELSE
+        LOCAL_ERROR="An interface with an user number of "//TRIM(NUMBER_TO_VSTRING(InterfaceUserNumber,"*",Err,ERROR))// &
+          & " does not exist on the region with an user number of "//TRIM(NUMBER_TO_VSTRING(RegionUserNumber,"*",Err,ERROR))//"."
+        CALL FLAG_ERROR(LOCAL_ERROR,Err,ERROR,*999)
+      ENDIF
+    ELSE
+      LOCAL_ERROR="A region with an user number of "//TRIM(NUMBER_TO_VSTRING(RegionUserNumber,"*",Err,ERROR))// &
+        & " does not exist."
+      CALL FLAG_ERROR(LOCAL_ERROR,Err,ERROR,*999)
+    ENDIF
+
+    CALL EXITS("CMISSInterfacePointsConnectivityProjectionResultsSetNumber")
+    RETURN
+999 CALL ERRORS("CMISSInterfacePointsConnectivityProjectionResultsSetNumber",Err,ERROR)
+    CALL EXITS("CMISSInterfacePointsConnectivityProjectionResultsSetNumber")
+    CALL CMISS_HANDLE_ERROR(Err,ERROR)
+    RETURN
+    
+  END SUBROUTINE CMISSInterfacePointsConnectivityProjectionResultsSetNumber
+
+  !  
+  !================================================================================================================================
+  ! 
+   
+  !>Sets the xi coordinate mapping between the interface and xi coordinates in a coupled region mesh
+  SUBROUTINE CMISSInterfacePointsConnectivityProjectionResultsSetObj(InterfacePointsConnectivity,DataPoints,Err)
+  
+    !Argument variables
+    TYPE(CMISSInterfacePointsConnectivityType), INTENT(IN) :: InterfacePointsConnectivity !<The interface to start the creation of the meshes connectivity for
+    TYPE(CMISSDataPointsType), INTENT(IN) :: DataPoints !<Data points in the interface that contains projection results
+    INTEGER(INTG), INTENT(OUT) :: Err !<The error code.
+    !Local variables
+  
+    CALL ENTERS("CMISSInterfacePointsConnectivityProjectionResultsSetObj",Err,ERROR,*999)
+ 
+    CALL INTERFACE_POINTS_CONNECTIVITY_PROJECTION_RESULTS_SET(InterfacePointsConnectivity%POINTS_CONNECTIVITY, &
+      & DataPoints%DATA_POINTS,Err,ERROR,*999)
+
+    CALL EXITS("CMISSInterfacePointsConnectivityProjectionResultsSetObj")
+    RETURN
+999 CALL ERRORS("CMISSInterfacePointsConnectivityProjectionResultsSetObj",Err,ERROR)
+    CALL EXITS("CMISSInterfacePointsConnectivityProjectionResultsSetObj")
+    CALL CMISS_HANDLE_ERROR(Err,ERROR)
+    RETURN
+    
+  END SUBROUTINE CMISSInterfacePointsConnectivityProjectionResultsSetObj
+  
 
 !!==================================================================================================================================
 !!

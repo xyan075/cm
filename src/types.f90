@@ -291,15 +291,9 @@ MODULE TYPES
     INTEGER(INTG) :: NUMBER_OF_DATA_POINTS !<The number of data points defined on the region/interface.
     TYPE(DATA_POINT_TYPE), ALLOCATABLE :: DATA_POINTS(:) !<DATA_POINTS(data_points_idx). The data point information for the data_points_idx'th global data point.
     TYPE(TREE_TYPE), POINTER :: DATA_POINTS_TREE !<The tree for user to global data point mapping.
-<<<<<<< HEAD
-    !INTEGER(INTG) :: NUMBER_OF_DATA_PROJECTIONS
-    TYPE(DATA_PROJECTION_TYPE), POINTER :: DATA_PROJECTION !<DATA_PROJECTION(data_projection_idx). A pointer to the data projection data_projection_idx'th data projection.
-    LOGICAL :: DATA_POINTS_PROJECTED !<Is .TRUE. if the data points have been projected, .FALSE. if not.
-=======
     INTEGER(INTG) :: NUMBER_OF_DATA_PROJECTIONS !<The number of data projections defined on the data points.
     TYPE(DATA_PROJECTION_PTR_TYPE), POINTER :: DATA_PROJECTIONS(:) !<DATA_PROJECTIONS(projection_idx). A pointer to the projection_idx'th data projection for the data points.
     TYPE(TREE_TYPE), POINTER :: DATA_PROJECTIONS_TREE !<The tree for user to global data projections mapping.
->>>>>>> TimSzuHsienWu/master
   END TYPE DATA_POINTS_TYPE
  
   !
@@ -328,11 +322,6 @@ MODULE TYPES
   END TYPE DATA_PROJECTION_TYPE
   
   !>A buffer type to allow for an array of pointers to a MESH_TOPOLOGY_TYPE.
-  TYPE DATA_PROJECTION_PTR_TYPE
-    TYPE(DATA_PROJECTION_TYPE), POINTER :: PTR !<The pointer to the data projection.
-  END TYPE DATA_PROJECTION_PTR_TYPE
-
-  !>A buffer type to allow for an array of pointers to a DATA_PROJECTION_TYPE.
   TYPE DATA_PROJECTION_PTR_TYPE
     TYPE(DATA_PROJECTION_TYPE), POINTER :: PTR !<The pointer to the data projection.
   END TYPE DATA_PROJECTION_PTR_TYPE

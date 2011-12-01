@@ -104,6 +104,8 @@ MODULE INTERFACE_ROUTINES
   
   PUBLIC INTERFACE_POINTS_CONNECTIVITY_POINT_XI_CONTACT_SET
   
+  PUBLIC INTERFACE_POINTS_CONNECTIVITY_PROJECTION_RESULTS_SET
+  
   PUBLIC INTERFACE_COORDINATE_SYSTEM_SET,INTERFACE_COORDINATE_SYSTEM_GET
   
 CONTAINS
@@ -1280,7 +1282,7 @@ CONTAINS
   SUBROUTINE INTERFACE_POINTS_CONNECTIVITY_ELEMENT_NUMBER_SET(POINTS_CON,POINTS_IDX,COUPLED_MESHID,COUPLED_ELEM,ERR,ERROR,*)
 
     !Argument variables
-    TYPE(INTERFACE_POINTS_CONNECTIVITY_TYPE), POINTER :: POINTS_CON !<A pointer to interface mesh connectivity to set the element number of elements for.
+    TYPE(INTERFACE_POINTS_CONNECTIVITY_TYPE), POINTER :: POINTS_CON !<A pointer to interface points connectivity to set the element number of elements for.
     INTEGER(INTG), INTENT(IN) :: POINTS_IDX !<The index of the data point.
     INTEGER(INTG), INTENT(IN) :: COUPLED_MESHID !<The index of the coupled mesh in the interface to set the number of elements for.
     INTEGER(INTG), INTENT(IN) :: COUPLED_ELEM !<The coupled mesh element number
@@ -1336,7 +1338,7 @@ CONTAINS
     & COMP_NO,XI,ERR,ERROR,*)
 
     !Argument variables
-    TYPE(INTERFACE_POINTS_CONNECTIVITY_TYPE), POINTER :: POINTS_CON !<A pointer to interface mesh connectivity to set the element number of elements for.
+    TYPE(INTERFACE_POINTS_CONNECTIVITY_TYPE), POINTER :: POINTS_CON !<A pointer to interface points connectivity to set the element number of elements for.
     INTEGER(INTG), INTENT(IN) :: POINTS_IDX !<The index of the data point.
     INTEGER(INTG), INTENT(IN) :: COUPLED_MESHID !<The index of the coupled mesh in the interface to set the number of elements for.
     INTEGER(INTG), INTENT(IN) :: COUPLED_ELEM !<The coupled mesh element number
@@ -1400,7 +1402,7 @@ CONTAINS
   SUBROUTINE INTERFACE_POINTS_CONNECTIVITY_CREATE_FINISH(INTERFACE_POINTS_CONNECTIVITY,ERR,ERROR,*) 
 
     !Argument variables
-    TYPE(INTERFACE_POINTS_CONNECTIVITY_TYPE), POINTER :: INTERFACE_POINTS_CONNECTIVITY !<A pointer to the interface meshes connectivity to finish creating
+    TYPE(INTERFACE_POINTS_CONNECTIVITY_TYPE), POINTER :: INTERFACE_POINTS_CONNECTIVITY !<A pointer to the interface poiints connectivity to finish creating
     INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
     TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
     !Local Variables
@@ -1435,7 +1437,7 @@ CONTAINS
   !>Calculate line/face numbers for coupled mesh elements that are connected to the interface mesh
   SUBROUTINE INTERFACE_POINTS_CONNECTIVITY_CONTACT_NUMBER_CALCULATE(POINTS_CON,ERR,ERROR,*)
     !Argument variables
-    TYPE(INTERFACE_POINTS_CONNECTIVITY_TYPE), POINTER :: POINTS_CON !<A pointer to interface mesh connectivity to calculate line numbers for.
+    TYPE(INTERFACE_POINTS_CONNECTIVITY_TYPE), POINTER :: POINTS_CON !<A pointer to interface points connectivity to calculate line numbers for.
     INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
     TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
     
@@ -1546,7 +1548,7 @@ CONTAINS
       & LOCAL_CONTACT,COMP_NO,XI,ERR,ERROR,*)
 
     !Argument variables
-    TYPE(INTERFACE_POINTS_CONNECTIVITY_TYPE), POINTER :: POINTS_CON !<A pointer to interface mesh connectivity to set the element number of elements for.
+    TYPE(INTERFACE_POINTS_CONNECTIVITY_TYPE), POINTER :: POINTS_CON !<A pointer to interface point connectivity to set the element number of elements for.
     INTEGER(INTG), INTENT(IN) :: POINTS_IDX !<The index of the data point.
     INTEGER(INTG), INTENT(IN) :: COUPLED_MESHID !<The index of the coupled mesh in the interface to set the number of elements for.
     INTEGER(INTG), INTENT(IN) :: COUPLED_ELEM !<The coupled mesh element number
@@ -1677,6 +1679,72 @@ CONTAINS
     RETURN 1
     
   END SUBROUTINE INTERFACE_POINTS_CONNECTIVITY_POINT_XI_CONTACT_SET
+
+  !
+  !================================================================================================================================
+  !
+  
+    !>Finalises the meshes connectivity and deallocates all memory
+  SUBROUTINE INTERFACE_POINTS_CONNECTIVITY_PROJECTION_RESULTS_SET(POINTS_CON,DATA_POINTS,ERR,ERROR,*)
+
+    !Argument variables
+    TYPE(INTERFACE_POINTS_CONNECTIVITY_TYPE), POINTER :: POINTS_CON !<A pointer to interface points connectivity to set the element number of elements for.
+    TYPE(DATA_POINTS_TYPE), POINTER :: DATA_POINTS !<A pointer to the data points that contains projection results
+    INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
+    
+    !Local Variables
+    TYPE(DATA_PROJECTION_RESULT_TYPE), POINTER :: DATA_PROJECTION_RESULT
+    INTEGER(INTG) :: data_projection_idx,data_point_idx
+    INTEGER(INTG) :: COMP_NO=1 !\TODO:mesh component number is now hard-coded to be one, need to be 
+    TYPE(VARYING_STRING) :: LOCAL_ERROR
+    
+    CALL ENTERS("INTERFACE_POINTS_CONNECTIVITY_PROJECTION_RESULTS_SET",ERR,ERROR,*999)
+
+    ! Preliminary error checks to verify user input information
+    IF(ASSOCIATED(POINTS_CON)) THEN
+      IF(POINTS_CON%POINTS_CONNECTIVITY_FINISHED) THEN
+        CALL FLAG_ERROR("Interface points connectivity already been finished.",ERR,ERROR,*999)
+      ELSE
+        IF (ALLOCATED(POINTS_CON%POINTS_CONNECTIVITY)) THEN
+          IF(ASSOCIATED(DATA_POINTS)) THEN
+            IF(POINTS_CON%NUMBER_INT_DOM==DATA_POINTS%NUMBER_OF_DATA_PROJECTIONS) THEN
+              DO data_projection_idx=1,DATA_POINTS%NUMBER_OF_DATA_PROJECTIONS
+                IF(DATA_POINTS%DATA_PROJECTIONS(data_projection_idx)%PTR%DATA_PROJECTION_PROJECTED) THEN
+                  DO data_point_idx=1,DATA_POINTS%NUMBER_OF_DATA_POINTS
+                    DATA_PROJECTION_RESULT=>DATA_POINTS%DATA_POINTS(data_point_idx)%DATA_PROJECTIONS_RESULT(data_projection_idx)
+                    CALL INTERFACE_POINTS_CONNECTIVITY_ELEMENT_NUMBER_SET(POINTS_CON,data_point_idx,data_projection_idx, &
+                      & DATA_PROJECTION_RESULT%ELEMENT_NUMBER,ERR,ERROR,*999)
+                    CALL INTERFACE_POINTS_CONNECTIVITY_POINT_XI_CONTACT_SET(POINTS_CON,data_point_idx,data_projection_idx, &
+                      & DATA_PROJECTION_RESULT%ELEMENT_NUMBER,DATA_PROJECTION_RESULT%ELEMENT_LINE_NUMBER,COMP_NO, &
+                      & DATA_PROJECTION_RESULT%XI,ERR,ERROR,*999)
+                  ENDDO          
+                ELSE
+                  LOCAL_ERROR="Data Projection  "//TRIM(NUMBER_TO_VSTRING(data_projection_idx,"*",ERR,ERROR))//" is not projected."        
+                  CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
+                ENDIF      
+              ENDDO
+            ELSE
+              CALL FLAG_ERROR("Number of coupled mesh does not match number of data projections.",ERR,ERROR,*999)
+            ENDIF
+          ELSE
+            CALL FLAG_ERROR("Data points is not associated.",ERR,ERROR,*999)
+          ENDIF        
+        ELSE
+          CALL FLAG_ERROR("Interface points connectivity array not allocated.",ERR,ERROR,*999)
+        ENDIF  
+      ENDIF
+    ELSE
+      CALL FLAG_ERROR("Interface points connectivity is not associated.",ERR,ERROR,*999)
+    ENDIF
+    
+    CALL EXITS("INTERFACE_POINTS_CONNECTIVITY_PROJECTION_RESULTS_SET")
+    RETURN
+999 CALL ERRORS("INTERFACE_POINTS_CONNECTIVITY_PROJECTION_RESULTS_SET",ERR,ERROR)
+    CALL EXITS("INTERFACE_POINTS_CONNECTIVITY_PROJECTION_RESULTS_SET")
+    RETURN 1
+    
+  END SUBROUTINE INTERFACE_POINTS_CONNECTIVITY_PROJECTION_RESULTS_SET
 
   !
   !================================================================================================================================
