@@ -1576,6 +1576,7 @@ MODULE OPENCMISS
   INTERFACE CMISSDataPointsCreateStart
     MODULE PROCEDURE CMISSDataPointsCreateStartNumber
     MODULE PROCEDURE CMISSDataPointsCreateStartObj
+    MODULE PROCEDURE CMISSDataPointsCreateStartInterfaceObj
   END INTERFACE !CMISSDataPointsCreateFinish
 
   !>Destroys data points.
