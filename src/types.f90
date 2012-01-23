@@ -2018,7 +2018,7 @@ END TYPE GENERATED_MESH_ELLIPSOID_TYPE
     INTEGER(INTG) :: OPERATOR !<An integer which denotes whether type of interface operator. \see INTERFACE_CONDITIONS_Operator,INTERFACE_CONDITIONS
     TYPE(INTERFACE_GEOMETRY_TYPE) :: GEOMETRY !<The geometry information for the interface condition.
     TYPE(INTERFACE_LAGRANGE_TYPE), POINTER :: LAGRANGE !<A pointer to the interface condition Lagrange multipler information if there are any for this interface condition.
-    TYPE(INTERFACE_DEPENDENT_TYPE), POINTER :: DEPENDENT !<A pointer to the interface condition dependent field information if there is any for this interface condition.
+    TYPE(INTERFACE_DEPENDENT_TYPE), POINTER :: DEPENDENT !<A pointer to the interface condition dependent field (i.e. coupled mesh dependent field)information if there is any for this interface condition.
     TYPE(INTERFACE_EQUATIONS_TYPE), POINTER :: INTERFACE_EQUATIONS !<A pointer to the interface equations if there are any for this interface condition
   END TYPE INTERFACE_CONDITION_TYPE
 
@@ -2091,6 +2091,7 @@ END TYPE GENERATED_MESH_ELLIPSOID_TYPE
     TYPE(FIELDS_TYPE), POINTER :: FIELDS !<A pointer to the fields defined over an interface.
     TYPE(INTERFACE_CONDITIONS_TYPE), POINTER :: INTERFACE_CONDITIONS !<The pointer to the interface conditions for this interface
     INTEGER :: INTERFACE_METHOD !<temporary, 1 if mesh method, 2 if data point method
+    LOGICAL :: SELF_CONTACT !<Is .TRUE. if the interface deals with self-contact, .FALSE. if not.
   END TYPE INTERFACE_TYPE
 
   !>A buffer type to allow for an array of pointers to a INTERFACE_TYPE.
