@@ -150,7 +150,12 @@ CONTAINS
                 DO matrix_idx=1,INTERFACE_MAPPING%NUMBER_OF_INTERFACE_MATRICES
                   !Initialise and setup the interface matrix
                   CALL INTERFACE_MAPPING_MATRIX_TO_VAR_MAP_INITIALISE(INTERFACE_MAPPING,matrix_idx,ERR,ERROR,*999)
-                  mesh_idx=CREATE_VALUES_CACHE%MATRIX_ROW_FIELD_VARIABLE_INDICES(matrix_idx)
+                  IF(INTERFACE_CONDITION%INTERFACE%SELF_CONTACT) THEN
+                    mesh_idx=CREATE_VALUES_CACHE%MATRIX_ROW_FIELD_VARIABLE_INDICES(1)!Same as the first mesh.
+                  ELSE
+                    mesh_idx=CREATE_VALUES_CACHE%MATRIX_ROW_FIELD_VARIABLE_INDICES(matrix_idx)
+                  ENDIF
+                  
                   NULLIFY(EQUATIONS_SET)
                   NULLIFY(FIELD_VARIABLE)
                   DO variable_idx=1,INTERFACE_DEPENDENT%NUMBER_OF_DEPENDENT_VARIABLES
