@@ -1310,7 +1310,8 @@ CONTAINS
                 !\todo Update mesh component index to look at the number of mesh components in each element. Currently this defaults to the first mesh component ie %XI(XI_DIR,1)). The interface mesh types will also need to be restructured.
                 ALLOCATE(POINTS_CON%POINTS_CONNECTIVITY(POINTS_IDX,COUPLED_MESHID)%XI(XI_DIR,1))
               ENDIF
-              POINTS_CON%POINTS_CONNECTIVITY(POINTS_IDX,COUPLED_MESHID)%XI=0.0_DP
+              !The initial guess was set to be 0.5
+              POINTS_CON%POINTS_CONNECTIVITY(POINTS_IDX,COUPLED_MESHID)%XI=0.5_DP
             ELSE
               CALL FLAG_ERROR("Interface points connectivity array not allocated.",ERR,ERROR,*999)
             END IF
