@@ -418,7 +418,7 @@ CONTAINS
                   IF(ASSOCIATED(INTERFACE_DEPENDENT)) THEN
                     !Default the number of interface matrices to the number of added dependent variables
                     INTERFACE_MAPPING%CREATE_VALUES_CACHE%NUMBER_OF_INTERFACE_MATRICES= &
-                      INTERFACE_DEPENDENT%NUMBER_OF_DEPENDENT_VARIABLES
+                    INTERFACE_DEPENDENT%NUMBER_OF_DEPENDENT_VARIABLES
                     !Default the Lagrange variable to the first Lagrange variable              
                     INTERFACE_MAPPING%CREATE_VALUES_CACHE%LAGRANGE_VARIABLE_TYPE=0
                     DO variable_type_idx=1,FIELD_NUMBER_OF_VARIABLE_TYPES

@@ -555,7 +555,8 @@ CONTAINS
     INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
     TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
     !Local Variables
-    INTEGER(INTG) :: component_idx,derivative,derivative_idx,global_ny,local_ny,node,node_idx,version
+    INTEGER(INTG) :: component_idx,derivative,derivative_idx,global_ny,local_ny,node,node_idx,version,gauss_point_idx,xi_idx
+    INTEGER(INTG) :: TOTAL_NUMBER_OF_GAUSS_POINTS
     TYPE(BASIS_TYPE), POINTER :: BASIS
     TYPE(DOMAIN_ELEMENTS_TYPE), POINTER :: ELEMENTS_TOPOLOGY
     TYPE(VARYING_STRING) :: LOCAL_ERROR
@@ -712,7 +713,18 @@ CONTAINS
                 CASE(FIELD_GRID_POINT_BASED_INTERPOLATION)
                   CALL FLAG_ERROR("Not implemented.",ERR,ERROR,*999)
                 CASE(FIELD_GAUSS_POINT_BASED_INTERPOLATION)
-                  CALL FLAG_ERROR("Not implemented.",ERR,ERROR,*999)
+                  BASIS=>COLS_FIELD_VARIABLE%COMPONENTS(component_idx)%DOMAIN%MESH%GENERATED_MESH%REGULAR_MESH%BASES(1)%PTR
+                  TOTAL_NUMBER_OF_GAUSS_POINTS=1
+                  DO xi_idx=1,BASIS%NUMBER_OF_XI
+                    TOTAL_NUMBER_OF_GAUSS_POINTS=TOTAL_NUMBER_OF_GAUSS_POINTS*BASIS%QUADRATURE%NUMBER_OF_GAUSS_XI(xi_idx)
+                  ENDDO
+                  DO gauss_point_idx=1,TOTAL_NUMBER_OF_GAUSS_POINTS
+                    local_ny=COLS_FIELD_VARIABLE%COMPONENTS(component_idx)%PARAM_TO_DOF_MAP%GAUSS_POINT_PARAM2DOF_MAP% &
+                      & GAUSS_POINTS(gauss_point_idx,COLUMN_ELEMENT_NUMBER)
+                    global_ny=COLS_FIELD_VARIABLE%DOMAIN_MAPPING%LOCAL_TO_GLOBAL_MAP(local_ny)
+                    ELEMENT_MATRIX%NUMBER_OF_COLUMNS=ELEMENT_MATRIX%NUMBER_OF_COLUMNS+1
+                    ELEMENT_MATRIX%COLUMN_DOFS(ELEMENT_MATRIX%NUMBER_OF_COLUMNS)=global_ny
+                  ENDDO                 
                 CASE DEFAULT
                   LOCAL_ERROR="The interpolation type of "// &
                     & TRIM(NUMBER_TO_VSTRING(COLS_FIELD_VARIABLE%COMPONENTS(component_idx)%INTERPOLATION_TYPE,"*",ERR,ERROR))// &
@@ -878,7 +890,8 @@ CONTAINS
     INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
     TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
     !Local Variables
-    INTEGER(INTG) :: component_idx,derivative,derivative_idx,local_ny,node,node_idx,version
+    INTEGER(INTG) :: component_idx,derivative,derivative_idx,local_ny,node,node_idx,version,xi_idx,gauss_point_idx
+    INTEGER(INTG) :: TOTAL_NUMBER_OF_GAUSS_POINTS
     TYPE(BASIS_TYPE), POINTER :: BASIS
     TYPE(DOMAIN_ELEMENTS_TYPE), POINTER :: ELEMENTS_TOPOLOGY
     TYPE(VARYING_STRING) :: LOCAL_ERROR
@@ -918,7 +931,17 @@ CONTAINS
             CASE(FIELD_GRID_POINT_BASED_INTERPOLATION)
               CALL FLAG_ERROR("Not implemented.",ERR,ERROR,*999)
             CASE(FIELD_GAUSS_POINT_BASED_INTERPOLATION)
-              CALL FLAG_ERROR("Not implemented.",ERR,ERROR,*999)
+              BASIS=>ROWS_FIELD_VARIABLE%COMPONENTS(component_idx)%DOMAIN%MESH%GENERATED_MESH%REGULAR_MESH%BASES(1)%PTR
+              TOTAL_NUMBER_OF_GAUSS_POINTS=1
+              DO xi_idx=1,BASIS%NUMBER_OF_XI
+                TOTAL_NUMBER_OF_GAUSS_POINTS=TOTAL_NUMBER_OF_GAUSS_POINTS*BASIS%QUADRATURE%NUMBER_OF_GAUSS_XI(xi_idx)
+              ENDDO
+              DO gauss_point_idx=1,TOTAL_NUMBER_OF_GAUSS_POINTS
+                local_ny=ROWS_FIELD_VARIABLE%COMPONENTS(component_idx)%PARAM_TO_DOF_MAP%GAUSS_POINT_PARAM2DOF_MAP% &
+                  & GAUSS_POINTS(gauss_point_idx,ELEMENT_NUMBER)
+                ELEMENT_VECTOR%NUMBER_OF_ROWS=ELEMENT_VECTOR%NUMBER_OF_ROWS+1
+                ELEMENT_VECTOR%ROW_DOFS(ELEMENT_VECTOR%NUMBER_OF_ROWS)=local_ny
+              ENDDO   
             CASE DEFAULT
               LOCAL_ERROR="The interpolation type of "// &
                 & TRIM(NUMBER_TO_VSTRING(ROWS_FIELD_VARIABLE%COMPONENTS(component_idx)%INTERPOLATION_TYPE,"*",ERR,ERROR))// &
