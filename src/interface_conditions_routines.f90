@@ -2187,20 +2187,22 @@ CONTAINS
                 COUPLED_MESH_GEOMETRIC_FIELD=>INTERFACE_EQUATIONS%INTERPOLATION%VARIABLE_INTERPOLATION(coupled_mesh_idx)% &
                   & GEOMETRIC_FIELD 
                 INTERFACE_MATRIX_CONTACT=>INTERFACE_EQUATIONS%INTERFACE_MATRICES%MATRICES(coupled_mesh_idx)%PTR
+                !Gets the interpolation parameters for this interface element
                 CALL FIELD_INTERPOLATION_PARAMETERS_ELEMENT_GET(FIELD_VALUES_SET_TYPE,ELEM,INTERFACE_EQUATIONS% &
                   & INTERPOLATION%INTERFACE_INTERPOLATION%GEOMETRIC_INTERPOLATION(1)% &
-                  & INTERPOLATION_PARAMETERS(FIELD_U_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)
+                  & INTERPOLATION_PARAMETERS(FIELD_U_VARIABLE_TYPE)%PTR,ERR,ERROR,*999) !MESH CASE
                    
                 !Global number of the line in contact
                 LOCAL_CONTACT=INTERFACE_CONDITION%INTERFACE%MESH_CONNECTIVITY%ELEMENTS_CONNECTIVITY(ELEM,coupled_mesh_idx)% &
                   & COUPLED_MESH_CONTACT_NUMBER
                 SELECT CASE(INTERFACE_NUMBER_OF_XI)
                 CASE(1)
-                  !Compute interpolation parameters for the line
+                  !Compute interpolation parameters for the line for the couple mesh field
                   CALL FIELD_INTERPOLATION_PARAMETERS_LINE_GET(FIELD_VALUES_SET_TYPE,LOCAL_CONTACT,INTERFACE_EQUATIONS% & 
                     & INTERPOLATION%VARIABLE_INTERPOLATION(coupled_mesh_idx)%GEOMETRIC_INTERPOLATION(1)% &
                     & INTERPOLATION_PARAMETERS(FIELD_U_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)
                 CASE(2)
+                  !Compute interpolation parameters for the face for the couple mesh field
                   CALL FIELD_INTERPOLATION_PARAMETERS_FACE_GET(FIELD_VALUES_SET_TYPE,LOCAL_CONTACT,INTERFACE_EQUATIONS% &
                     & INTERPOLATION%VARIABLE_INTERPOLATION(coupled_mesh_idx)%GEOMETRIC_INTERPOLATION(1)% &
                     & INTERPOLATION_PARAMETERS(FIELD_U_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)
@@ -2213,7 +2215,7 @@ CONTAINS
                   !TPBG
                   !CALL WRITE_STRING_VALUE(DIAGNOSTIC_OUTPUT_TYPE,"  Gausspoint number : ",ng,ERR,ERROR,*999)
                   !TPBG
-                  !Interpolate for gauss points on the interface
+                  !Interpolate for gauss points on the interface MESH CASE
                   CALL FIELD_INTERPOLATE_GAUSS(FIRST_PART_DERIV,BASIS_DEFAULT_QUADRATURE_SCHEME,ng,INTERFACE_EQUATIONS% &
                     & INTERPOLATION%INTERFACE_INTERPOLATION%GEOMETRIC_INTERPOLATION(1)% &
                     & INTERPOLATED_POINT(FIELD_U_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)
@@ -2221,7 +2223,7 @@ CONTAINS
                     & INTERFACE_EQUATIONS%INTERPOLATION%INTERFACE_INTERPOLATION%GEOMETRIC_INTERPOLATION(1)% &
                     & INTERPOLATED_POINT_METRICS(FIELD_U_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)
                   RWG=INTERFACE_EQUATIONS%INTERPOLATION%INTERFACE_INTERPOLATION%GEOMETRIC_INTERPOLATION(1)% &
-                    & INTERPOLATED_POINT_METRICS(FIELD_U_VARIABLE_TYPE)%PTR%JACOBIAN * INTERFACE_QUADRATURE_SCHEME%GAUSS_WEIGHTS(ng)
+                    & INTERPOLATED_POINT_METRICS(FIELD_U_VARIABLE_TYPE)%PTR%JACOBIAN * INTERFACE_QUADRATURE_SCHEME%GAUSS_WEIGHTS(ng) 
                   dir=SIZE(INTERFACE_CONDITION%INTERFACE%MESH_CONNECTIVITY%ELEMENTS_CONNECTIVITY(ELEM,coupled_mesh_idx)%XI,1)
                   !Projecting gauss points to the coupled mesh and find the projection xi locations.
                   XI(1:dir)=INTERFACE_TRANSFORM_GPT(INTERFACE_CONDITION%INTERFACE%MESH_CONNECTIVITY,ELEM,coupled_mesh_idx, &
@@ -2285,7 +2287,7 @@ CONTAINS
                       nhs=0
                       PGMSI=BASIS_EVALUATE_XI(COUPLED_MESH_ELEMENT_BASIS,ms,NO_PART_DERIV,XI,ERR,ERROR)*NORMAL(mh)
                       !Loop over element columns
-                      DO nh=mh,mh!LAGRANGE_VARIABLE%NUMBER_OF_COMPONENTS
+                      DO nh=mh,mh!each component is de-coupled from each other therefore only x-x or y-y entries are filled (not x-y, y-x) in the interface matrix
                         nhc=LAGRANGE_VARIABLE%COMPONENTS(nh)%MESH_COMPONENT_NUMBER                      
                         INTERFACE_QUADRATURE_SCHEME=>INTERFACE_DEPENDENT_BASIS%QUADRATURE%QUADRATURE_SCHEME_MAP &
                           & (BASIS_DEFAULT_QUADRATURE_SCHEME)%PTR

@@ -3454,7 +3454,7 @@ MODULE OPENCMISS
   PUBLIC CMISSFieldDimensionGet,CMISSFieldDimensionSet
 
   PUBLIC CMISSFieldGeometricFieldGet,CMISSFieldGeometricFieldSet
-
+  
   PUBLIC CMISSFieldLabelGet,CMISSFieldLabelSet
 
   PUBLIC CMISSFieldMeshDecompositionGet,CMISSFieldMeshDecompositionSet
@@ -24628,10 +24628,10 @@ CONTAINS
     RETURN
     
   END SUBROUTINE CMISSFieldGeometricFieldSetObj
-
+  
   !  
   !================================================================================================================================
-  !  
+  !    
 
   !>Returns the character string label for a field identified by a user number.
   SUBROUTINE CMISSFieldLabelGetCNumber(RegionUserNumber,FieldUserNumber,Label,Err)
