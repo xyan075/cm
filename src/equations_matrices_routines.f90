@@ -609,6 +609,8 @@ CONTAINS
                   CALL FLAG_ERROR("Not implemented.",ERR,ERROR,*999)
                 CASE(FIELD_GAUSS_POINT_BASED_INTERPOLATION)
                   CALL FLAG_ERROR("Not implemented.",ERR,ERROR,*999)
+                CASE(FIELD_DATA_POINT_BASED_INTERPOLATION)
+                  CALL FLAG_ERROR("Not implemented.",ERR,ERROR,*999)
                 CASE DEFAULT
                   LOCAL_ERROR="The interpolation type of "// &
                     & TRIM(NUMBER_TO_VSTRING(ROWS_FIELD_VARIABLE%COMPONENTS(component_idx)%INTERPOLATION_TYPE,"*",ERR,ERROR))// &
@@ -660,6 +662,8 @@ CONTAINS
                 CASE(FIELD_GRID_POINT_BASED_INTERPOLATION)
                   CALL FLAG_ERROR("Not implemented.",ERR,ERROR,*999)
                 CASE(FIELD_GAUSS_POINT_BASED_INTERPOLATION)
+                  CALL FLAG_ERROR("Not implemented.",ERR,ERROR,*999)
+                CASE(FIELD_DATA_POINT_BASED_INTERPOLATION)
                   CALL FLAG_ERROR("Not implemented.",ERR,ERROR,*999)
                 CASE DEFAULT
                   LOCAL_ERROR="The interpolation type of "// &
@@ -724,7 +728,9 @@ CONTAINS
                     global_ny=COLS_FIELD_VARIABLE%DOMAIN_MAPPING%LOCAL_TO_GLOBAL_MAP(local_ny)
                     ELEMENT_MATRIX%NUMBER_OF_COLUMNS=ELEMENT_MATRIX%NUMBER_OF_COLUMNS+1
                     ELEMENT_MATRIX%COLUMN_DOFS(ELEMENT_MATRIX%NUMBER_OF_COLUMNS)=global_ny
-                  ENDDO                 
+                  ENDDO       
+                CASE(FIELD_DATA_POINT_BASED_INTERPOLATION)
+                  CALL FLAG_ERROR("Not implemented.",ERR,ERROR,*999)          
                 CASE DEFAULT
                   LOCAL_ERROR="The interpolation type of "// &
                     & TRIM(NUMBER_TO_VSTRING(COLS_FIELD_VARIABLE%COMPONENTS(component_idx)%INTERPOLATION_TYPE,"*",ERR,ERROR))// &
@@ -942,6 +948,8 @@ CONTAINS
                 ELEMENT_VECTOR%NUMBER_OF_ROWS=ELEMENT_VECTOR%NUMBER_OF_ROWS+1
                 ELEMENT_VECTOR%ROW_DOFS(ELEMENT_VECTOR%NUMBER_OF_ROWS)=local_ny
               ENDDO   
+            CASE(FIELD_DATA_POINT_BASED_INTERPOLATION)
+              CALL FLAG_ERROR("Not implemented.",ERR,ERROR,*999)
             CASE DEFAULT
               LOCAL_ERROR="The interpolation type of "// &
                 & TRIM(NUMBER_TO_VSTRING(ROWS_FIELD_VARIABLE%COMPONENTS(component_idx)%INTERPOLATION_TYPE,"*",ERR,ERROR))// &
@@ -3659,6 +3667,9 @@ CONTAINS
                                               CASE(FIELD_GAUSS_POINT_BASED_INTERPOLATION)
                                                 CALL FLAG_ERROR("Gauss point based interpolation is not implemented yet.",&
                                                   & ERR,ERROR,*999)
+                                              CASE(FIELD_DATA_POINT_BASED_INTERPOLATION)
+                                                CALL FLAG_ERROR("Grid point based interpolation is not implemented yet.",& 
+                                                  & ERR,ERROR,*999)
                                               CASE DEFAULT
                                                 LOCAL_ERROR="Local dof number "//TRIM(NUMBER_TO_VSTRING(local_ny,"*",ERR,ERROR))// &
                                                   & " has invalid interpolation type."
@@ -3718,6 +3729,9 @@ CONTAINS
                                             CASE(FIELD_GAUSS_POINT_BASED_INTERPOLATION)
                                               CALL FLAG_ERROR("Gauss point based interpolation is not implemented yet.", &
                                                 & ERR,ERROR,*999)
+                                            CASE(FIELD_DATA_POINT_BASED_INTERPOLATION)
+                                              CALL FLAG_ERROR("Data point based interpolation is not implemented yet.", &
+                                                & ERR,ERROR,*999)
                                             CASE DEFAULT
                                               LOCAL_ERROR="Local dof number "//TRIM(NUMBER_TO_VSTRING(local_ny,"*",ERR,ERROR))// &
                                                 & " has invalid interpolation type."
@@ -3734,6 +3748,8 @@ CONTAINS
                                           CALL FLAG_ERROR("Grid point based interpolation is not implemented yet.",ERR,ERROR,*999)
                                         CASE(FIELD_GAUSS_POINT_BASED_INTERPOLATION)
                                           CALL FLAG_ERROR("Gauss point based interpolation is not implemented yet.",ERR,ERROR,*999)
+                                        CASE(FIELD_DATA_POINT_BASED_INTERPOLATION)
+                                          CALL FLAG_ERROR("Data point based interpolation is not implemented yet.",ERR,ERROR,*999)
                                         CASE DEFAULT
                                           LOCAL_ERROR="Local dof number "//TRIM(NUMBER_TO_VSTRING(local_ny,"*",ERR,ERROR))// &
                                             & " has an invalid type."

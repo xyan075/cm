@@ -321,6 +321,8 @@ MODULE OPENCMISS
 
   PUBLIC CMISSDecompositionType,CMISSDecompositionTypeFinalise,CMISSDecompositionTypeInitialise
   
+  PUBLIC CMISSDecompositionTopologyDataPointsCalculate
+  
   PUBLIC CMISSDecompositionCalculateFacesSet
 
   PUBLIC CMISSEquationsType,CMISSEquationsTypeFinalise,CMISSEquationsTypeInitialise
@@ -2866,6 +2868,7 @@ MODULE OPENCMISS
   INTEGER(INTG), PARAMETER :: CMISSFieldNodeBasedInterpolation = FIELD_NODE_BASED_INTERPOLATION !<Node based interpolation. Parameters are nodal based and a basis function is used \see OPENCMISS_FieldInterpolationTypes,OPENCMISS
   INTEGER(INTG), PARAMETER :: CMISSFieldGridPointBasedInterpolation = FIELD_GRID_POINT_BASED_INTERPOLATION !<Grid point based interpolation. Parameters are different at each grid point \see OPENCMISS_FieldInterpolationTypes,OPENCMISS
   INTEGER(INTG), PARAMETER :: CMISSFieldGaussPointBasedInterpolation = FIELD_GAUSS_POINT_BASED_INTERPOLATION !<Gauss point based interpolation. Parameters are different at each Gauss point \see OPENCMISS_FieldInterpolationTypes,OPENCMISS
+  INTEGER(INTG), PARAMETER :: CMISSFieldDataPointBasedInterpolation = FIELD_DATA_POINT_BASED_INTERPOLATION !<data point based interpolation. Parameters are different at each data point \see OPENCMISS_FieldInterpolationTypes,OPENCMISS
   !>@}
   !> \addtogroup OPENCMISS_FieldVariableTypes OPENCMISS::Field::VariableTypes
   !> \brief Field variable type parameters.
@@ -3401,7 +3404,7 @@ MODULE OPENCMISS
   PUBLIC CMISSFieldGeometricType,CMISSFieldFibreType,CMISSFieldGeneralType,CMISSFieldMaterialType
 
   PUBLIC CMISSFieldConstantInterpolation,CMISSFieldElementBasedInterpolation,CMISSFieldNodeBasedInterpolation, &
-    & CMISSFieldGridPointBasedInterpolation,CMISSFieldGaussPointBasedInterpolation
+    & CMISSFieldGridPointBasedInterpolation,CMISSFieldGaussPointBasedInterpolation,CMISSFieldDataPointBasedInterpolation
 
   PUBLIC CMISSFieldNumberOfVariableSubtypes
 
@@ -4253,6 +4256,13 @@ MODULE OPENCMISS
     MODULE PROCEDURE CMISSDecompositionCalculateFacesSetNumber
     MODULE PROCEDURE CMISSDecompositionCalculateFacesSetObj
   END INTERFACE !CMISSDecompositionCalculateFacesSet
+  
+  !>Sets/changes whether data points topology should be calculated for the decomposition.
+  INTERFACE CMISSDecompositionTopologyDataPointsCalculate
+    MODULE PROCEDURE CMISSDecompositionTopologyDataPointsCalculateInterfaceNumber
+    MODULE PROCEDURE CMISSDecompositionTopologyDataPointsCalculateRegionNumber
+    MODULE PROCEDURE CMISSDecompositionTopologyDataPointsCalculateObj
+  END INTERFACE !CMISSDecompositionTopologyDataPointsCalculate
 
   !>Finishes the creation of a mesh. \see OPENCMISS::CMISSMeshCreateStart
   INTERFACE CMISSMeshCreateFinish
@@ -36603,6 +36613,160 @@ CONTAINS
     RETURN
     
   END SUBROUTINE CMISSDecompositionCalculateFacesSetObj
+  
+  !  
+  !================================================================================================================================
+  !  
+
+  !>Sets whether faces should be calculated
+  SUBROUTINE CMISSDecompositionTopologyDataPointsCalculateRegionNumber(RegionUserNumber,MeshUserNumber,DecompositionUserNumber, &
+      & DataProjection,Err)
+  
+    !Argument variables
+    INTEGER(INTG), INTENT(IN) :: RegionUserNumber !<The user number of the region.
+    TYPE(CMISSDataProjectionType), INTENT(IN) :: DataProjection !<The data projection
+    INTEGER(INTG), INTENT(IN) :: DecompositionUserNumber !<The user number of the decomposition to set the decomposition type for.
+    INTEGER(INTG), INTENT(IN) :: MeshUserNumber
+    INTEGER(INTG), INTENT(OUT) :: Err !<The error code.
+    !Local variables
+    TYPE(DECOMPOSITION_TYPE), POINTER :: DECOMPOSITION
+    TYPE(MESH_TYPE), POINTER :: MESH
+    TYPE(REGION_TYPE), POINTER :: REGION
+    TYPE(VARYING_STRING) :: LOCAL_ERROR
+    
+    CALL ENTERS("CMISSDecompositionTopologyDataPointsCalculateRegionNumber",Err,ERROR,*999)
+ 
+    NULLIFY(REGION)
+    NULLIFY(MESH)
+    NULLIFY(DECOMPOSITION)
+    CALL REGION_USER_NUMBER_FIND(RegionUserNumber,REGION,Err,ERROR,*999)
+    IF(ASSOCIATED(REGION)) THEN
+      CALL MESH_USER_NUMBER_FIND(MeshUserNumber,REGION,MESH,Err,ERROR,*999)
+      IF(ASSOCIATED(MESH)) THEN
+        CALL DECOMPOSITION_USER_NUMBER_FIND(DecompositionUserNumber,MESH,DECOMPOSITION,Err,ERROR,*999)
+        IF(ASSOCIATED(DECOMPOSITION)) THEN
+          CALL DECOMPOSITION_TOPOLOGY_DATA_POINTS_CALCULATE(DECOMPOSITION,DataProjection%DATA_PROJECTION,Err,ERROR,*999)
+        ELSE
+          LOCAL_ERROR="A decomposition with an user number of "//TRIM(NUMBER_TO_VSTRING(DecompositionUserNumber,"*",Err,ERROR))// &
+            & " does not exist on the mesh with an user number of "//TRIM(NUMBER_TO_VSTRING(MeshUserNumber,"*",Err,ERROR))//"."
+          CALL FLAG_ERROR(LOCAL_ERROR,Err,ERROR,*999)
+        ENDIF
+      ELSE
+        LOCAL_ERROR="A mesh with an user number of "//TRIM(NUMBER_TO_VSTRING(MeshUserNumber,"*",Err,ERROR))// &
+          & " does not exist on the region with an user number of "//TRIM(NUMBER_TO_VSTRING(RegionUserNumber,"*",Err,ERROR))//"."
+        CALL FLAG_ERROR(LOCAL_ERROR,Err,ERROR,*999)
+      ENDIF
+    ELSE
+      LOCAL_ERROR="A region with an user number of "//TRIM(NUMBER_TO_VSTRING(RegionUserNumber,"*",Err,ERROR))// &
+        & " does not exist."
+      CALL FLAG_ERROR(LOCAL_ERROR,Err,ERROR,*999)
+    ENDIF
+
+    CALL EXITS("CMISSDecompositionTopologyDataPointsCalculateRegionNumber")
+    RETURN
+999 CALL ERRORS("CMISSDecompositionTopologyDataPointsCalculateRegionNumber",Err,ERROR)
+    CALL EXITS("CMISSDecompositionTopologyDataPointsCalculateRegionNumber")
+    CALL CMISS_HANDLE_ERROR(Err,ERROR)
+    RETURN
+    
+  END SUBROUTINE CMISSDecompositionTopologyDataPointsCalculateRegionNumber
+  
+  !  
+  !================================================================================================================================
+  !  
+
+  !>Sets whether faces should be calculated
+  SUBROUTINE CMISSDecompositionTopologyDataPointsCalculateInterfaceNumber(ParentRegionUserNumber,InterfaceUserNumber, &
+      & MeshUserNumber,DecompositionUserNumber,DataProjection,Err)
+  
+    !Argument variables
+    INTEGER(INTG), INTENT(IN) :: ParentRegionUserNumber !<The user number of the region.
+    INTEGER(INTG), INTENT(IN) :: InterfaceUserNumber !<The user number of the region.
+    INTEGER(INTG), INTENT(IN) :: MeshUserNumber
+    INTEGER(INTG), INTENT(IN) :: DecompositionUserNumber
+    TYPE(CMISSDataProjectionType), INTENT(IN) :: DataProjection !<The data projection
+    INTEGER(INTG), INTENT(OUT) :: Err !<The error code.
+    !Local variables
+    TYPE(DECOMPOSITION_TYPE), POINTER :: DECOMPOSITION
+    TYPE(MESH_TYPE), POINTER :: MESH
+    TYPE(REGION_TYPE), POINTER :: PARENT_REGION
+    TYPE(INTERFACE_TYPE), POINTER :: INTERFACE
+    TYPE(VARYING_STRING) :: LOCAL_ERROR
+    
+    CALL ENTERS("CMISSDecompositionTopologyDataPointsCalculateInterfaceNumber",Err,ERROR,*999)
+ 
+    NULLIFY(PARENT_REGION)
+    NULLIFY(INTERFACE)
+    NULLIFY(MESH)
+    NULLIFY(DECOMPOSITION)
+    CALL REGION_USER_NUMBER_FIND(ParentRegionUserNumber,PARENT_REGION,Err,ERROR,*999)
+    IF(ASSOCIATED(PARENT_REGION)) THEN
+      CALL INTERFACE_USER_NUMBER_FIND(InterfaceUserNumber,PARENT_REGION,INTERFACE,Err,ERROR,*999)
+      IF(ASSOCIATED(INTERFACE)) THEN
+        CALL MESH_USER_NUMBER_FIND(MeshUserNumber,INTERFACE,MESH,Err,ERROR,*999)
+        IF(ASSOCIATED(MESH)) THEN
+          CALL DECOMPOSITION_USER_NUMBER_FIND(DecompositionUserNumber,MESH,DECOMPOSITION,Err,ERROR,*999)
+          IF(ASSOCIATED(DECOMPOSITION)) THEN
+            CALL DECOMPOSITION_TOPOLOGY_DATA_POINTS_CALCULATE(DECOMPOSITION,DataProjection%DATA_PROJECTION,Err,ERROR,*999)
+          ELSE
+            LOCAL_ERROR="A decomposition with an user number of "//TRIM(NUMBER_TO_VSTRING(DecompositionUserNumber, &
+              & "*",Err,ERROR))//" does not exist on the mesh with an user number of " &
+              & //TRIM(NUMBER_TO_VSTRING(MeshUserNumber,"*",Err,ERROR))//"."
+            CALL FLAG_ERROR(LOCAL_ERROR,Err,ERROR,*999)
+          ENDIF
+        ELSE
+          LOCAL_ERROR="A mesh with an user number of "//TRIM(NUMBER_TO_VSTRING(MeshUserNumber,"*",Err,ERROR))// &
+            & " does not exist on the region with an user number of "//TRIM(NUMBER_TO_VSTRING(ParentRegionUserNumber, &
+            & "*",Err,ERROR))//"."
+          CALL FLAG_ERROR(LOCAL_ERROR,Err,ERROR,*999)
+        ENDIF
+      ELSE
+        LOCAL_ERROR="An interface with an user number of "//TRIM(NUMBER_TO_VSTRING(InterfaceUserNumber,"*",Err,ERROR))// &
+          & " does not exist."
+        CALL FLAG_ERROR(LOCAL_ERROR,Err,ERROR,*999)
+      ENDIF
+    ELSE
+      LOCAL_ERROR="A region with an user number of "//TRIM(NUMBER_TO_VSTRING(ParentRegionUserNumber,"*",Err,ERROR))// &
+        & " does not exist."
+      CALL FLAG_ERROR(LOCAL_ERROR,Err,ERROR,*999)
+    ENDIF
+
+    CALL EXITS("CMISSDecompositionTopologyDataPointsCalculateInterfaceNumber")
+    RETURN
+999 CALL ERRORS("CMISSDecompositionTopologyDataPointsCalculateInterfaceNumber",Err,ERROR)
+    CALL EXITS("CMISSDecompositionTopologyDataPointsCalculateInterfaceNumber")
+    CALL CMISS_HANDLE_ERROR(Err,ERROR)
+    RETURN
+    
+  END SUBROUTINE CMISSDecompositionTopologyDataPointsCalculateInterfaceNumber
+  
+  !  
+  !================================================================================================================================
+  !  
+  
+  SUBROUTINE CMISSDecompositionTopologyDataPointsCalculateObj(Decomposition,DataProjection,Err)
+  
+  !Argument variables
+    TYPE(CMISSDecompositionType), INTENT(IN) :: Decomposition !<The decomposition to calculate data points topology for
+    TYPE(CMISSDataProjectionType), INTENT(IN) :: DataProjection !<The data projection
+    INTEGER(INTG), INTENT(OUT) :: Err !<The error code.
+    !Local variables
+    TYPE(DECOMPOSITION_TOPOLOGY_TYPE), POINTER :: TOPOLOGY
+    TYPE(VARYING_STRING) :: LOCAL_ERROR
+  
+    CALL ENTERS("CMISSDecompositionTopologyDataPointsCalculateObj",Err,ERROR,*999)
+    
+    CALL DECOMPOSITION_TOPOLOGY_DATA_POINTS_CALCULATE(Decomposition%DECOMPOSITION,DataProjection%DATA_PROJECTION,Err,ERROR,*999)
+ 
+    CALL EXITS("CMISSDecompositionTopologyDataPointsCalculateObj")
+    RETURN
+999 CALL ERRORS("CMISSDecompositionTopologyDataPointsCalculateObj",Err,ERROR)
+    CALL EXITS("CMISSDecompositionTopologyDataPointsCalculateObj")
+    CALL CMISS_HANDLE_ERROR(Err,ERROR)
+    RETURN
+    
+  END SUBROUTINE CMISSDecompositionTopologyDataPointsCalculateObj
+  
 
   !  
   !================================================================================================================================

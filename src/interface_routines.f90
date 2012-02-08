@@ -1446,6 +1446,7 @@ CONTAINS
     INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
     TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
     !Local Variables
+    INTEGER(INTG) :: element_idx
      
     CALL ENTERS("INTERFACE_POINTS_CONNECTIVITY_CREATE_FINISH",ERR,ERROR,*999)
 
@@ -1458,6 +1459,7 @@ CONTAINS
              & ERR,ERROR,*999)!also calculate normal xi direction
          ENDIF
          INTERFACE_POINTS_CONNECTIVITY%POINTS_CONNECTIVITY_FINISHED=.TRUE.
+         INTERFACE_POINTS_CONNECTIVITY%NUMBER_OF_ELEMENTS=INTERFACE_POINTS_CONNECTIVITY%INTERFACE%MESH_CONNECTIVITY%NUMBER_INT_ELEM
        ENDIF
      ELSE
        CALL FLAG_ERROR("Interface meshes connectivity is not associated.",ERR,ERROR,*999)
@@ -1735,8 +1737,8 @@ CONTAINS
     
     !Local Variables
     TYPE(DATA_PROJECTION_RESULT_TYPE), POINTER :: DATA_PROJECTION_RESULT
-    INTEGER(INTG) :: data_projection_idx,data_point_idx
     INTEGER(INTG) :: COMP_NO=1 !\TODO:mesh component number is now hard-coded to be one, need to be 
+    INTEGER(INTG) :: data_projection_idx,data_point_idx
     LOGICAL:: POINTS_CON_FINISHED
     TYPE(VARYING_STRING) :: LOCAL_ERROR
     
@@ -1746,12 +1748,12 @@ CONTAINS
     IF(ASSOCIATED(POINTS_CON)) THEN
       IF (ALLOCATED(POINTS_CON%POINTS_CONNECTIVITY)) THEN
         IF(ASSOCIATED(DATA_POINTS)) THEN
-          IF(POINTS_CON%NUMBER_INT_DOM==DATA_POINTS%NUMBER_OF_DATA_PROJECTIONS) THEN
+          IF(POINTS_CON%NUMBER_INT_DOM==DATA_POINTS%NUMBER_OF_DATA_PROJECTIONS-1) THEN !The last data projection was on the interface mesh for setting up lagrange field
             IF(POINTS_CON%POINTS_CONNECTIVITY_FINISHED) THEN
               POINTS_CON%POINTS_CONNECTIVITY_FINISHED=.FALSE.
               POINTS_CON_FINISHED=.TRUE.
             ENDIF
-            DO data_projection_idx=1,DATA_POINTS%NUMBER_OF_DATA_PROJECTIONS
+            DO data_projection_idx=1,DATA_POINTS%NUMBER_OF_DATA_PROJECTIONS-1 !The last data projection was on the interface mesh for setting up lagrange field
               IF(DATA_POINTS%DATA_PROJECTIONS(data_projection_idx)%PTR%DATA_PROJECTION_PROJECTED) THEN
                 DO data_point_idx=1,DATA_POINTS%NUMBER_OF_DATA_POINTS
                   DATA_PROJECTION_RESULT=>DATA_POINTS%DATA_POINTS(data_point_idx)%DATA_PROJECTIONS_RESULT(data_projection_idx)
@@ -1760,12 +1762,12 @@ CONTAINS
                   CALL INTERFACE_POINTS_CONNECTIVITY_POINT_XI_CONTACT_SET(POINTS_CON,data_point_idx,data_projection_idx, &
                     & DATA_PROJECTION_RESULT%ELEMENT_NUMBER,DATA_PROJECTION_RESULT%ELEMENT_LINE_NUMBER,COMP_NO, &
                     & DATA_PROJECTION_RESULT%XI,ERR,ERROR,*999)
-                ENDDO          
+                ENDDO !data_point_idx      
               ELSE
                 LOCAL_ERROR="Data Projection  "//TRIM(NUMBER_TO_VSTRING(data_projection_idx,"*",ERR,ERROR))//" is not projected."        
                 CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
               ENDIF      
-            ENDDO
+            ENDDO !data_projection_idx                       
             IF(POINTS_CON_FINISHED) POINTS_CON%POINTS_CONNECTIVITY_FINISHED=.TRUE.
           ELSE
             CALL FLAG_ERROR("Number of coupled mesh does not match number of data projections.",ERR,ERROR,*999)

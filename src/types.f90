@@ -984,6 +984,22 @@ END TYPE GENERATED_MESH_ELLIPSOID_TYPE
     TYPE(DECOMPOSITION_ELEMENT_TYPE), POINTER :: ELEMENTS(:) !<ELEMENTS(ne). The pointer to the array of topology information for the elements of this decomposition. ELEMENTS(ne) contains the topological information for the ne'th local element of the decomposition. \todo Change this to allocatable???
     TYPE(TREE_TYPE), POINTER :: ELEMENTS_TREE !<A tree mapping the decomposition local element number to the decomposition user element number.
   END TYPE DECOMPOSITION_ELEMENTS_TYPE
+  
+  !>Contains information on the projected data points on an element, for decomposition since data points on elements go with the elements
+  TYPE DECOMPOSITION_ELEMENT_DATA_POINTS_TYPE
+    INTEGER(INTG) :: NUMBER_OF_PROJECTED_DATA !<Number of projected data on this element
+    INTEGER(INTG) :: ELEMENT_NUMBER !<The number of this element (element index and element number can be different)
+    INTEGER(INTG), ALLOCATABLE :: DATA_INDICES(:)
+  END TYPE DECOMPOSITION_ELEMENT_DATA_POINTS_TYPE
+    
+  TYPE DECOMPOSITION_DATA_TYPE
+    TYPE(DECOMPOSITION_TYPE), POINTER :: DECOMPOSITION !<The pointer to the decomposition for this faces topology information.
+    INTEGER(INTG) :: TOTAL_NUMBER_OF_PROJECTED_DATA !<Number of projected data on this element
+    INTEGER(INTG) :: NUMBER_OF_ELEMENTS !<Number of element in the interface mesh
+    INTEGER(INTG), ALLOCATABLE :: DATA_INDICES_LIST(:) !<List of data_points indices, sorting in asceding order
+    INTEGER(INTG), ALLOCATABLE :: ELEMENT_MAP(:) !<Corresponding element numbers in the DATA_INDICES_LIST order
+    TYPE(DECOMPOSITION_ELEMENT_DATA_POINTS_TYPE), ALLOCATABLE :: ELEMENT_DATA_POINTS(:) !<Information of the projected data on the elements for decomposition of data points
+  END TYPE DECOMPOSITION_DATA_TYPE
 
    !>Contains the topology information for a decomposition
   TYPE DECOMPOSITION_TOPOLOGY_TYPE
@@ -991,6 +1007,7 @@ END TYPE GENERATED_MESH_ELLIPSOID_TYPE
     TYPE(DECOMPOSITION_ELEMENTS_TYPE), POINTER :: ELEMENTS !<The pointer to the topology information for the elements of this decomposition.
     TYPE(DECOMPOSITION_LINES_TYPE), POINTER :: LINES !<The pointer to the topology information for the lines of this decomposition.
     TYPE(DECOMPOSITION_FACES_TYPE), POINTER :: FACES !<The pointer to the topology information for the faces of this decomposition.
+    TYPE(DECOMPOSITION_DATA_TYPE), POINTER :: DATA_POINTS !<The pointer to the topology information for the data of this decomposition.
   END TYPE DECOMPOSITION_TOPOLOGY_TYPE
 
   !>Contains information on the mesh decomposition. \see OPENCMISS::CMISSDecompositionType
@@ -1170,7 +1187,7 @@ END TYPE GENERATED_MESH_ELLIPSOID_TYPE
   !>A type to hold the mapping from field data points to field dof numbers for a particular field variable component.
   TYPE FIELD_DATA_POINT_PARAM_TO_DOF_MAP_TYPE
     INTEGER(INTG) :: NUMBER_OF_DATA_POINT_PARAMETERS !<The number of Gauss point based field parameters for this field variable component.
-    INTEGER(INTG), ALLOCATABLE :: DATA_POINTS(:,:) !<DATA_POINT_PARAM2DOF_MAP%DATA_POINTS(data_point_idx,element_idx). The field variable dof number of the data_point_idx'th Gauss point in the element_idx'th element based parameter for this field variable component. 
+    INTEGER(INTG), ALLOCATABLE :: DATA_POINTS(:) !<DATA_POINT_PARAM2DOF_MAP%DATA_POINTS(data_point_idx). The field variable dof number of the data_point_idx'th Gauss point in the element_idx'th element based parameter for this field variable component. 
   END TYPE FIELD_DATA_POINT_PARAM_TO_DOF_MAP_TYPE
 
   !>A type to hold the mapping from field parameters (nodes, elements, etc) to field dof numbers for a particular field variable component.
@@ -2076,6 +2093,7 @@ END TYPE GENERATED_MESH_ELLIPSOID_TYPE
     TYPE(MESH_TYPE), POINTER :: INTERFACE_MESH
     LOGICAL :: POINTS_CONNECTIVITY_FINISHED !<Is .TRUE. if the coupled mesh data points connectivity has finished being created, .FALSE. if not.
     INTEGER(INTG) :: NUMBER_OF_DATA_POINTS !<Is the number of data points in the interface
+    INTEGER(INTG) :: NUMBER_OF_ELEMENTS !<Number of element in the interface mesh
     INTEGER(INTG) :: NUMBER_INT_DOM !<Is the number of domains coupled via the interface
     TYPE(INTERFACE_POINT_CONNECTIVITY_TYPE), ALLOCATABLE :: POINTS_CONNECTIVITY(:,:) !<POINTS_CONNECTIVITY(point_index,coupled_mesh_idx)
   END TYPE INTERFACE_POINTS_CONNECTIVITY_TYPE

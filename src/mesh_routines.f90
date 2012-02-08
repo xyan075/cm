@@ -115,7 +115,7 @@ MODULE MESH_ROUTINES
   
   PUBLIC DECOMPOSITION_NUMBER_OF_DOMAINS_GET,DECOMPOSITION_NUMBER_OF_DOMAINS_SET
   
-  PUBLIC DECOMPOSITION_TOPOLOGY_ELEMENT_CHECK_EXISTS
+  PUBLIC DECOMPOSITION_TOPOLOGY_ELEMENT_CHECK_EXISTS,DECOMPOSITION_TOPOLOGY_DATA_POINTS_CALCULATE
   
   PUBLIC DECOMPOSITION_TYPE_GET,DECOMPOSITION_TYPE_SET
   
@@ -1812,6 +1812,7 @@ CONTAINS
         NULLIFY(DECOMPOSITION%TOPOLOGY%ELEMENTS)
         NULLIFY(DECOMPOSITION%TOPOLOGY%LINES)
         NULLIFY(DECOMPOSITION%TOPOLOGY%FACES)
+        NULLIFY(DECOMPOSITION%TOPOLOGY%DATA_POINTS)
         !Initialise the topology components
         CALL DECOMPOSITION_TOPOLOGY_ELEMENTS_INITIALISE(DECOMPOSITION%TOPOLOGY,ERR,ERROR,*999)
         IF(DECOMPOSITION%CALCULATE_LINES) THEN !Default is currently true
@@ -1819,7 +1820,8 @@ CONTAINS
         ENDIF
         IF(DECOMPOSITION%CALCULATE_FACES) THEN !Default is currently false
           CALL DECOMPOSITION_TOPOLOGY_FACES_INITIALISE(DECOMPOSITION%TOPOLOGY,ERR,ERROR,*999)
-        ENDIF
+        ENDIF      
+        CALL DECOMPOSITION_TOPOLOGY_DATA_POINTS_INITIALISE(DECOMPOSITION%TOPOLOGY,ERR,ERROR,*999)
       ENDIF
     ELSE
       CALL FLAG_ERROR("Decomposition is not associated.",ERR,ERROR,*999)
@@ -2446,6 +2448,157 @@ CONTAINS
     CALL EXITS("DECOMPOSITION_TOPOLOGY_LINES_INITIALISE")
     RETURN 1
   END SUBROUTINE DECOMPOSITION_TOPOLOGY_LINES_INITIALISE
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Initialises the line data structures for a decomposition topology.
+  SUBROUTINE DECOMPOSITION_TOPOLOGY_DATA_POINTS_INITIALISE(TOPOLOGY,ERR,ERROR,*)
+
+    !Argument variables
+    TYPE(DECOMPOSITION_TOPOLOGY_TYPE), POINTER :: TOPOLOGY !<A pointer to the decomposition topology to initialise the lines for
+    INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
+    !Local Variables
+
+    CALL ENTERS("DECOMPOSITION_TOPOLOGY_DATA_POINTS_INITIALISE",ERR,ERROR,*999)
+
+    IF(ASSOCIATED(TOPOLOGY)) THEN
+      IF(ASSOCIATED(TOPOLOGY%DATA_POINTS)) THEN
+        CALL FLAG_ERROR("Decomposition already has topology data points associated.",ERR,ERROR,*999)
+      ELSE
+        ALLOCATE(TOPOLOGY%DATA_POINTS,STAT=ERR)
+        IF(ERR/=0) CALL FLAG_ERROR("Could not allocate topology data points.",ERR,ERROR,*999)
+        TOPOLOGY%DATA_POINTS%NUMBER_OF_ELEMENTS=0
+        TOPOLOGY%DATA_POINTS%TOTAL_NUMBER_OF_PROJECTED_DATA=0
+        TOPOLOGY%DATA_POINTS%DECOMPOSITION=>TOPOLOGY%DECOMPOSITION      
+      ENDIF
+    ELSE
+      CALL FLAG_ERROR("Topology is not associated.",ERR,ERROR,*999)
+    ENDIF
+    
+    CALL EXITS("DECOMPOSITION_TOPOLOGY_DATA_POINTS_INITIALISE")
+    RETURN
+999 CALL ERRORS("DECOMPOSITION_TOPOLOGY_DATA_POINTS_INITIALISE",ERR,ERROR)
+    CALL EXITS("DECOMPOSITION_TOPOLOGY_DATA_POINTS_INITIALISE")
+    RETURN 1
+  END SUBROUTINE DECOMPOSITION_TOPOLOGY_DATA_POINTS_INITIALISE
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Calculates the faces in the given decomposition topology.
+  SUBROUTINE DECOMPOSITION_TOPOLOGY_DATA_POINTS_CALCULATE(DECOMPOSITION,DATA_PROJECTION,ERR,ERROR,*)
+  
+    !Argument variables
+    TYPE(DECOMPOSITION_TYPE), POINTER :: DECOMPOSITION !<A pointer to the decomposition topology to calcualte the data projection for
+    TYPE(DATA_PROJECTION_TYPE), POINTER :: DATA_PROJECTION !A p
+    INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
+    !Local Variables
+    TYPE(DATA_POINTS_TYPE), POINTER :: DATA_POINTS !<A pointer to the data points
+    TYPE(DECOMPOSITION_DATA_TYPE), POINTER :: DATA_POINTS_TOPOLOGY
+    TYPE(DATA_PROJECTION_RESULT_TYPE), POINTER :: DATA_PROJECTION_RESULT
+    TYPE(MESH_ELEMENTS_TYPE), POINTER :: ELEMENTS
+    INTEGER(INTG) :: data_projection_idx,data_point_idx,ELEMENT_NUMBER,element_idx,count_idx
+    INTEGER(INTG), ALLOCATABLE :: SORTING_IDX(:),ELEMENT_MAP_TEMP(:)
+    
+    
+    IF(ASSOCIATED(DECOMPOSITION)) THEN
+      IF(DATA_PROJECTION%DATA_PROJECTION_FINISHED) THEN 
+        DATA_POINTS=>DATA_PROJECTION%DATA_POINTS
+        DATA_POINTS_TOPOLOGY=>DECOMPOSITION%TOPOLOGY%DATA_POINTS
+        !Hard code the first mesh component since element topology is the same for all mesh components
+        ELEMENTS=>DECOMPOSITION%MESH%TOPOLOGY(1)%PTR%ELEMENTS
+        ALLOCATE(DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(ELEMENTS%NUMBER_OF_ELEMENTS),STAT=ERR)
+        DATA_POINTS_TOPOLOGY%NUMBER_OF_ELEMENTS=ELEMENTS%NUMBER_OF_ELEMENTS
+        DO element_idx=1,DATA_POINTS_TOPOLOGY%NUMBER_OF_ELEMENTS
+          DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(element_idx)%ELEMENT_NUMBER=ELEMENTS%ELEMENTS(element_idx)%GLOBAL_NUMBER
+        ENDDO
+        
+        !Calculate number of projected data points on an element
+        DO data_point_idx=1,DATA_POINTS%NUMBER_OF_DATA_POINTS
+          !The last projection is hard-coded to be the interface mesh projection
+          DATA_PROJECTION_RESULT=>DATA_POINTS%DATA_POINTS(data_point_idx)% &
+            & DATA_PROJECTIONS_RESULT(DATA_POINTS%NUMBER_OF_DATA_PROJECTIONS)
+          ELEMENT_NUMBER=DATA_PROJECTION_RESULT%ELEMENT_NUMBER
+          DO element_idx=1,DATA_POINTS_TOPOLOGY%NUMBER_OF_ELEMENTS
+            IF(DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(element_idx)%ELEMENT_NUMBER==ELEMENT_NUMBER) THEN
+              DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(element_idx)%NUMBER_OF_PROJECTED_DATA= &
+                & DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(element_idx)%NUMBER_OF_PROJECTED_DATA+1;
+            ENDIF
+          ENDDO !element_idx
+        ENDDO
+        
+        !Allocate memory to store data indices and initialise them to be zero   
+        DO element_idx=1,DATA_POINTS_TOPOLOGY%NUMBER_OF_ELEMENTS
+          ALLOCATE(DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(element_idx)%DATA_INDICES(DATA_POINTS_TOPOLOGY% &
+            & ELEMENT_DATA_POINTS(element_idx)%NUMBER_OF_PROJECTED_DATA),STAT=ERR)
+          DO count_idx=1,DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(element_idx)%NUMBER_OF_PROJECTED_DATA
+            DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(element_idx)%DATA_INDICES(count_idx)=0
+          ENDDO
+        ENDDO     
+        !Record the indecies of the data that projected on the elements 
+        DO data_point_idx=1,DATA_POINTS%NUMBER_OF_DATA_POINTS
+          !The last projection is hard-coded to be the interface mesh projection
+          DATA_PROJECTION_RESULT=>DATA_POINTS%DATA_POINTS(data_point_idx)% &
+            & DATA_PROJECTIONS_RESULT(DATA_POINTS%NUMBER_OF_DATA_PROJECTIONS)
+          ELEMENT_NUMBER=DATA_PROJECTION_RESULT%ELEMENT_NUMBER
+          DO element_idx=1,DATA_POINTS_TOPOLOGY%NUMBER_OF_ELEMENTS
+            count_idx=1         
+              IF(DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(element_idx)%ELEMENT_NUMBER==ELEMENT_NUMBER) THEN
+                DO WHILE(DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(element_idx)%DATA_INDICES(count_idx)/=0)
+                  count_idx=count_idx+1
+                ENDDO
+                DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(element_idx)%DATA_INDICES(count_idx)=data_point_idx
+                DATA_POINTS_TOPOLOGY%TOTAL_NUMBER_OF_PROJECTED_DATA=DATA_POINTS_TOPOLOGY%TOTAL_NUMBER_OF_PROJECTED_DATA+1
+              ENDIF             
+          ENDDO !element_idx
+        ENDDO !data_point_idx
+        !Allocate memory to store total data indices in ascending order and element map
+        ALLOCATE(DATA_POINTS_TOPOLOGY%DATA_INDICES_LIST(DATA_POINTS_TOPOLOGY%TOTAL_NUMBER_OF_PROJECTED_DATA),STAT=ERR)
+        ALLOCATE(DATA_POINTS_TOPOLOGY%ELEMENT_MAP(DATA_POINTS_TOPOLOGY%TOTAL_NUMBER_OF_PROJECTED_DATA),STAT=ERR)
+        ALLOCATE(SORTING_IDX(DATA_POINTS_TOPOLOGY%TOTAL_NUMBER_OF_PROJECTED_DATA),STAT=ERR) 
+        ALLOCATE(ELEMENT_MAP_TEMP(DATA_POINTS_TOPOLOGY%TOTAL_NUMBER_OF_PROJECTED_DATA),STAT=ERR) 
+        !Record the indecies of the data points and element map
+        count_idx=1  
+        DO data_point_idx=1,DATA_POINTS%NUMBER_OF_DATA_POINTS        
+          !The last projection is hard-coded to be the interface mesh projection
+          DATA_PROJECTION_RESULT=>DATA_POINTS%DATA_POINTS(data_point_idx)% &
+            & DATA_PROJECTIONS_RESULT(DATA_POINTS%NUMBER_OF_DATA_PROJECTIONS)
+          ELEMENT_NUMBER=DATA_PROJECTION_RESULT%ELEMENT_NUMBER
+          DO element_idx=1,DATA_POINTS_TOPOLOGY%NUMBER_OF_ELEMENTS         
+            IF(DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(element_idx)%ELEMENT_NUMBER==ELEMENT_NUMBER) THEN
+              DATA_POINTS_TOPOLOGY%DATA_INDICES_LIST(count_idx)=data_point_idx
+              ELEMENT_MAP_TEMP(count_idx)=ELEMENT_NUMBER
+              count_idx=count_idx+1 
+            ENDIF             
+          ENDDO !element_idx
+        ENDDO !data_point_idx
+        !CALL BUBBLE_ISORT_INTG(DATA_POINTS_TOPOLOGY%DATA_INDICES_LIST,SORTING_IDX,ERR,ERROR,*999) !sorting
+        DO data_point_idx=1,DATA_POINTS_TOPOLOGY%TOTAL_NUMBER_OF_PROJECTED_DATA
+          !DATA_POINTS_TOPOLOGY%ELEMENT_MAP(SORTING_IDX(data_point_idx))=ELEMENT_MAP_TEMP(data_point_idx) !sorting
+          DATA_POINTS_TOPOLOGY%ELEMENT_MAP(data_point_idx)=ELEMENT_MAP_TEMP(data_point_idx)
+        ENDDO !data_point_idx
+        IF(ALLOCATED(SORTING_IDX)) DEALLOCATE(SORTING_IDX)
+        IF(ALLOCATED(ELEMENT_MAP_TEMP)) DEALLOCATE(ELEMENT_MAP_TEMP)
+      ELSE
+        CALL FLAG_ERROR("Data projection is not finished.",ERR,ERROR,*999)
+      ENDIF     
+    ELSE
+      CALL FLAG_ERROR("Topology is not associated.",ERR,ERROR,*999)
+    ENDIF
+    
+    
+  
+  CALL EXITS("DECOMPOSITION_TOPOLOGY_DATA_POINTS_CALCULATE")
+    RETURN
+999 CALL ERRORS("DECOMPOSITION_TOPOLOGY_DATA_POINTS_CALCULATE",ERR,ERROR)
+    CALL EXITS("DECOMPOSITION_TOPOLOGY_DATA_POINTS_CALCULATE")
+    RETURN 1
+  END SUBROUTINE DECOMPOSITION_TOPOLOGY_DATA_POINTS_CALCULATE
   
   !
   !================================================================================================================================
