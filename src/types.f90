@@ -426,6 +426,34 @@ MODULE TYPES
     TYPE(MESH_NODE_TYPE), POINTER :: NODES(:) !<NODES(np). The pointer to the array of topology information for the nodes of the mesh. NODES(np) contains the topological information for the np'th global node of the mesh. \todo Should this be allocatable???
     TYPE(TREE_TYPE), POINTER :: NODES_TREE !<A tree mapping the mesh global number to the region nodes global number.
   END TYPE MESH_NODES_TYPE
+  
+  TYPE MESH_ELEMENT_DATA_POINT_TYPE
+    INTEGER(INTG) :: USER_NUMBER !<User number of the projected data point
+    INTEGER(INTG) :: GLOBAL_NUMBER !<Global number of the data point, sequence is according to element number sequence  
+  END TYPE MESH_ELEMENT_DATA_POINT_TYPE
+  
+  !>Contains information on the projected data points on an element
+  TYPE MESH_ELEMENT_DATA_POINTS_TYPE
+    INTEGER(INTG) :: NUMBER_OF_PROJECTED_DATA !<Number of projected data on this element
+    INTEGER(INTG) :: ELEMENT_NUMBER !<The number of this element (element index and element number can be different)
+    TYPE(MESH_ELEMENT_DATA_POINT_TYPE), ALLOCATABLE :: DATA_INDICES(:) !<The global and user number of this data point
+  END TYPE MESH_ELEMENT_DATA_POINTS_TYPE
+  
+  !>Contains information of the projected data point 
+  TYPE MESH_DATA_POINT_TYPE 
+    INTEGER(INTG) :: USER_NUMBER !<User number of the projected data point
+    INTEGER(INTG) :: GLOBAL_NUMBER !<Global number of the data point, sequence is according to element number sequence 
+    INTEGER(INTG) :: ELEMENT_NUMBER !<The element number which the data point is projected on 
+  END TYPE MESH_DATA_POINT_TYPE 
+  
+  !<Contains the information for the data points of a mesh
+  TYPE MESH_DATA_POINTS_TYPE
+    TYPE(MESH_TYPE), POINTER :: MESH !<The pointer to the mesh for this data points information.
+    INTEGER(INTG) :: TOTAL_NUMBER_OF_PROJECTED_DATA !<Number of projected data on this element
+    INTEGER(INTG) :: NUMBER_OF_ELEMENTS !<Number of element in the mesh where data points are attached to.
+    TYPE(MESH_DATA_POINT_TYPE), ALLOCATABLE :: DATA_POINTS(:) !<Information of the projected data points
+    TYPE(MESH_ELEMENT_DATA_POINTS_TYPE), ALLOCATABLE :: ELEMENT_DATA_POINTS(:) !<Information of the projected data on the elements 
+  END TYPE MESH_DATA_POINTS_TYPE
 
   !>Contains information on the (global) topology of a mesh.
   TYPE MESH_TOPOLOGY_TYPE
@@ -434,6 +462,7 @@ MODULE TYPES
     TYPE(MESH_NODES_TYPE), POINTER :: NODES !<Pointer to the nodes within the mesh topology.
     TYPE(MESH_ELEMENTS_TYPE), POINTER :: ELEMENTS !<Pointer to the elements within the mesh topology.
     TYPE(MESH_DOFS_TYPE), POINTER :: DOFS !<Pointer to the dofs within the mesh topology.
+    TYPE(MESH_DATA_POINTS_TYPE), POINTER :: DATA_POINTS !<Pointer to the data points within the mesh topology
   END TYPE MESH_TOPOLOGY_TYPE
 
   !>A buffer type to allow for an array of pointers to a MESH_TOPOLOGY_TYPE.
@@ -681,6 +710,13 @@ END TYPE GENERATED_MESH_ELLIPSOID_TYPE
     TYPE(DOMAIN_NODE_TYPE), POINTER :: NODES(:) !<NODES(np). The pointer to the array of topology information for the nodes of this domain. NODES(np) contains the topological information for the np'th local node of the domain. \todo Change this to allocatable???
     TYPE(TREE_TYPE), POINTER :: NODES_TREE !<A tree mapping the domain local number to the region nodes user number.
   END TYPE DOMAIN_NODES_TYPE
+  
+  TYPE DOMAIN_DATA_POINTS_TYPE
+    TYPE(DOMAIN_TYPE), POINTER :: DOMAIN !<The pointer to the domain for this elements topology information.
+    INTEGER(INTG) :: NUMBER_OF_DATA_POINTS !<The number of data points (excluding ghost data points) in this domain topology.
+    INTEGER(INTG) :: TOTAL_NUMBER_OF_DATA_POINTS !<The total number of data points (including ghost data points) in this domain topology.
+    INTEGER(INTG) :: NUMBER_OF_GLOBAL_DATA_POINTS !<The number of global data points in this domain topology.
+  END TYPE DOMAIN_DATA_POINTS_TYPE
 
   !>Contains the topology information for a domain
   TYPE DOMAIN_TOPOLOGY_TYPE
@@ -690,6 +726,7 @@ END TYPE GENERATED_MESH_ELLIPSOID_TYPE
     TYPE(DOMAIN_ELEMENTS_TYPE), POINTER :: ELEMENTS !<The pointer to the topology information for the elements of this domain.
     TYPE(DOMAIN_FACES_TYPE), POINTER :: FACES !<The pointer to the topology information for the faces of this domain.
     TYPE(DOMAIN_LINES_TYPE), POINTER :: LINES !<The pointer to the topology information for the lines of this domain.
+    TYPE(DOMAIN_DATA_POINTS_TYPE), POINTER :: DATA_POINTS  !<The pointer to the topology information for the data points of this domain.
   END TYPE DOMAIN_TOPOLOGY_TYPE
 
   !
@@ -894,6 +931,7 @@ END TYPE GENERATED_MESH_ELLIPSOID_TYPE
     TYPE(DOMAIN_MAPPING_TYPE), POINTER :: ELEMENTS !<Pointer to the element mappings for the domain decomposition.
     TYPE(DOMAIN_MAPPING_TYPE), POINTER :: NODES !<Pointer to the node mappings for the domain decomposition.
     TYPE(DOMAIN_MAPPING_TYPE), POINTER :: DOFS !<Pointer to the dof mappings for the domain decomposition.
+    TYPE(DOMAIN_MAPPING_TYPE), POINTER :: DATA_POINTS !<Pointer to the data points mappings for the domain decomposition.
   END TYPE DOMAIN_MAPPINGS_TYPE
   
   !>A pointer to the domain decomposition for this domain.
@@ -2042,6 +2080,7 @@ END TYPE GENERATED_MESH_ELLIPSOID_TYPE
     TYPE(INTERFACE_TYPE), POINTER :: INTERFACE !<A pointer back to the interface.
     INTEGER(INTG) :: METHOD !<An integer which denotes the interface condition method. \see INTERFACE_CONDITIONS_Methods,INTERFACE_CONDITIONS
     INTEGER(INTG) :: OPERATOR !<An integer which denotes whether type of interface operator. \see INTERFACE_CONDITIONS_Operator,INTERFACE_CONDITIONS
+    INTEGER(INTG) :: CONNECTIVITY !<An integer which denotes whether type of connectivity. \see INTERFACE_CONDITIONS_Connectivity,INTERFACE_CONDITIONS
     TYPE(INTERFACE_GEOMETRY_TYPE) :: GEOMETRY !<The geometry information for the interface condition.
     TYPE(INTERFACE_LAGRANGE_TYPE), POINTER :: LAGRANGE !<A pointer to the interface condition Lagrange multipler information if there are any for this interface condition.
     TYPE(INTERFACE_DEPENDENT_TYPE), POINTER :: DEPENDENT !<A pointer to the interface condition dependent field (i.e. coupled mesh dependent field)information if there is any for this interface condition.

@@ -2149,27 +2149,7 @@ CONTAINS
                         CALL FLAG_ERROR("Domain is not associated.",ERR,ERROR,*999)
                       ENDIF
                     CASE(FIELD_DATA_POINT_BASED_INTERPOLATION)
-                      COMPONENT_DOMAIN=>FIELD_VARIABLE%COMPONENTS(COMPONENT_NUMBER)%DOMAIN
-                      IF(ASSOCIATED(COMPONENT_DOMAIN)) THEN
-                        DOMAIN_TOPOLOGY=>COMPONENT_DOMAIN%TOPOLOGY
-                        IF(ASSOCIATED(DOMAIN_TOPOLOGY)) THEN
-                          DOMAIN_ELEMENTS=>DOMAIN_TOPOLOGY%ELEMENTS
-                          IF(ASSOCIATED(DOMAIN_ELEMENTS)) THEN 
-                              DO data_point_idx=1,MAX_NGP ! could be just element's data_point_idx
-                                !field_dof=FIELD_VARIABLE%COMPONENTS(COMPONENT_NUMBER)%PARAM_TO_DOF_MAP% &
-                                !  & DATA_POINT_PARAM2DOF_MAP%DATA_POINTS(data_point_idx)
-                                !FIELD_PARAMETERS(field_dof)=VALUE
-                              ENDDO !data_point_idx
-                            
-                          ELSE
-                            CALL FLAG_ERROR("Domain topology elements is not associated.",ERR,ERROR,*999)
-                          ENDIF
-                        ELSE
-                          CALL FLAG_ERROR("Domain topology is not associated.",ERR,ERROR,*999)
-                        ENDIF
-                      ELSE
-                        CALL FLAG_ERROR("Domain is not associated.",ERR,ERROR,*999)
-                      ENDIF
+                      CALL FLAG_ERROR("Not implemented.",ERR,ERROR,*999)
                     CASE DEFAULT
                       LOCAL_ERROR="The interpolation type of "//TRIM(NUMBER_TO_VSTRING(FIELD_VARIABLE% &
                         & COMPONENTS(COMPONENT_NUMBER)%INTERPOLATION_TYPE,"*",ERR,ERROR))// &
@@ -3577,11 +3557,15 @@ CONTAINS
                   IF(NGP > MAXINTERP) MAXINTERP = NGP
                 ENDDO
                 FIELD_VARIABLE%COMPONENTS(COMPONENT_NUMBER)%MAX_NUMBER_OF_INTERPOLATION_PARAMETERS = MAXINTERP
-              CASE(FIELD_DATA_POINT_BASED_INTERPOLATION) ! ?
+              CASE(FIELD_DATA_POINT_BASED_INTERPOLATION) 
+                FIELD_VARIABLE%COMPONENTS(COMPONENT_NUMBER)%MAX_NUMBER_OF_INTERPOLATION_PARAMETERS=-1
                 DO ne=1,DOMAIN%TOPOLOGY%ELEMENTS%TOTAL_NUMBER_OF_ELEMENTS
-!TODO
+                  IF(FIELD_VARIABLE%FIELD%DECOMPOSITION%TOPOLOGY%DATA_POINTS%ELEMENT_DATA_POINTS(ne)%NUMBER_OF_PROJECTED_DATA> &
+                      & FIELD_VARIABLE%COMPONENTS(COMPONENT_NUMBER)%MAX_NUMBER_OF_INTERPOLATION_PARAMETERS) THEN
+                    FIELD_VARIABLE%COMPONENTS(COMPONENT_NUMBER)%MAX_NUMBER_OF_INTERPOLATION_PARAMETERS= &
+                      & FIELD_VARIABLE%FIELD%DECOMPOSITION%TOPOLOGY%DATA_POINTS%ELEMENT_DATA_POINTS(ne)%NUMBER_OF_PROJECTED_DATA
+                  ENDIF
                 ENDDO
-                FIELD_VARIABLE%COMPONENTS(COMPONENT_NUMBER)%MAX_NUMBER_OF_INTERPOLATION_PARAMETERS = MAXINTERP
               CASE DEFAULT
                 LOCAL_ERROR="The interpolation type of "//TRIM(NUMBER_TO_VSTRING(FIELD_VARIABLE% &
                   & COMPONENTS(COMPONENT_NUMBER)%INTERPOLATION_TYPE,"*",ERR,ERROR))// &
@@ -8268,18 +8252,14 @@ CONTAINS
       & my_computational_node_number,domain_type_stop,start_idx,stop_idx,element_idx,node_idx,NUMBER_OF_LOCAL, NGP, MAX_NGP, &
       & gp,MPI_IERROR,NUMBER_OF_GLOBAL_DOFS,gauss_point_idx,NUMBER_OF_DATA_POINT_DOFS,data_point_nyy,data_point_idx, &
       & GLOBAL_ELEMENT_NUMBER,element_idx_loop,domain_element_idx,DATA_COUNT
-    INTEGER(INTG), ALLOCATABLE :: VARIABLE_LOCAL_DOFS_OFFSETS(:),VARIABLE_GHOST_DOFS_OFFSETS(:), &
-      & DOMAIN_ELEMENTS(:,:),DOMAIN_ELEMENT_DATA(:,:),DATA_GHOST_START(:),ELEMENT_GHOST_START(:),ELEMENT_DATA_MAP(:,:)
+    INTEGER(INTG), ALLOCATABLE :: VARIABLE_LOCAL_DOFS_OFFSETS(:),VARIABLE_GHOST_DOFS_OFFSETS(:)
     TYPE(DECOMPOSITION_TYPE), POINTER :: DECOMPOSITION
     TYPE(DOMAIN_TYPE), POINTER :: DOMAIN
-    TYPE(DOMAIN_MAPPING_TYPE), POINTER :: ELEMENTS_MAPPING,DOFS_MAPPING,FIELD_VARIABLE_DOFS_MAPPING
+    TYPE(DOMAIN_MAPPING_TYPE), POINTER :: ELEMENTS_MAPPING,DOFS_MAPPING,FIELD_VARIABLE_DOFS_MAPPING,DATA_POINTS_MAPPING
     TYPE(DOMAIN_TOPOLOGY_TYPE), POINTER :: DOMAIN_TOPOLOGY
     TYPE(FIELD_VARIABLE_COMPONENT_TYPE), POINTER :: FIELD_COMPONENT
     TYPE(VARYING_STRING) :: LOCAL_ERROR
     TYPE(BASIS_TYPE), POINTER :: BASIS
-    TYPE(DATA_POINTS_TYPE), POINTER :: DATA_POINTS
-    TYPE(DOMAIN_MAPPING_TYPE), POINTER :: ELEMENT_MAPPING
-    TYPE(DECOMPOSITION_DATA_TYPE), POINTER :: DATA_POINTS_TOPOLOGY
 
     CALL ENTERS("FIELD_MAPPINGS_CALCULATE",ERR,ERROR,*999)
     
@@ -8343,37 +8323,10 @@ CONTAINS
           CASE(FIELD_DATA_POINT_BASED_INTERPOLATION)
             DOMAIN=>FIELD_COMPONENT%DOMAIN
             DOMAIN_TOPOLOGY=>DOMAIN%TOPOLOGY
-            ELEMENT_MAPPING=>DOMAIN%MAPPINGS%ELEMENTS
-            DATA_POINTS=>FIELD%INTERFACE%DATA_POINTS
-            DATA_POINTS_TOPOLOGY=>FIELD%DECOMPOSITION%TOPOLOGY%DATA_POINTS
-            !non-ghosting elements(internal+boundary)
-            DO element_idx=ELEMENT_MAPPING%INTERNAL_START,ELEMENT_MAPPING%BOUNDARY_FINISH
-              GLOBAL_ELEMENT_NUMBER=ELEMENT_MAPPING%LOCAL_TO_GLOBAL_MAP(element_idx)
-              element_idx_loop=1
-              DO WHILE(DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(element_idx_loop)%ELEMENT_NUMBER/=GLOBAL_ELEMENT_NUMBER)
-                element_idx_loop=element_idx_loop+1
-              ENDDO
-              NUMBER_OF_LOCAL_VARIABLE_DOFS=NUMBER_OF_LOCAL_VARIABLE_DOFS+DATA_POINTS_TOPOLOGY% &
-                & ELEMENT_DATA_POINTS(element_idx_loop)%NUMBER_OF_PROJECTED_DATA!local dof              
-              TOTAL_NUMBER_OF_VARIABLE_DOFS=TOTAL_NUMBER_OF_VARIABLE_DOFS+DATA_POINTS_TOPOLOGY% &
-                & ELEMENT_DATA_POINTS(element_idx_loop)%NUMBER_OF_PROJECTED_DATA                      
-            ENDDO !element_idx 
-            !ghosting elements
-            DO element_idx=ELEMENT_MAPPING%GHOST_START,ELEMENT_MAPPING%GHOST_FINISH
-              GLOBAL_ELEMENT_NUMBER=ELEMENT_MAPPING%LOCAL_TO_GLOBAL_MAP(element_idx)
-              element_idx_loop=1
-              DO WHILE(DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(element_idx_loop)%ELEMENT_NUMBER/=GLOBAL_ELEMENT_NUMBER)
-                element_idx_loop=element_idx_loop+1
-              ENDDO          
-              TOTAL_NUMBER_OF_VARIABLE_DOFS=TOTAL_NUMBER_OF_VARIABLE_DOFS+DATA_POINTS_TOPOLOGY% &
-                & ELEMENT_DATA_POINTS(element_idx_loop)%NUMBER_OF_PROJECTED_DATA!local+ghost dof               
-            ENDDO !element_idx            
-            DO element_idx=1,DATA_POINTS_TOPOLOGY%NUMBER_OF_ELEMENTS
-              !Total number of dofs in the mesh
-              NUMBER_OF_GLOBAL_VARIABLE_DOFS=NUMBER_OF_GLOBAL_VARIABLE_DOFS+DATA_POINTS_TOPOLOGY% &
-                & ELEMENT_DATA_POINTS(element_idx)%NUMBER_OF_PROJECTED_DATA!Total dof in the mesh
-            ENDDO              
-            NUMBER_OF_DATA_POINT_DOFS=NUMBER_OF_DATA_POINT_DOFS+DATA_POINTS_TOPOLOGY%TOTAL_NUMBER_OF_PROJECTED_DATA
+            NUMBER_OF_DATA_POINT_DOFS=NUMBER_OF_DATA_POINT_DOFS+DOMAIN_TOPOLOGY%DATA_POINTS%TOTAL_NUMBER_OF_DATA_POINTS
+            NUMBER_OF_LOCAL_VARIABLE_DOFS=NUMBER_OF_LOCAL_VARIABLE_DOFS+DOMAIN_TOPOLOGY%DATA_POINTS%NUMBER_OF_DATA_POINTS
+            TOTAL_NUMBER_OF_VARIABLE_DOFS=TOTAL_NUMBER_OF_VARIABLE_DOFS+DOMAIN_TOPOLOGY%DATA_POINTS%TOTAL_NUMBER_OF_DATA_POINTS
+            NUMBER_OF_GLOBAL_VARIABLE_DOFS=NUMBER_OF_GLOBAL_VARIABLE_DOFS+DOMAIN_TOPOLOGY%DATA_POINTS%NUMBER_OF_GLOBAL_DATA_POINTS
           CASE DEFAULT
             LOCAL_ERROR="The interpolation type of "// &
               & TRIM(NUMBER_TO_VSTRING(FIELD%VARIABLES(variable_idx)%COMPONENTS(component_idx)%INTERPOLATION_TYPE, &
@@ -8611,7 +8564,6 @@ CONTAINS
                 DOMAIN=>FIELD_COMPONENT%DOMAIN
                 DOMAIN_TOPOLOGY=>DOMAIN%TOPOLOGY
                 DECOMPOSITION=>DOMAIN%DECOMPOSITION
-
                 DOFS_MAPPING=>DOMAIN%MAPPINGS%DOFS
                 IF(domain_type_idx==1) THEN
                   ALLOCATE(FIELD_COMPONENT%PARAM_TO_DOF_MAP%NODE_PARAM2DOF_MAP%NODES( &
@@ -8835,134 +8787,77 @@ CONTAINS
                   !Setup reverse parameter to dof map
                   FIELD_COMPONENT%PARAM_TO_DOF_MAP%GAUSS_POINT_PARAM2DOF_MAP%GAUSS_POINTS(gp,element_idx)=variable_local_ny
                  ENDDO !gp
-                ENDDO !element_idx                          
+                ENDDO !element_idx                       
               CASE(FIELD_DATA_POINT_BASED_INTERPOLATION)
                 DOMAIN=>FIELD_COMPONENT%DOMAIN
                 ELEMENTS_MAPPING=>DOMAIN%MAPPINGS%ELEMENTS
+                DATA_POINTS_MAPPING=>DOMAIN%MAPPINGS%DATA_POINTS
                 DOMAIN_TOPOLOGY=>DOMAIN%TOPOLOGY
                 DECOMPOSITION=>DOMAIN%DECOMPOSITION                
                 IF(domain_type_idx==1) THEN ! domain_type_idx==1 -> non ghosts
                   !Allocate parameter to dof map for this field variable component, assuming all the data points are projected onto this domain.
-                  ALLOCATE(FIELD_COMPONENT%PARAM_TO_DOF_MAP%DATA_POINT_PARAM2DOF_MAP%DATA_POINTS(DATA_POINTS_TOPOLOGY% &
-                    & TOTAL_NUMBER_OF_PROJECTED_DATA),STAT=ERR)
+                  ALLOCATE(FIELD_COMPONENT%PARAM_TO_DOF_MAP%DATA_POINT_PARAM2DOF_MAP%DATA_POINTS(DOMAIN_TOPOLOGY%DATA_POINTS% &
+                    & NUMBER_OF_GLOBAL_DATA_POINTS),STAT=ERR)
                   IF(ERR/=0) CALL FLAG_ERROR("Could not allocate field component parameter to dof data point map.",ERR,ERROR,*999)
                   ! Number of data points
-                  FIELD_COMPONENT%PARAM_TO_DOF_MAP%DATA_POINT_PARAM2DOF_MAP%NUMBER_OF_DATA_POINT_PARAMETERS=DATA_POINTS_TOPOLOGY% &
-                    & TOTAL_NUMBER_OF_PROJECTED_DATA
-                  !DOMAIN_ELEMENTS stores the the elements numbers in order in the domain, first number is the total number of elements,
-                  !There are multiples rows for multiple domains
-                  ALLOCATE(DOMAIN_ELEMENTS(DECOMPOSITION%NUMBER_OF_DOMAINS,0:DATA_POINTS_TOPOLOGY%NUMBER_OF_ELEMENTS),STAT=ERR)
-                  !DOMAIN_ELEMENT_DATA stores the data indices in order in the domain, first number is the total number of data in the domain
-                  ALLOCATE(DOMAIN_ELEMENT_DATA(DECOMPOSITION%NUMBER_OF_DOMAINS,0:DATA_POINTS_TOPOLOGY% &
-                    & TOTAL_NUMBER_OF_PROJECTED_DATA),STAT=ERR)
-                  !DATA_GHOST_START stores the index of first ghost data point
-                  ALLOCATE(DATA_GHOST_START(DECOMPOSITION%NUMBER_OF_DOMAINS),STAT=ERR)
-                  !ELEMENT_GHOST_START stores the index of first ghost element 
-                  ALLOCATE(ELEMENT_GHOST_START(DECOMPOSITION%NUMBER_OF_DOMAINS),STAT=ERR)
-                  !ELEMENT_DATA_MAP stores the correponding element number for each data points in order.
-                  ALLOCATE(ELEMENT_DATA_MAP(DECOMPOSITION%NUMBER_OF_DOMAINS,DATA_POINTS_TOPOLOGY%TOTAL_NUMBER_OF_PROJECTED_DATA))                 
-                  !Calculate number of elements and data points in each domain, and record the first ghosting element and data point
-                  DO domain_idx=1,DECOMPOSITION%NUMBER_OF_DOMAINS
-                    DATA_GHOST_START(domain_idx)=0
-                    ELEMENT_GHOST_START(domain_idx)=0
-                    DOMAIN_ELEMENT_DATA(domain_idx,0)=0
-                    DOMAIN_ELEMENTS(domain_idx,0)=ELEMENTS_MAPPING%NUMBER_OF_DOMAIN_LOCAL(domain_idx-1)+ &
-                      & ELEMENTS_MAPPING%NUMBER_OF_DOMAIN_GHOST(domain_idx-1)
-                    DATA_COUNT=0
-                    DO element_idx=1,DATA_POINTS_TOPOLOGY%NUMBER_OF_ELEMENTS               
-                      DOMAIN_ELEMENTS(domain_idx,ELEMENTS_MAPPING%GLOBAL_TO_LOCAL_MAP(element_idx)% &
-                        & LOCAL_NUMBER(domain_idx))=element_idx
-                      IF(ELEMENT_MAPPING%GLOBAL_TO_LOCAL_MAP(element_idx)%LOCAL_TYPE(domain_idx)==DOMAIN_LOCAL_GHOST .AND. &
-                        & ELEMENT_GHOST_START(domain_idx)==0) THEN
-                        ELEMENT_GHOST_START(domain_idx)=DOMAIN_ELEMENTS(domain_idx,ELEMENTS_MAPPING%GLOBAL_TO_LOCAL_MAP &
-                          & (element_idx)%LOCAL_NUMBER(domain_idx))
-                      ENDIF
-                    ENDDO!element_idx
-                    DO element_idx=1,DOMAIN_ELEMENTS(domain_idx,0)
-                      GLOBAL_ELEMENT_NUMBER=DOMAIN_ELEMENTS(domain_idx,element_idx)
-                      IF(ELEMENT_MAPPING%GLOBAL_TO_LOCAL_MAP(GLOBAL_ELEMENT_NUMBER)%LOCAL_TYPE(domain_idx)==DOMAIN_LOCAL_GHOST &
-                          & .AND. ELEMENT_GHOST_START(domain_idx)==0) THEN  
-                        DATA_GHOST_START(domain_idx)=DATA_COUNT+1                    
-                      ENDIF
-                      DOMAIN_ELEMENT_DATA(domain_idx,0)=DOMAIN_ELEMENT_DATA(domain_idx,0)+DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS &
-                        & (GLOBAL_ELEMENT_NUMBER)%NUMBER_OF_PROJECTED_DATA
-                      DO data_point_idx=1,DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(GLOBAL_ELEMENT_NUMBER)%NUMBER_OF_PROJECTED_DATA
-                        DATA_COUNT=DATA_COUNT+1
-                        DOMAIN_ELEMENT_DATA(domain_idx,DATA_COUNT)=DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS &
-                          & (GLOBAL_ELEMENT_NUMBER)%DATA_INDICES(data_point_idx)
-                        ELEMENT_DATA_MAP(domain_idx,DATA_COUNT)=GLOBAL_ELEMENT_NUMBER
-                      ENDDO !data_point_id   
-                    ENDDO !element_idx
-                  ENDDO !domain_idx
-                  !Field mapping calculation
-                  DO data_point_idx=1,DATA_POINTS_TOPOLOGY%TOTAL_NUMBER_OF_PROJECTED_DATA
-                    variable_global_ny=data_point_idx+VARIABLE_GLOBAL_DOFS_OFFSET
-                    GLOBAL_ELEMENT_NUMBER=DATA_POINTS_TOPOLOGY%ELEMENT_MAP(data_point_idx)
-                    NUMBER_OF_DOMAINS=ELEMENT_MAPPING%GLOBAL_TO_LOCAL_MAP(GLOBAL_ELEMENT_NUMBER)%NUMBER_OF_DOMAINS
+                  FIELD_COMPONENT%PARAM_TO_DOF_MAP%DATA_POINT_PARAM2DOF_MAP%NUMBER_OF_DATA_POINT_PARAMETERS=DOMAIN_TOPOLOGY% &
+                    & DATA_POINTS%NUMBER_OF_GLOBAL_DATA_POINTS
+                  DO data_point_idx=1,DATA_POINTS_MAPPING%NUMBER_OF_GLOBAL
                     IF(ASSOCIATED(FIELD_VARIABLE_DOFS_MAPPING)) THEN
-                      !Allocate memory for this DOF to record local numbers on different domains.     
+                      variable_global_ny=data_point_idx+VARIABLE_GLOBAL_DOFS_OFFSET
+                      CALL DOMAIN_MAPPINGS_MAPPING_GLOBAL_INITIALISE(FIELD_VARIABLE_DOFS_MAPPING% &
+                        & GLOBAL_TO_LOCAL_MAP(variable_global_ny),ERR,ERROR,*999)
+                      NUMBER_OF_DOMAINS=DATA_POINTS_MAPPING%GLOBAL_TO_LOCAL_MAP(data_point_idx)%NUMBER_OF_DOMAINS
                       ALLOCATE(FIELD_VARIABLE_DOFS_MAPPING%GLOBAL_TO_LOCAL_MAP(variable_global_ny)% &
-                        & LOCAL_NUMBER(NUMBER_OF_DOMAINS),STAT=ERR)      
+                        & LOCAL_NUMBER(NUMBER_OF_DOMAINS),STAT=ERR)
                       IF(ERR/=0) CALL FLAG_ERROR("Could not allocate field variable dofs global to local map local number.", &
                         & ERR,ERROR,*999)
                       ALLOCATE(FIELD_VARIABLE_DOFS_MAPPING%GLOBAL_TO_LOCAL_MAP(variable_global_ny)% &
                         & DOMAIN_NUMBER(NUMBER_OF_DOMAINS),STAT=ERR)
                       IF(ERR/=0) CALL FLAG_ERROR("Could not allocate field variable dofs global to local map domain number.", &
                         & ERR,ERROR,*999)
-                      ALLOCATE(FIELD_VARIABLE_DOFS_MAPPING%GLOBAL_TO_LOCAL_MAP(variable_global_ny)% &
-                        & LOCAL_TYPE(NUMBER_OF_DOMAINS),STAT=ERR)
+                      ALLOCATE(FIELD_VARIABLE_DOFS_MAPPING%GLOBAL_TO_LOCAL_MAP(variable_global_ny)%LOCAL_TYPE(NUMBER_OF_DOMAINS), &
+                        & STAT=ERR)
                       IF(ERR/=0) CALL FLAG_ERROR("Could not allocate field variable dofs global to local map domain number.", &
-                        & ERR,ERROR,*999) 
+                        & ERR,ERROR,*999)
+                      FIELD_VARIABLE_DOFS_MAPPING%GLOBAL_TO_LOCAL_MAP(variable_global_ny)%NUMBER_OF_DOMAINS=NUMBER_OF_DOMAINS
                       DO domain_idx=1,NUMBER_OF_DOMAINS
-                        domain_no=ELEMENTS_MAPPING%GLOBAL_TO_LOCAL_MAP(GLOBAL_ELEMENT_NUMBER)%DOMAIN_NUMBER(domain_idx)                                  
+                        domain_no=DATA_POINTS_MAPPING%GLOBAL_TO_LOCAL_MAP(data_point_idx)%DOMAIN_NUMBER(domain_idx)
                         FIELD_VARIABLE_DOFS_MAPPING%GLOBAL_TO_LOCAL_MAP(variable_global_ny)%LOCAL_NUMBER(domain_idx)= &
-                          & data_point_idx+VARIABLE_LOCAL_DOFS_OFFSETS(domain_no)
+                          & DATA_POINTS_MAPPING%GLOBAL_TO_LOCAL_MAP(data_point_idx)%LOCAL_NUMBER(domain_idx)+ &
+                          & VARIABLE_LOCAL_DOFS_OFFSETS(domain_no)
+                        ! domain and type same as element
                         FIELD_VARIABLE_DOFS_MAPPING%GLOBAL_TO_LOCAL_MAP(variable_global_ny)%DOMAIN_NUMBER(domain_idx)= &
-                          & ELEMENT_MAPPING%GLOBAL_TO_LOCAL_MAP(GLOBAL_ELEMENT_NUMBER)%DOMAIN_NUMBER(domain_idx)
+                          & DATA_POINTS_MAPPING%GLOBAL_TO_LOCAL_MAP(data_point_idx)%DOMAIN_NUMBER(domain_idx)
                         FIELD_VARIABLE_DOFS_MAPPING%GLOBAL_TO_LOCAL_MAP(variable_global_ny)%LOCAL_TYPE(domain_idx)= &
-                          & ELEMENT_MAPPING%GLOBAL_TO_LOCAL_MAP(GLOBAL_ELEMENT_NUMBER)%LOCAL_TYPE(domain_idx)
-                        FIELD_VARIABLE_DOFS_MAPPING%GLOBAL_TO_LOCAL_MAP(variable_global_ny)%NUMBER_OF_DOMAINS= &
-                          & NUMBER_OF_DOMAINS
-                      ENDDO
+                          & DATA_POINTS_MAPPING%GLOBAL_TO_LOCAL_MAP(data_point_idx)%LOCAL_TYPE(domain_idx)
+                      ENDDO !domain_idx                       
                     ENDIF
                   ENDDO !data_point_idx
-                  DO domain_idx=1,DECOMPOSITION%NUMBER_OF_DOMAINS
-                    IF(component_idx>1) THEN
-                      IF(DATA_GHOST_START(domain_idx)==0) THEN
-                        VARIABLE_GHOST_DOFS_OFFSETS(domain_idx-1)=VARIABLE_GHOST_DOFS_OFFSETS(domain_idx-1)+ &
-                          & DOMAIN_ELEMENT_DATA(domain_idx,0)
-                      ELSE
-                        VARIABLE_GHOST_DOFS_OFFSETS(domain_idx-1)=VARIABLE_GHOST_DOFS_OFFSETS(domain_idx-1)+ &
-                          & DATA_GHOST_START(domain_idx)-1
-                      ENDIF
-                    ENDIF
-                    VARIABLE_LOCAL_DOFS_OFFSETS(domain_idx-1)=VARIABLE_LOCAL_DOFS_OFFSETS(domain_idx-1)+ &
-                      & DOMAIN_ELEMENT_DATA(domain_idx,0)
-                  ENDDO !domain_idx
-                  start_idx=1               
-                  stop_idx=0
-                  DO element_idx=1,ELEMENT_MAPPING%NUMBER_OF_LOCAL
-                    GLOBAL_ELEMENT_NUMBER=ELEMENT_MAPPING%DOMAIN_LIST(element_idx)
-                    stop_idx=stop_idx+DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(GLOBAL_ELEMENT_NUMBER)%NUMBER_OF_PROJECTED_DATA
-                  ENDDO !element_idx
-                                                                   
+                  !start from 1 and end with number of local data points (internal+boundary)
+                  start_idx=1
+                  stop_idx=DATA_POINTS_MAPPING%NUMBER_OF_LOCAL
+                  !Adjust the local and ghost offsets
+                  IF(component_idx>1) THEN
+                    !We can multiple an array with a number
+                    VARIABLE_GHOST_DOFS_OFFSETS=VARIABLE_GHOST_DOFS_OFFSETS+DATA_POINTS_MAPPING%NUMBER_OF_DOMAIN_LOCAL
+                  ENDIF
+                  VARIABLE_LOCAL_DOFS_OFFSETS=VARIABLE_LOCAL_DOFS_OFFSETS+DATA_POINTS_MAPPING%NUMBER_OF_DOMAIN_LOCAL+ &
+                    & DATA_POINTS_MAPPING%NUMBER_OF_DOMAIN_GHOST
+                  
                 ELSE  ! domain_type_idx == 2 -> ghosts
                   !Handle global dofs domain mapping. For the second pass adjust the local dof numbers to ensure that the ghost
                   !dofs are at the end of the local dofs.
                   !Adjust the ghost offsets
-                  DO domain_idx=1,DECOMPOSITION%NUMBER_OF_DOMAINS
-                    IF(component_idx>1) THEN !DATA_GHOST_START(domain_idx)/=0 since there are ghosting data points
-                      VARIABLE_GHOST_DOFS_OFFSETS(domain_idx-1)=VARIABLE_GHOST_DOFS_OFFSETS(domain_idx-1)+ &
-                        & DATA_GHOST_START(domain_idx)-1
-                    ENDIF
-                  ENDDO !domain_idx
-                  DO data_point_idx=1,DATA_POINTS_TOPOLOGY%TOTAL_NUMBER_OF_PROJECTED_DATA
-                    variable_global_ny=data_point_idx+VARIABLE_GLOBAL_DOFS_OFFSET
-                    GLOBAL_ELEMENT_NUMBER=DATA_POINTS_TOPOLOGY%ELEMENT_MAP(data_point_idx)
-                    NUMBER_OF_DOMAINS=ELEMENT_MAPPING%GLOBAL_TO_LOCAL_MAP(GLOBAL_ELEMENT_NUMBER)%NUMBER_OF_DOMAINS
+                  IF(component_idx>1) THEN
+                    VARIABLE_GHOST_DOFS_OFFSETS=VARIABLE_GHOST_DOFS_OFFSETS-ELEMENTS_MAPPING%NUMBER_OF_DOMAIN_LOCAL
+                  ENDIF
+                  DO data_point_idx=1,DATA_POINTS_MAPPING%NUMBER_OF_GLOBAL
                     IF(ASSOCIATED(FIELD_VARIABLE_DOFS_MAPPING)) THEN
+                      variable_global_ny=data_point_idx+VARIABLE_GLOBAL_DOFS_OFFSET
+                      NUMBER_OF_DOMAINS=DATA_POINTS_MAPPING%GLOBAL_TO_LOCAL_MAP(data_point_idx)%NUMBER_OF_DOMAINS
                       DO domain_idx=1,NUMBER_OF_DOMAINS
-                        domain_no=ELEMENTS_MAPPING%GLOBAL_TO_LOCAL_MAP(GLOBAL_ELEMENT_NUMBER)%DOMAIN_NUMBER(domain_idx)
+                        domain_no=DATA_POINTS_MAPPING%GLOBAL_TO_LOCAL_MAP(data_point_idx)%DOMAIN_NUMBER(domain_idx)
                         IF(FIELD_VARIABLE_DOFS_MAPPING%GLOBAL_TO_LOCAL_MAP(variable_global_ny)%LOCAL_TYPE(domain_idx)== &
                             & DOMAIN_LOCAL_GHOST) THEN
                           FIELD_VARIABLE_DOFS_MAPPING%GLOBAL_TO_LOCAL_MAP(variable_global_ny)%LOCAL_NUMBER(domain_idx)= &
@@ -8972,21 +8867,17 @@ CONTAINS
                           FIELD_VARIABLE_DOFS_MAPPING%GLOBAL_TO_LOCAL_MAP(variable_global_ny)%LOCAL_NUMBER(domain_idx)= &
                             & FIELD_VARIABLE_DOFS_MAPPING%GLOBAL_TO_LOCAL_MAP(variable_global_ny)%LOCAL_NUMBER(domain_idx)+ &
                             & VARIABLE_LOCAL_DOFS_OFFSETS(domain_no)
-                        ENDIF
-                      ENDDO !domain_idx
+                        ENDIF                     
+                      ENDDO !domain_idx                                      
                     ENDIF
-                  ENDDO !data_point_idx
-                  DO domain_idx=1,DECOMPOSITION%NUMBER_OF_DOMAINS
-                    VARIABLE_LOCAL_DOFS_OFFSETS(domain_idx-1)=VARIABLE_LOCAL_DOFS_OFFSETS(domain_idx-1)- &
-                      & (DOMAIN_ELEMENT_DATA(domain_idx,0)-DATA_GHOST_START(domain_idx)+1)!DATA_GHOST_START(domain_idx)/=0 since there are ghosting data points
-                  ENDDO !domain_idx                      
-                  start_idx=stop_idx+1        
-                  DO element_idx=ELEMENT_MAPPING%NUMBER_OF_LOCAL+1,ELEMENT_MAPPING%TOTAL_NUMBER_OF_LOCAL
-                    GLOBAL_ELEMENT_NUMBER=ELEMENT_MAPPING%DOMAIN_LIST(element_idx)
-                    stop_idx=stop_idx+DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(GLOBAL_ELEMENT_NUMBER)%NUMBER_OF_PROJECTED_DATA
-                  ENDDO !element_idx   
-                ENDIF
-                
+                  ENDDO !data_point_idx  
+                  start_idx=DATA_POINTS_MAPPING%NUMBER_OF_LOCAL+1
+                  stop_idx=DATA_POINTS_MAPPING%TOTAL_NUMBER_OF_LOCAL
+                  !Adjust the local offsets
+                  VARIABLE_LOCAL_DOFS_OFFSETS=VARIABLE_LOCAL_DOFS_OFFSETS-DATA_POINTS_MAPPING%NUMBER_OF_DOMAIN_GHOST
+                ENDIF                   
+                !Assuming all the data points have been projected onto the domain elements
+                VARIABLE_GLOBAL_DOFS_OFFSET=VARIABLE_GLOBAL_DOFS_OFFSET+DATA_POINTS_MAPPING%NUMBER_OF_GLOBAL
                 DO data_point_idx=start_idx,stop_idx
                   variable_local_ny= variable_local_ny+1
                   data_point_nyy=data_point_nyy+1
@@ -8997,27 +8888,7 @@ CONTAINS
                   FIELD%VARIABLES(variable_idx)%DOF_TO_PARAM_MAP%DATA_POINT_DOF2PARAM_MAP(2,data_point_nyy)=component_idx
                   !Setup reverse parameter to dof map
                   FIELD_COMPONENT%PARAM_TO_DOF_MAP%DATA_POINT_PARAM2DOF_MAP%DATA_POINTS(data_point_idx)=variable_local_ny
-                ENDDO !data_point_idxdata_point_nyy
-                                
-                
-                !Deallocate memory
-                IF(ALLOCATED(DOMAIN_ELEMENTS)) DEALLOCATE(DOMAIN_ELEMENTS)
-                IF(ALLOCATED(DOMAIN_ELEMENT_DATA)) DEALLOCATE(DOMAIN_ELEMENT_DATA)
-                IF(ALLOCATED(DATA_GHOST_START)) DEALLOCATE(DATA_GHOST_START)
-                IF(ALLOCATED(ELEMENT_GHOST_START)) DEALLOCATE(ELEMENT_GHOST_START)
-                IF(ALLOCATED(ELEMENT_DATA_MAP)) DEALLOCATE(ELEMENT_DATA_MAP)
-                
-                
-                !Assuming all the data points have been projected onto the domain elements
-                VARIABLE_GLOBAL_DOFS_OFFSET=VARIABLE_GLOBAL_DOFS_OFFSET+DATA_POINTS_TOPOLOGY%TOTAL_NUMBER_OF_PROJECTED_DATA
-                
-                
-              
-              
-              
-              
-              
-              !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++    
+                ENDDO !data_point_idx                                      
               CASE DEFAULT
                 LOCAL_ERROR="The interpolation type of "// &
                   & TRIM(NUMBER_TO_VSTRING(FIELD%VARIABLES(variable_idx)%COMPONENTS(component_idx)%INTERPOLATION_TYPE, &
