@@ -711,11 +711,32 @@ END TYPE GENERATED_MESH_ELLIPSOID_TYPE
     TYPE(TREE_TYPE), POINTER :: NODES_TREE !<A tree mapping the domain local number to the region nodes user number.
   END TYPE DOMAIN_NODES_TYPE
   
+  TYPE DOMAIN_ELEMENT_DATA_POINT_TYPE
+    INTEGER(INTG) :: USER_NUMBER !<User number of the projected data point
+    INTEGER(INTG) :: GLOBAL_NUMBER !<Global number of the data point, sequence is according to element number sequence  
+    INTEGER(INTG) :: LOCAL_NUMBER !<local number of the data point
+  END TYPE DOMAIN_ELEMENT_DATA_POINT_TYPE
+  
+  !>Contains information on the projected data points on an element
+  TYPE DOMAIN_ELEMENT_DATA_POINTS_TYPE
+    INTEGER(INTG) :: NUMBER_OF_PROJECTED_DATA !<Number of projected data on this element
+    INTEGER(INTG) :: ELEMENT_NUMBER !<The number of this element (element index and element number can be different)
+    TYPE(DOMAIN_ELEMENT_DATA_POINT_TYPE), ALLOCATABLE :: DATA_INDICES(:) !<The global and user number of this data point
+  END TYPE DOMAIN_ELEMENT_DATA_POINTS_TYPE       
+  
+  !>Contains information of the projected data point 
+  !TYPE DOMAIN_DATA_POINT_TYPE 
+  !  INTEGER(INTG) :: USER_NUMBER !<User number of the projected data point
+  !  INTEGER(INTG) :: GLOBAL_NUMBER !<Global number of the data point, sequence is according to element number sequence 
+  !  INTEGER(INTG) :: ELEMENT_NUMBER !<The element number which the data point is projected on 
+  !END TYPE DOMAIN_DATA_POINT_TYPE 
+  
   TYPE DOMAIN_DATA_POINTS_TYPE
     TYPE(DOMAIN_TYPE), POINTER :: DOMAIN !<The pointer to the domain for this elements topology information.
     INTEGER(INTG) :: NUMBER_OF_DATA_POINTS !<The number of data points (excluding ghost data points) in this domain topology.
     INTEGER(INTG) :: TOTAL_NUMBER_OF_DATA_POINTS !<The total number of data points (including ghost data points) in this domain topology.
     INTEGER(INTG) :: NUMBER_OF_GLOBAL_DATA_POINTS !<The number of global data points in this domain topology.
+    TYPE(DOMAIN_ELEMENT_DATA_POINTS_TYPE), ALLOCATABLE :: ELEMENT_DATA_POINTS(:) !<Information of the projected data on the elements 
   END TYPE DOMAIN_DATA_POINTS_TYPE
 
   !>Contains the topology information for a domain

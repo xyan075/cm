@@ -294,7 +294,10 @@ CONTAINS
     INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
     TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
     !Local Variables
-    INTEGER(INTG) :: matrix_idx,ROWS_ELEMENT_NUMBER,ROWS_MESH_INDEX
+    INTEGER(INTG) :: matrix_idx,data_point_idx,ROWS_MESH_INDEX,NUMBER_OF_COUPLED_MESH_ELEMENTS, &
+      & COUPLED_MESH_ELEMENT_NUMBER,DATA_POINT_USER_NUMBER
+    INTEGER(INTG) :: ROWS_NUMBER_OF_ELEMENTS,COLS_NUMBER_OF_ELEMENTS !Number of elements in the row and col variables whose dofs are present in this element matrix
+    INTEGER(INTG), ALLOCATABLE :: COUPLED_MESH_ELEMENT_NUMBERS(:),ROWS_ELEMENT_NUMBERS(:),ELEMENT_NUMBERS(:)
     TYPE(FIELD_VARIABLE_TYPE), POINTER :: COLS_FIELD_VARIABLE,ROWS_FIELD_VARIABLE
     TYPE(INTERFACE_TYPE), POINTER :: INTERFACE
     TYPE(INTERFACE_CONDITION_TYPE), POINTER :: INTERFACE_CONDITION
@@ -304,6 +307,9 @@ CONTAINS
     TYPE(INTERFACE_MATRIX_TYPE), POINTER :: INTERFACE_MATRIX
     TYPE(INTERFACE_RHS_TYPE), POINTER :: RHS_VECTOR
     TYPE(INTERFACE_MESH_CONNECTIVITY_TYPE), POINTER :: MESH_CONNECTIVITY
+    TYPE(INTERFACE_POINTS_CONNECTIVITY_TYPE), POINTER :: POINTS_CONNECTIVITY
+    TYPE(MESH_DATA_POINTS_TYPE), POINTER :: MESH_POINTS_TOPOLOGY
+    TYPE(LIST_TYPE), POINTER :: COUPLED_MESH_ELEMENTS
     TYPE(VARYING_STRING) :: LOCAL_ERROR
 
 #ifdef TAUPROF
@@ -321,59 +327,138 @@ CONTAINS
           IF(ASSOCIATED(INTERFACE_CONDITION)) THEN
             INTERFACE=>INTERFACE_CONDITION%INTERFACE
             IF(ASSOCIATED(INTERFACE)) THEN
-              MESH_CONNECTIVITY=>INTERFACE%MESH_CONNECTIVITY
-              IF(ASSOCIATED(MESH_CONNECTIVITY)) THEN
-                IF(ALLOCATED(MESH_CONNECTIVITY%ELEMENTS_CONNECTIVITY)) THEN
-                  !Calculate the row and columns for the interface equations matrices
-                  DO matrix_idx=1,INTERFACE_MATRICES%NUMBER_OF_INTERFACE_MATRICES
-                    INTERFACE_MATRIX=>INTERFACE_MATRICES%MATRICES(matrix_idx)%PTR
-                    IF(ASSOCIATED(INTERFACE_MATRIX)) THEN
-                      ROWS_FIELD_VARIABLE=>INTERFACE_MAPPING%INTERFACE_MATRIX_ROWS_TO_VAR_MAPS(matrix_idx)%VARIABLE
-                      COLS_FIELD_VARIABLE=>INTERFACE_MAPPING%LAGRANGE_VARIABLE !TEMPORARY: Needs generalising
-                      ROWS_MESH_INDEX=INTERFACE_MAPPING%INTERFACE_MATRIX_ROWS_TO_VAR_MAPS(matrix_idx)%MESH_INDEX
-                      ROWS_ELEMENT_NUMBER=MESH_CONNECTIVITY%ELEMENTS_CONNECTIVITY(ELEMENT_NUMBER,ROWS_MESH_INDEX)% &
-                        & COUPLED_MESH_ELEMENT_NUMBER
-                      CALL EQUATIONS_MATRICES_ELEMENT_MATRIX_CALCULATE(INTERFACE_MATRIX%ELEMENT_MATRIX, &
-                        & INTERFACE_MATRIX%UPDATE_MATRIX,ROWS_ELEMENT_NUMBER,ELEMENT_NUMBER,ROWS_FIELD_VARIABLE, &
-                        & COLS_FIELD_VARIABLE,ERR,ERROR,*999)
-                    ELSE
-                      LOCAL_ERROR="Interface matrix number "//TRIM(NUMBER_TO_VSTRING(matrix_idx,"*",ERR,ERROR))// &
-                        & " is not associated."
-                      CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
-                    ENDIF
-                  ENDDO !matrix_idx
-                ELSE
-                  !Calculate the row and columns for the interface equations matrices
-                  DO matrix_idx=1,INTERFACE_MATRICES%NUMBER_OF_INTERFACE_MATRICES
-                    INTERFACE_MATRIX=>INTERFACE_MATRICES%MATRICES(matrix_idx)%PTR
-                    IF(ASSOCIATED(INTERFACE_MATRIX)) THEN
-                      ROWS_FIELD_VARIABLE=>INTERFACE_MAPPING%INTERFACE_MATRIX_ROWS_TO_VAR_MAPS(matrix_idx)%VARIABLE
-                      COLS_FIELD_VARIABLE=>INTERFACE_MAPPING%LAGRANGE_VARIABLE !TEMPORARY: Needs generalising
-                      CALL EQUATIONS_MATRICES_ELEMENT_MATRIX_CALCULATE(INTERFACE_MATRIX%ELEMENT_MATRIX, &
-                        & INTERFACE_MATRIX%UPDATE_MATRIX,ELEMENT_NUMBER,ELEMENT_NUMBER,ROWS_FIELD_VARIABLE, &
-                        & COLS_FIELD_VARIABLE,ERR,ERROR,*999)
-                    ELSE
-                      LOCAL_ERROR="Interface matrix number "//TRIM(NUMBER_TO_VSTRING(matrix_idx,"*",ERR,ERROR))// &
-                        & " is not associated."
-                      CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
-                    ENDIF
-                  ENDDO !matrix_idx
-                ENDIF
-                RHS_VECTOR=>INTERFACE_MATRICES%RHS_VECTOR
-                IF(ASSOCIATED(RHS_VECTOR)) THEN
-                  RHS_MAPPING=>INTERFACE_MAPPING%RHS_MAPPING
-                  IF(ASSOCIATED(RHS_MAPPING)) THEN
-                    !Calculate the rows  for the equations RHS
-                    ROWS_FIELD_VARIABLE=>RHS_MAPPING%RHS_VARIABLE
-                    CALL EQUATIONS_MATRICES_ELEMENT_VECTOR_CALCULATE(RHS_VECTOR%ELEMENT_VECTOR,RHS_VECTOR%UPDATE_VECTOR, &
-                      & ELEMENT_NUMBER,ROWS_FIELD_VARIABLE,ERR,ERROR,*999)
+              SELECT CASE(INTERFACE_CONDITION%CONNECTIVITY)
+              CASE(INTERFACE_CONDITION_MESH_CONNECTIVITY)
+                MESH_CONNECTIVITY=>INTERFACE%MESH_CONNECTIVITY
+                IF(ASSOCIATED(MESH_CONNECTIVITY)) THEN
+                  IF(ALLOCATED(MESH_CONNECTIVITY%ELEMENTS_CONNECTIVITY)) THEN
+                    !Calculate the row and columns for the interface equations matrices
+                    DO matrix_idx=1,INTERFACE_MATRICES%NUMBER_OF_INTERFACE_MATRICES
+                      INTERFACE_MATRIX=>INTERFACE_MATRICES%MATRICES(matrix_idx)%PTR
+                      IF(ASSOCIATED(INTERFACE_MATRIX)) THEN
+                        ALLOCATE(ELEMENT_NUMBERS(1),STAT=ERR)
+                        ELEMENT_NUMBERS=ELEMENT_NUMBER
+                        ROWS_FIELD_VARIABLE=>INTERFACE_MAPPING%INTERFACE_MATRIX_ROWS_TO_VAR_MAPS(matrix_idx)%VARIABLE
+                        COLS_FIELD_VARIABLE=>INTERFACE_MAPPING%LAGRANGE_VARIABLE !TEMPORARY: Needs generalising
+                        ROWS_MESH_INDEX=INTERFACE_MAPPING%INTERFACE_MATRIX_ROWS_TO_VAR_MAPS(matrix_idx)%MESH_INDEX
+                        ROWS_ELEMENT_NUMBERS=MESH_CONNECTIVITY%ELEMENTS_CONNECTIVITY(ELEMENT_NUMBER,ROWS_MESH_INDEX)% &
+                          & COUPLED_MESH_ELEMENT_NUMBER
+                        CALL EQUATIONS_MATRICES_ELEMENT_MATRIX_CALCULATE(INTERFACE_MATRIX%ELEMENT_MATRIX, &
+                          & INTERFACE_MATRIX%UPDATE_MATRIX,ROWS_ELEMENT_NUMBERS,ELEMENT_NUMBERS,ROWS_FIELD_VARIABLE, &
+                          & COLS_FIELD_VARIABLE,ERR,ERROR,*999)
+                      ELSE
+                        LOCAL_ERROR="Interface matrix number "//TRIM(NUMBER_TO_VSTRING(matrix_idx,"*",ERR,ERROR))// &
+                          & " is not associated."
+                        CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
+                      ENDIF
+                    ENDDO !matrix_idx
                   ELSE
-                    CALL FLAG_ERROR("Interface mapping rhs mapping is not associated.",ERR,ERROR,*999)
+                    !If mesh connectivity is not defined, then use the same element numbers for both interface and coupled mesh variables.
+                    !Calculate the row and columns for the interface equations matrices
+                    DO matrix_idx=1,INTERFACE_MATRICES%NUMBER_OF_INTERFACE_MATRICES
+                      INTERFACE_MATRIX=>INTERFACE_MATRICES%MATRICES(matrix_idx)%PTR
+                      IF(ASSOCIATED(INTERFACE_MATRIX)) THEN
+                        ELEMENT_NUMBERS=ELEMENT_NUMBER
+                        ALLOCATE(ELEMENT_NUMBERS(1),STAT=ERR)
+                        ROWS_FIELD_VARIABLE=>INTERFACE_MAPPING%INTERFACE_MATRIX_ROWS_TO_VAR_MAPS(matrix_idx)%VARIABLE
+                        COLS_FIELD_VARIABLE=>INTERFACE_MAPPING%LAGRANGE_VARIABLE !TEMPORARY: Needs generalising
+                        CALL EQUATIONS_MATRICES_ELEMENT_MATRIX_CALCULATE(INTERFACE_MATRIX%ELEMENT_MATRIX, &
+                          & INTERFACE_MATRIX%UPDATE_MATRIX,ELEMENT_NUMBERS,ELEMENT_NUMBERS,ROWS_FIELD_VARIABLE, &
+                          & COLS_FIELD_VARIABLE,ERR,ERROR,*999)
+                      ELSE
+                        LOCAL_ERROR="Interface matrix number "//TRIM(NUMBER_TO_VSTRING(matrix_idx,"*",ERR,ERROR))// &
+                          & " is not associated."
+                        CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
+                      ENDIF
+                    ENDDO !matrix_idx
+                  ENDIF            
+                  RHS_VECTOR=>INTERFACE_MATRICES%RHS_VECTOR
+                  IF(ASSOCIATED(RHS_VECTOR)) THEN
+                    RHS_MAPPING=>INTERFACE_MAPPING%RHS_MAPPING
+                    IF(ASSOCIATED(RHS_MAPPING)) THEN
+                      !Calculate the rows  for the equations RHS
+                      ROWS_FIELD_VARIABLE=>RHS_MAPPING%RHS_VARIABLE
+                      CALL EQUATIONS_MATRICES_ELEMENT_VECTOR_CALCULATE(RHS_VECTOR%ELEMENT_VECTOR,RHS_VECTOR%UPDATE_VECTOR, &
+                        & ELEMENT_NUMBER,ROWS_FIELD_VARIABLE,ERR,ERROR,*999)
+                    ELSE
+                      CALL FLAG_ERROR("Interface mapping rhs mapping is not associated.",ERR,ERROR,*999)
+                    ENDIF
                   ENDIF
+                ELSE
+                  CALL FLAG_ERROR("Interface mesh connectivity is not associated.",ERR,ERROR,*999)              
                 ENDIF
-              ELSE
-                CALL FLAG_ERROR("Interface mesh connectivity is not associated.",ERR,ERROR,*999)              
-              ENDIF
+              CASE(INTERFACE_CONDITION_POINTS_CONNECTIVITY)
+                POINTS_CONNECTIVITY=>INTERFACE%POINTS_CONNECTIVITY
+                IF(ASSOCIATED(POINTS_CONNECTIVITY)) THEN
+                  IF(ALLOCATED(POINTS_CONNECTIVITY%POINTS_CONNECTIVITY)) THEN
+                    !Calculate the row and columns for the interface equations matrices
+                    DO matrix_idx=1,INTERFACE_MATRICES%NUMBER_OF_INTERFACE_MATRICES
+                      INTERFACE_MATRIX=>INTERFACE_MATRICES%MATRICES(matrix_idx)%PTR
+                      IF(ASSOCIATED(INTERFACE_MATRIX)) THEN
+                        ALLOCATE(ELEMENT_NUMBERS(1),STAT=ERR)
+                        ELEMENT_NUMBERS=ELEMENT_NUMBER
+                        ROWS_FIELD_VARIABLE=>INTERFACE_MAPPING%INTERFACE_MATRIX_ROWS_TO_VAR_MAPS(matrix_idx)%VARIABLE
+                        COLS_FIELD_VARIABLE=>INTERFACE_MAPPING%LAGRANGE_VARIABLE !TEMPORARY: Needs generalising
+                        ROWS_MESH_INDEX=INTERFACE_MAPPING%INTERFACE_MATRIX_ROWS_TO_VAR_MAPS(matrix_idx)%MESH_INDEX                       
+                        !Compute number of elements in the coupled mesh that the data points in a interface mesh element have been projected to
+                        MESH_POINTS_TOPOLOGY=>INTERFACE%POINTS_CONNECTIVITY%INTERFACE_MESH%TOPOLOGY(1)%PTR%DATA_POINTS   
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+                        NULLIFY(COUPLED_MESH_ELEMENTS)
+                        CALL LIST_CREATE_START(COUPLED_MESH_ELEMENTS,ERR,ERROR,*999)
+                        CALL LIST_DATA_TYPE_SET(COUPLED_MESH_ELEMENTS,LIST_INTG_TYPE,ERR,ERROR,*999)
+                        CALL LIST_INITIAL_SIZE_SET(COUPLED_MESH_ELEMENTS,MESH_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(ELEMENT_NUMBER)% &
+                          & NUMBER_OF_PROJECTED_DATA,ERR,ERROR,*999)
+                        CALL LIST_CREATE_FINISH(COUPLED_MESH_ELEMENTS,ERR,ERROR,*999)
+                        DO data_point_idx=1,MESH_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(ELEMENT_NUMBER)%NUMBER_OF_PROJECTED_DATA
+                          DATA_POINT_USER_NUMBER=MESH_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(ELEMENT_NUMBER)% &
+                            & DATA_INDICES(data_point_idx)%USER_NUMBER
+                          COUPLED_MESH_ELEMENT_NUMBER=INTERFACE%POINTS_CONNECTIVITY%POINTS_CONNECTIVITY(DATA_POINT_USER_NUMBER, &
+                            & matrix_idx)%COUPLED_MESH_ELEMENT_NUMBER
+                          CALL LIST_ITEM_ADD(COUPLED_MESH_ELEMENTS,COUPLED_MESH_ELEMENT_NUMBER,ERR,ERROR,*999)
+                        ENDDO
+                        CALL LIST_REMOVE_DUPLICATES(COUPLED_MESH_ELEMENTS,ERR,ERROR,*999)
+                        CALL LIST_DETACH_AND_DESTROY(COUPLED_MESH_ELEMENTS,NUMBER_OF_COUPLED_MESH_ELEMENTS, &
+                          & COUPLED_MESH_ELEMENT_NUMBERS,ERR,ERROR,*999)
+                                    
+                        
+                        CALL EQUATIONS_MATRICES_ELEMENT_MATRIX_CALCULATE(INTERFACE_MATRIX%ELEMENT_MATRIX, &
+                          & INTERFACE_MATRIX%UPDATE_MATRIX,COUPLED_MESH_ELEMENT_NUMBERS(1:NUMBER_OF_COUPLED_MESH_ELEMENTS), &
+                          & ELEMENT_NUMBERS,ROWS_FIELD_VARIABLE,COLS_FIELD_VARIABLE,ERR,ERROR,*999)
+                        DEALLOCATE(COUPLED_MESH_ELEMENT_NUMBERS)
+                      ELSE
+                        LOCAL_ERROR="Interface matrix number "//TRIM(NUMBER_TO_VSTRING(matrix_idx,"*",ERR,ERROR))// &
+                          & " is not associated."
+                        CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
+                      ENDIF
+                    ENDDO !matrix_idx
+                  ELSE
+                    CALL FLAG_ERROR("Interface points connectivity is not associated.",ERR,ERROR,*999)     
+                  ENDIF
+                ELSE
+                  CALL FLAG_ERROR("Interface points connectivity is not associated.",ERR,ERROR,*999)          
+                ENDIF
+                
+                
+                  
+              END SELECT 
             ELSE
               CALL FLAG_ERROR("Interface condition interface is not associated.",ERR,ERROR,*999)            
             ENDIF
@@ -492,8 +577,8 @@ CONTAINS
                 NULLIFY(COUPLED_MESH_ELEMENTS)
                 CALL LIST_CREATE_START(COUPLED_MESH_ELEMENTS,ERR,ERROR,*999)
                 CALL LIST_DATA_TYPE_SET(COUPLED_MESH_ELEMENTS,LIST_INTG_TYPE,ERR,ERROR,*999)
-                CALL LIST_INITIAL_SIZE_SET(COUPLED_MESH_ELEMENTS,MESH_POINTS_TOPOLOGY%TOTAL_NUMBER_OF_PROJECTED_DATA, &
-                  & ERR,ERROR,*999)
+                CALL LIST_INITIAL_SIZE_SET(COUPLED_MESH_ELEMENTS,MESH_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(element_idx)% &
+                  & NUMBER_OF_PROJECTED_DATA,ERR,ERROR,*999)
                 CALL LIST_CREATE_FINISH(COUPLED_MESH_ELEMENTS,ERR,ERROR,*999)
                 DO data_point_idx=1,MESH_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(element_idx)%NUMBER_OF_PROJECTED_DATA
                   DATA_POINT_USER_NUMBER=MESH_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(element_idx)%DATA_INDICES(data_point_idx)% &
