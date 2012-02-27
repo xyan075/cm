@@ -319,6 +319,7 @@ MODULE TYPES
     INTEGER(INTG) :: COORDINATE_SYSTEM_DIMENSIONS !<The coordinate system dimension of this data projection.
     REAL(DP) :: MAXIMUM_ITERATION_UPDATE !<The maximum xi update allowed at each newton iteration, analogous to maximum trust region size in the trust region model approach.
     INTEGER(INTG) :: MAXIMUM_NUMBER_OF_ITERATIONS !<The maximum number of iterations
+    TYPE(MESH_TYPE), POINTER :: MESH !<The pointer to the mesh where data points are projected
     INTEGER(INTG) :: NUMBER_OF_CLOSEST_ELEMENTS !<The number of closest elements to perform full projection on. The algorithm first find the distance of the data point to each elements base on starting xi, full projection is only performed on the first few elements sorted by the distance
     INTEGER(INTG) :: NUMBER_OF_XI !<The number of xi of the mesh, ie. the mesh dimension
     INTEGER(INTG) :: PROJECTION_TYPE !<type of projection to perform. \See DATA_PROJECTION_ROUTINES     
@@ -2147,6 +2148,11 @@ END TYPE GENERATED_MESH_ELLIPSOID_TYPE
     INTEGER(INTG) :: COUPLED_MESH_CONTACT_XI_NORMAL !< LOCAL_MESH_LINE_XI_NORMAL(connectivity_point_idx) contact line/face normal xi direction
     REAL(DP), ALLOCATABLE :: XI(:,:) !<XI(xi_idx,mesh_component) !\todo Comment
   END TYPE INTERFACE_POINT_CONNECTIVITY_TYPE
+  
+  TYPE INTERFACE_POINTS_CONNECTIVITY_COUPLED_ELEMENTS_TYPE
+    INTEGER(INTG) :: NUMBER_OF_COUPLED_MESH_ELEMENTS !<Total number of coupled mesh elements that the data points in this interface elements are projected to
+    INTEGER(INTG), ALLOCATABLE :: ELEMENT_NUMBERS(:) !<element numbers
+  END TYPE INTERFACE_POINTS_CONNECTIVITY_COUPLED_ELEMENTS_TYPE
     
   !>Contains information on the data point coupling between meshes in the an interface
   TYPE INTERFACE_POINTS_CONNECTIVITY_TYPE
@@ -2157,6 +2163,7 @@ END TYPE GENERATED_MESH_ELLIPSOID_TYPE
     INTEGER(INTG) :: NUMBER_OF_ELEMENTS !<Number of element in the interface mesh
     INTEGER(INTG) :: NUMBER_INT_DOM !<Is the number of domains coupled via the interface
     TYPE(INTERFACE_POINT_CONNECTIVITY_TYPE), ALLOCATABLE :: POINTS_CONNECTIVITY(:,:) !<POINTS_CONNECTIVITY(point_index,coupled_mesh_idx)
+    TYPE(INTERFACE_POINTS_CONNECTIVITY_COUPLED_ELEMENTS_TYPE), ALLOCATABLE :: COUPLED_MESH_ELEMENTS(:,:) !<COUPLED_MESH_ELEMENTS(interface_element_idx,coupled_mesh_idx)
   END TYPE INTERFACE_POINTS_CONNECTIVITY_TYPE
  
   !>Contains information for the interface data.

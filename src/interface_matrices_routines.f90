@@ -294,7 +294,7 @@ CONTAINS
     INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
     TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
     !Local Variables
-    INTEGER(INTG) :: matrix_idx,data_point_idx,ROWS_MESH_INDEX,NUMBER_OF_COUPLED_MESH_ELEMENTS, &
+    INTEGER(INTG) :: matrix_idx,data_point_idx,element_idx,ROWS_MESH_INDEX,NUMBER_OF_COUPLED_MESH_ELEMENTS, &
       & COUPLED_MESH_ELEMENT_NUMBER,DATA_POINT_USER_NUMBER
     INTEGER(INTG) :: ROWS_NUMBER_OF_ELEMENTS,COLS_NUMBER_OF_ELEMENTS !Number of elements in the row and col variables whose dofs are present in this element matrix
     INTEGER(INTG), ALLOCATABLE :: COUPLED_MESH_ELEMENT_NUMBERS(:),ROWS_ELEMENT_NUMBERS(:),ELEMENT_NUMBERS(:)
@@ -328,7 +328,7 @@ CONTAINS
             INTERFACE=>INTERFACE_CONDITION%INTERFACE
             IF(ASSOCIATED(INTERFACE)) THEN
               !Hard code-interpolation type for the first component of the first variable   
-              SELECT CASE(INTERFACE_CONDITION%LAGRANGE%LAGRANGE_FIELD%VARIABLE(1)%COMPONENT(1))
+              SELECT CASE(INTERFACE_CONDITION%LAGRANGE%LAGRANGE_FIELD%VARIABLES(1)%COMPONENTS(1)%INTERPOLATION_TYPE)
               CASE(FIELD_NODE_BASED_INTERPOLATION) !Mesh connectivity
                 MESH_CONNECTIVITY=>INTERFACE%MESH_CONNECTIVITY
                 IF(ASSOCIATED(MESH_CONNECTIVITY)) THEN
@@ -388,7 +388,7 @@ CONTAINS
                 ELSE
                   CALL FLAG_ERROR("Interface mesh connectivity is not associated.",ERR,ERROR,*999)              
                 ENDIF
-              CASE(FIELD_DATA_POINT_BASED_INTERPOLATION)
+              CASE(FIELD_DATA_POINT_BASED_INTERPOLATION) !Points connecitivity
                 POINTS_CONNECTIVITY=>INTERFACE%POINTS_CONNECTIVITY
                 IF(ASSOCIATED(POINTS_CONNECTIVITY)) THEN
                   IF(ALLOCATED(POINTS_CONNECTIVITY%POINTS_CONNECTIVITY)) THEN
@@ -403,25 +403,6 @@ CONTAINS
                         ROWS_MESH_INDEX=INTERFACE_MAPPING%INTERFACE_MATRIX_ROWS_TO_VAR_MAPS(matrix_idx)%MESH_INDEX                       
                         !Compute number of elements in the coupled mesh that the data points in a interface mesh element have been projected to
                         MESH_POINTS_TOPOLOGY=>INTERFACE%POINTS_CONNECTIVITY%INTERFACE_MESH%TOPOLOGY(1)%PTR%DATA_POINTS   
-                        
-                        
-                        
-                        
-                        
-                        
-                        
-                        
-                        
-                        
-                        
-                        
-                        
-                        
-                        
-                        
-                        
-                        
-                        !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
                         NULLIFY(COUPLED_MESH_ELEMENTS)
                         CALL LIST_CREATE_START(COUPLED_MESH_ELEMENTS,ERR,ERROR,*999)
                         CALL LIST_DATA_TYPE_SET(COUPLED_MESH_ELEMENTS,LIST_INTG_TYPE,ERR,ERROR,*999)
@@ -438,8 +419,15 @@ CONTAINS
                         CALL LIST_REMOVE_DUPLICATES(COUPLED_MESH_ELEMENTS,ERR,ERROR,*999)
                         CALL LIST_DETACH_AND_DESTROY(COUPLED_MESH_ELEMENTS,NUMBER_OF_COUPLED_MESH_ELEMENTS, &
                           & COUPLED_MESH_ELEMENT_NUMBERS,ERR,ERROR,*999)
-                                    
-                        
+                        !Store coupled mesh elements that the data points in this interface element have been projected on to.                            
+                        INTERFACE%POINTS_CONNECTIVITY%COUPLED_MESH_ELEMENTS(ELEMENT_NUMBER,matrix_idx)% &
+                          & NUMBER_OF_COUPLED_MESH_ELEMENTS=NUMBER_OF_COUPLED_MESH_ELEMENTS
+                        ALLOCATE(INTERFACE%POINTS_CONNECTIVITY%COUPLED_MESH_ELEMENTS(ELEMENT_NUMBER,matrix_idx)% &
+                          & ELEMENT_NUMBERS(NUMBER_OF_COUPLED_MESH_ELEMENTS),STAT=ERR)
+                        DO element_idx=1,NUMBER_OF_COUPLED_MESH_ELEMENTS
+                          INTERFACE%POINTS_CONNECTIVITY%COUPLED_MESH_ELEMENTS(ELEMENT_NUMBER,matrix_idx)% &
+                          & ELEMENT_NUMBERS(element_idx)=COUPLED_MESH_ELEMENT_NUMBERS(element_idx)
+                        ENDDO             
                         CALL EQUATIONS_MATRICES_ELEMENT_MATRIX_CALCULATE(INTERFACE_MATRIX%ELEMENT_MATRIX, &
                           & INTERFACE_MATRIX%UPDATE_MATRIX,COUPLED_MESH_ELEMENT_NUMBERS(1:NUMBER_OF_COUPLED_MESH_ELEMENTS), &
                           & ELEMENT_NUMBERS,ROWS_FIELD_VARIABLE,COLS_FIELD_VARIABLE,ERR,ERROR,*999)
@@ -450,15 +438,24 @@ CONTAINS
                         CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
                       ENDIF
                     ENDDO !matrix_idx
+                    RHS_VECTOR=>INTERFACE_MATRICES%RHS_VECTOR
+                    IF(ASSOCIATED(RHS_VECTOR)) THEN
+                      RHS_MAPPING=>INTERFACE_MAPPING%RHS_MAPPING
+                      IF(ASSOCIATED(RHS_MAPPING)) THEN
+                        !Calculate the rows  for the equations RHS
+                        ROWS_FIELD_VARIABLE=>RHS_MAPPING%RHS_VARIABLE
+                        CALL EQUATIONS_MATRICES_ELEMENT_VECTOR_CALCULATE(RHS_VECTOR%ELEMENT_VECTOR,RHS_VECTOR%UPDATE_VECTOR, &
+                          & ELEMENT_NUMBER,ROWS_FIELD_VARIABLE,ERR,ERROR,*999)
+                      ELSE
+                        CALL FLAG_ERROR("Interface mapping rhs mapping is not associated.",ERR,ERROR,*999)
+                      ENDIF
+                    ENDIF
                   ELSE
                     CALL FLAG_ERROR("Interface points connectivity is not associated.",ERR,ERROR,*999)     
                   ENDIF
                 ELSE
                   CALL FLAG_ERROR("Interface points connectivity is not associated.",ERR,ERROR,*999)          
                 ENDIF
-                
-                
-                  
               END SELECT 
             ELSE
               CALL FLAG_ERROR("Interface condition interface is not associated.",ERR,ERROR,*999)            
@@ -561,15 +558,16 @@ CONTAINS
         DO matrix_idx=1,INTERFACE_MATRICES%NUMBER_OF_INTERFACE_MATRICES
           INTERFACE_MATRIX=>INTERFACE_MATRICES%MATRICES(matrix_idx)%PTR
           IF(ASSOCIATED(INTERFACE_MATRIX)) THEN
-            SELECT CASE(INTERFACE_MATRICES%INTERFACE_EQUATIONS%INTERFACE_CONDITION%CONNECTIVITY)
-            CASE(INTERFACE_CONDITION_MESH_CONNECTIVITY)
+            SELECT CASE(INTERFACE_MATRICES%INTERFACE_EQUATIONS%INTERFACE_CONDITION%LAGRANGE%LAGRANGE_FIELD%VARIABLES(1)% &
+              & COMPONENTS(1)%INTERPOLATION_TYPE)
+            CASE(FIELD_NODE_BASED_INTERPOLATION) !Mesh connectivity
               ROWS_NUMBER_OF_ELEMENTS=1
               COLS_NUMBER_OF_ELEMENTS=1
               ROWS_FIELD_VARIABLE=>INTERFACE_MAPPING%INTERFACE_MATRIX_ROWS_TO_VAR_MAPS(matrix_idx)%VARIABLE
               COLS_FIELD_VARIABLE=>INTERFACE_MAPPING%LAGRANGE_VARIABLE !TEMPORARY: Needs generalising
               CALL EQUATIONS_MATRICES_ELEMENT_MATRIX_SETUP(INTERFACE_MATRIX%ELEMENT_MATRIX,ROWS_FIELD_VARIABLE, &
                 & COLS_FIELD_VARIABLE,ROWS_NUMBER_OF_ELEMENTS,COLS_NUMBER_OF_ELEMENTS,ERR,ERROR,*999)
-            CASE(INTERFACE_CONDITION_POINTS_CONNECTIVITY)
+            CASE(FIELD_DATA_POINT_BASED_INTERPOLATION) !Points connectivity
               INTERFACE=>INTERFACE_MATRICES%INTERFACE_EQUATIONS%INTERFACE_CONDITION%INTERFACE
               MESH_POINTS_TOPOLOGY=>INTERFACE%POINTS_CONNECTIVITY%INTERFACE_MESH%TOPOLOGY(1)%PTR%DATA_POINTS   
               COLS_NUMBER_OF_ELEMENTS=1              
@@ -604,8 +602,8 @@ CONTAINS
                         
             CASE DEFAULT
               LOCAL_ERROR="The specified interface condition connectivity of "// &
-              & TRIM(NUMBER_TO_VSTRING(INTERFACE_MATRICES%INTERFACE_EQUATIONS%INTERFACE_CONDITION%CONNECTIVITY, &
-              & "*",ERR,ERROR))//" is not valid."
+              & TRIM(NUMBER_TO_VSTRING(INTERFACE_MATRICES%INTERFACE_EQUATIONS%INTERFACE_CONDITION%LAGRANGE%LAGRANGE_FIELD% &
+              & VARIABLES(1)%COMPONENTS(1)%INTERPOLATION_TYPE,"*",ERR,ERROR))//" is not valid."
           CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
             END SELECT
           ELSE

@@ -85,6 +85,8 @@ MODULE INTERFACE_ROUTINES
   PUBLIC INTERFACE_SELF_CONTACT_SET
 
   PUBLIC INTERFACE_DESTROY, INTERFACE_MESH_CONNECTIVITY_DESTROY
+  
+  PUBLIC INTERFACE_DATA_POINTS_GET
 
   PUBLIC INTERFACE_LABEL_GET,INTERFACE_LABEL_SET
 
@@ -432,6 +434,46 @@ CONTAINS
     CALL EXITS("INTERFACE_DESTROY")
     RETURN 1
   END SUBROUTINE INTERFACE_DESTROY
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Returns a pointer to the data points for a region. \see OPENCMISS::CMISSRegionDataPointsGet
+  SUBROUTINE INTERFACE_DATA_POINTS_GET(INTERFACE,DATA_POINTS,ERR,ERROR,*)
+
+    !Argument variables
+    TYPE(INTERFACE_TYPE), POINTER :: INTERFACE !<A pointer to the region to get the data points for
+    TYPE(DATA_POINTS_TYPE), POINTER :: DATA_POINTS !<On exit, a pointer to the data points for the region. Must not be associated on entry.
+    INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
+    !Local Variables
+ 
+    CALL ENTERS("REGION_DATA_POINTS_GET",ERR,ERROR,*998)
+
+    IF(ASSOCIATED(INTERFACE)) THEN
+      IF(INTERFACE%INTERFACE_FINISHED) THEN 
+        IF(ASSOCIATED(DATA_POINTS)) THEN
+          CALL FLAG_ERROR("Data points is already associated.",ERR,ERROR,*998)
+        ELSE
+          DATA_POINTS=>INTERFACE%DATA_POINTS
+          IF(.NOT.ASSOCIATED(DATA_POINTS)) CALL FLAG_ERROR("Data points is not associated.",ERR,ERROR,*999)
+        ENDIF
+      ELSE
+        CALL FLAG_ERROR("Interface has not been finished.",ERR,ERROR,*998)
+      ENDIF
+    ELSE
+      CALL FLAG_ERROR("Interface is not associated.",ERR,ERROR,*998)
+    ENDIF
+       
+    CALL EXITS("INTERFACE_DATA_POINTS_GET")
+    RETURN
+999 NULLIFY(DATA_POINTS)
+998 CALL ERRORS("INTERFACE_DATA_POINTS_GET",ERR,ERROR)
+    CALL EXITS("INTERFACE_DATA_POINTS_GET")
+    RETURN 1
+    
+  END SUBROUTINE INTERFACE_DATA_POINTS_GET  
 
   !
   !================================================================================================================================
@@ -808,7 +850,7 @@ CONTAINS
     TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
     !Local Variables
     INTEGER(INTG) :: I, K !< Dummy index
-    INTEGER(INTG) :: XI_DIR !<Number of XI directions of the coupled mesh
+    INTEGER(INTG) :: xi_dir !<Number of XI directions of the coupled mesh
     INTEGER(INTG) :: MESH_IDX!<The index of self-contacting mesh, if not a self-contact problem it's the same as the coupled mesh index
     
     CALL ENTERS("INTERFACE_MESH_CONNECTIVITY_ELEMENT_XI_SET",ERR,ERROR,*999)
@@ -885,7 +927,7 @@ CONTAINS
     TYPE(VARYING_STRING) :: LOCAL_ERROR
     !Local Variables
     INTEGER(INTG) :: I, K !< Dummy index
-    INTEGER(INTG) :: XI_DIR !<Number of XI directions of the coupled mesh
+    INTEGER(INTG) :: xi_dir !<Number of XI directions of the coupled mesh
     INTEGER(INTG) :: MESH_IDX !<The index of self-contacting mesh, if not a self-contact problem it's the same as the coupled mesh index
     
     CALL ENTERS("INTERFACE_MESH_CONNECTIVITY_ELEMENT_XI_CONTACT_SET",ERR,ERROR,*999)
@@ -1012,7 +1054,7 @@ CONTAINS
     TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
     !Local Variables
     INTEGER(INTG) :: I !< Dummy index
-    INTEGER(INTG) :: XI_DIR !<Number of XI directions of the coupled mesh
+    INTEGER(INTG) :: xi_dir !<Number of XI directions of the coupled mesh
     INTEGER(INTG) :: LOCAL_NODE !<Number of local nodes in the interface
     INTEGER(INTG) :: MESH_IDX!<The index of self-contacting mesh, if not a self-contact problem it's the same as the coupled mesh index
     
@@ -1031,11 +1073,11 @@ CONTAINS
              IF (ALLOCATED(MESH_CON%ELEMENTS_CONNECTIVITY)) THEN
                MESH_IDX=COUPLED_MESHID
                MESH_CON%ELEMENTS_CONNECTIVITY(INT_MESH_ELEM,MESH_IDX)%COUPLED_MESH_ELEMENT_NUMBER=NO_ELEM
-               XI_DIR=MESH_CON%INTERFACE_MESH%NUMBER_OF_DIMENSIONS+1
+               xi_dir=MESH_CON%INTERFACE_MESH%NUMBER_OF_DIMENSIONS+1
                LOCAL_NODE=MESH_CON%BASIS%NUMBER_OF_NODES
                IF(.NOT.ALLOCATED(MESH_CON%ELEMENTS_CONNECTIVITY(INT_MESH_ELEM,MESH_IDX)%XI)) THEN
-                 !\todo Update mesh component index to look at the number of mesh components in each element. Currently this defaults to the first mesh component ie %XI(XI_DIR,1,LOCAL_NODE)). The interface mesh types will also need to be restructured.
-                 ALLOCATE(MESH_CON%ELEMENTS_CONNECTIVITY(INT_MESH_ELEM,MESH_IDX)%XI(XI_DIR,1,LOCAL_NODE))
+                 !\todo Update mesh component index to look at the number of mesh components in each element. Currently this defaults to the first mesh component ie %XI(xi_dir,1,LOCAL_NODE)). The interface mesh types will also need to be restructured.
+                 ALLOCATE(MESH_CON%ELEMENTS_CONNECTIVITY(INT_MESH_ELEM,MESH_IDX)%XI(xi_dir,1,LOCAL_NODE))
                ENDIF
                MESH_CON%ELEMENTS_CONNECTIVITY(INT_MESH_ELEM,MESH_IDX)%XI=0.0_DP
              ELSE
@@ -1147,7 +1189,7 @@ CONTAINS
     INTEGER(INTG) :: COUPLED_MESHID
     INTEGER(INTG) :: INT_ELEM
     INTEGER(INTG) :: NUMBER_OF_NODES
-    INTEGER(INTG) :: XI_DIR
+    INTEGER(INTG) :: xi_dir
     INTEGER(INTG) :: LOCAL_CONTACT
     TYPE(VARYING_STRING) :: LOCAL_ERROR
     
@@ -1159,15 +1201,15 @@ CONTAINS
         NUMBER_OF_NODES=SIZE(MESH_CON%ELEMENTS_CONNECTIVITY(INT_ELEM,COUPLED_MESHID)%XI,3)
         SELECT CASE(SIZE(MESH_CON%ELEMENTS_CONNECTIVITY(INT_ELEM,COUPLED_MESHID)%XI,1))
         CASE(2)      
-          DO XI_DIR=1,SIZE(MESH_CON%ELEMENTS_CONNECTIVITY(INT_ELEM,COUPLED_MESHID)%XI,1)
-            XI_DIFF=MESH_CON%ELEMENTS_CONNECTIVITY(INT_ELEM,COUPLED_MESHID)%XI(XI_DIR,1,1)- &
-              & MESH_CON%ELEMENTS_CONNECTIVITY(INT_ELEM,COUPLED_MESHID)%XI(XI_DIR,1,NUMBER_OF_NODES)
+          DO xi_dir=1,SIZE(MESH_CON%ELEMENTS_CONNECTIVITY(INT_ELEM,COUPLED_MESHID)%XI,1)
+            XI_DIFF=MESH_CON%ELEMENTS_CONNECTIVITY(INT_ELEM,COUPLED_MESHID)%XI(xi_dir,1,1)- &
+              & MESH_CON%ELEMENTS_CONNECTIVITY(INT_ELEM,COUPLED_MESHID)%XI(xi_dir,1,NUMBER_OF_NODES)
             IF(XI_DIFF==0.0_DP) THEN
-              IF(MESH_CON%ELEMENTS_CONNECTIVITY(INT_ELEM,COUPLED_MESHID)%XI(XI_DIR,1,NUMBER_OF_NODES) &
+              IF(MESH_CON%ELEMENTS_CONNECTIVITY(INT_ELEM,COUPLED_MESHID)%XI(xi_dir,1,NUMBER_OF_NODES) &
                 & ==0.0_DP) THEN
-                LOCAL_CONTACT=3-(XI_DIR-1)*2
+                LOCAL_CONTACT=3-(xi_dir-1)*2
               ELSE
-                LOCAL_CONTACT=4-(XI_DIR-1)*2
+                LOCAL_CONTACT=4-(xi_dir-1)*2
               END IF
             END IF
           ENDDO
@@ -1186,15 +1228,15 @@ CONTAINS
             CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
           END SELECT
         CASE(3)
-          DO XI_DIR=1,SIZE(MESH_CON%ELEMENTS_CONNECTIVITY(INT_ELEM,COUPLED_MESHID)%XI,1)
-            XI_DIFF=MESH_CON%ELEMENTS_CONNECTIVITY(INT_ELEM,COUPLED_MESHID)%XI(XI_DIR,1,1)- &
-              & MESH_CON%ELEMENTS_CONNECTIVITY(INT_ELEM,COUPLED_MESHID)%XI(XI_DIR,1,NUMBER_OF_NODES)
+          DO xi_dir=1,SIZE(MESH_CON%ELEMENTS_CONNECTIVITY(INT_ELEM,COUPLED_MESHID)%XI,1)
+            XI_DIFF=MESH_CON%ELEMENTS_CONNECTIVITY(INT_ELEM,COUPLED_MESHID)%XI(xi_dir,1,1)- &
+              & MESH_CON%ELEMENTS_CONNECTIVITY(INT_ELEM,COUPLED_MESHID)%XI(xi_dir,1,NUMBER_OF_NODES)
             IF(XI_DIFF==0.0_DP) THEN
-              IF(MESH_CON%ELEMENTS_CONNECTIVITY(INT_ELEM,COUPLED_MESHID)%XI(XI_DIR,1,NUMBER_OF_NODES) &
+              IF(MESH_CON%ELEMENTS_CONNECTIVITY(INT_ELEM,COUPLED_MESHID)%XI(xi_dir,1,NUMBER_OF_NODES) &
                 & ==0.0_DP) THEN
-                LOCAL_CONTACT=(XI_DIR-1)*2+2
+                LOCAL_CONTACT=(xi_dir-1)*2+2
               ELSE
-                LOCAL_CONTACT=(XI_DIR-1)*2+1
+                LOCAL_CONTACT=(xi_dir-1)*2+1
               END IF
             END IF
           ENDDO
@@ -1329,7 +1371,7 @@ CONTAINS
     INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
     TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
     !Local Variables
-    INTEGER(INTG) :: XI_DIR !<Number of XI directions of the coupled mesh
+    INTEGER(INTG) :: xi_dir !<Number of XI directions of the coupled mesh
     
     CALL ENTERS("INTERFACE_POINTS_CONNECTIVITY_ELEMENT_NUMBER_SET",ERR,ERROR,*999)
 
@@ -1345,10 +1387,10 @@ CONTAINS
           ELSE
             IF (ALLOCATED(POINTS_CON%POINTS_CONNECTIVITY)) THEN
               POINTS_CON%POINTS_CONNECTIVITY(POINTS_IDX,COUPLED_MESHID)%COUPLED_MESH_ELEMENT_NUMBER=COUPLED_ELEM
-              XI_DIR=POINTS_CON%INTERFACE_MESH%NUMBER_OF_DIMENSIONS+1
+              xi_dir=POINTS_CON%INTERFACE_MESH%NUMBER_OF_DIMENSIONS+1
               IF(.NOT.ALLOCATED(POINTS_CON%POINTS_CONNECTIVITY(POINTS_IDX,COUPLED_MESHID)%XI)) THEN
-                !\todo Update mesh component index to look at the number of mesh components in each element. Currently this defaults to the first mesh component ie %XI(XI_DIR,1)). The interface mesh types will also need to be restructured.
-                ALLOCATE(POINTS_CON%POINTS_CONNECTIVITY(POINTS_IDX,COUPLED_MESHID)%XI(XI_DIR,1))
+                !\todo Update mesh component index to look at the number of mesh components in each element. Currently this defaults to the first mesh component ie %XI(xi_dir,1)). The interface mesh types will also need to be restructured.
+                ALLOCATE(POINTS_CON%POINTS_CONNECTIVITY(POINTS_IDX,COUPLED_MESHID)%XI(xi_dir,1))
               ENDIF
               POINTS_CON%POINTS_CONNECTIVITY(POINTS_IDX,COUPLED_MESHID)%XI=0.5_DP
             ELSE
@@ -1423,7 +1465,7 @@ CONTAINS
         ENDIF
       ENDIF
     ELSE
-      CALL FLAG_ERROR("Interface mesh connectivity is not associated.",ERR,ERROR,*999)
+      CALL FLAG_ERROR("Interface points connectivity is not associated.",ERR,ERROR,*999)
     ENDIF
 
     CALL EXITS("INTERFACE_POINTS_CONNECTIVITY_POINT_XI_SET")
@@ -1447,7 +1489,7 @@ CONTAINS
     TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
     !Local Variables
     INTEGER(INTG) :: element_idx
-     
+  
     CALL ENTERS("INTERFACE_POINTS_CONNECTIVITY_CREATE_FINISH",ERR,ERROR,*999)
 
      IF(ASSOCIATED(INTERFACE_POINTS_CONNECTIVITY)) THEN
@@ -1459,10 +1501,13 @@ CONTAINS
              & ERR,ERROR,*999)!also calculate normal xi direction
          ENDIF
          INTERFACE_POINTS_CONNECTIVITY%POINTS_CONNECTIVITY_FINISHED=.TRUE.
-         INTERFACE_POINTS_CONNECTIVITY%NUMBER_OF_ELEMENTS=INTERFACE_POINTS_CONNECTIVITY%INTERFACE%MESH_CONNECTIVITY%NUMBER_INT_ELEM
+         INTERFACE_POINTS_CONNECTIVITY%NUMBER_OF_ELEMENTS=INTERFACE_POINTS_CONNECTIVITY%INTERFACE%MESHES%MESHES(1)% &
+           & PTR%NUMBER_OF_ELEMENTS
+         ALLOCATE(INTERFACE_POINTS_CONNECTIVITY%COUPLED_MESH_ELEMENTS(INTERFACE_POINTS_CONNECTIVITY%NUMBER_OF_ELEMENTS, &
+           & INTERFACE_POINTS_CONNECTIVITY%NUMBER_INT_DOM),STAT=ERR)
        ENDIF
      ELSE
-       CALL FLAG_ERROR("Interface meshes connectivity is not associated.",ERR,ERROR,*999)
+       CALL FLAG_ERROR("Interface points connectivity is not associated.",ERR,ERROR,*999)
      ENDIF
     
     CALL EXITS("INTERFACE_POINTS_CONNECTIVITY_CREATE_FINISH")
@@ -1486,81 +1531,96 @@ CONTAINS
     !Local variables
     REAL(DP) :: XI_DIFF
     INTEGER(INTG) :: COUPLED_MESHID
-    INTEGER(INTG) :: POINT_IDX
-    INTEGER(INTG) :: XI_DIR
+    INTEGER(INTG) :: point_idx,reference_point_idx,mod_reference_point_idx
+    INTEGER(INTG) :: xi_dir
     INTEGER(INTG) :: LOCAL_CONTACT
+    LOGICAL :: DIFFERENT_ELEMENT
     TYPE(VARYING_STRING) :: LOCAL_ERROR
     
     CALL ENTERS("INTERFACE_POINTS_CONNECTIVITY_CONTACT_NUMBER_CALCULATE",ERR,ERROR,*999)
     
     DO COUPLED_MESHID=1,POINTS_CON%NUMBER_INT_DOM
-      DO POINT_IDX=1,POINTS_CON%NUMBER_OF_DATA_POINTS
-        SELECT CASE(SIZE(POINTS_CON%POINTS_CONNECTIVITY(POINT_IDX,COUPLED_MESHID)%XI,1))
+      DO point_idx=1,POINTS_CON%NUMBER_OF_DATA_POINTS
+        DIFFERENT_ELEMENT=.TRUE.
+        reference_point_idx=point_idx+1
+        SELECT CASE(SIZE(POINTS_CON%POINTS_CONNECTIVITY(point_idx,COUPLED_MESHID)%XI,1))
         CASE(2)      
-          DO XI_DIR=1,SIZE(POINTS_CON%POINTS_CONNECTIVITY(POINT_IDX,COUPLED_MESHID)%XI,1)
-            IF(POINT_IDX==POINTS_CON%NUMBER_OF_DATA_POINTS) THEN
-              XI_DIFF=POINTS_CON%POINTS_CONNECTIVITY(POINT_IDX,COUPLED_MESHID)%XI(XI_DIR,1)- &
-                & POINTS_CON%POINTS_CONNECTIVITY(POINT_IDX-1,COUPLED_MESHID)%XI(XI_DIR,1)
-            ELSE
-              XI_DIFF=POINTS_CON%POINTS_CONNECTIVITY(POINT_IDX,COUPLED_MESHID)%XI(XI_DIR,1)- &
-                & POINTS_CON%POINTS_CONNECTIVITY(POINT_IDX+1,COUPLED_MESHID)%XI(XI_DIR,1)
-            ENDIF
+          DO xi_dir=1,SIZE(POINTS_CON%POINTS_CONNECTIVITY(point_idx,COUPLED_MESHID)%XI,1)    
+            DO WHILE (DIFFERENT_ELEMENT) 
+              mod_reference_point_idx=MOD(reference_point_idx-1,POINTS_CON%NUMBER_OF_DATA_POINTS)+1
+              IF ((POINTS_CON%POINTS_CONNECTIVITY(point_idx,COUPLED_MESHID)%COUPLED_MESH_ELEMENT_NUMBER == &
+                  & POINTS_CON%POINTS_CONNECTIVITY(mod_reference_point_idx,COUPLED_MESHID)%COUPLED_MESH_ELEMENT_NUMBER) &
+                  &  .AND. (mod_reference_point_idx/=point_idx)) THEN
+                DIFFERENT_ELEMENT=.FALSE.
+              ELSE
+                IF (MOD(reference_point_idx,POINTS_CON%NUMBER_OF_DATA_POINTS)==point_idx) THEN
+                  LOCAL_ERROR="Only one data point in this element"
+                  CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
+                ELSE
+                  reference_point_idx=reference_point_idx+1
+                ENDIF
+              ENDIF
+            ENDDO !(DIFFERENT_ELEMENT) 
+            XI_DIFF=POINTS_CON%POINTS_CONNECTIVITY(point_idx,COUPLED_MESHID)%XI(xi_dir,1)- &
+              & POINTS_CON%POINTS_CONNECTIVITY(mod_reference_point_idx,COUPLED_MESHID)%XI(xi_dir,1)
+              
             IF(XI_DIFF==0.0_DP) THEN !Data points have same xi location (current xi direction)
               !Check if the absolute value is zero 
-              IF(POINTS_CON%POINTS_CONNECTIVITY(POINT_IDX,COUPLED_MESHID)%XI(XI_DIR,1) &
+              IF(POINTS_CON%POINTS_CONNECTIVITY(point_idx,COUPLED_MESHID)%XI(xi_dir,1) &
                 & ==0.0_DP) THEN
-                LOCAL_CONTACT=3-(XI_DIR-1)*2 !Line 1 or 3
+                LOCAL_CONTACT=3-(xi_dir-1)*2 !Line 1 or 3
               ELSE
-                LOCAL_CONTACT=4-(XI_DIR-1)*2 !Line 2 or 4
+                LOCAL_CONTACT=4-(xi_dir-1)*2 !Line 2 or 4
               END IF
             END IF
-          ENDDO
-          POINTS_CON%POINTS_CONNECTIVITY(POINT_IDX,COUPLED_MESHID)%COUPLED_MESH_CONTACT_NUMBER=LOCAL_CONTACT
+          ENDDO !xi_dir
+          
+          POINTS_CON%POINTS_CONNECTIVITY(point_idx,COUPLED_MESHID)%COUPLED_MESH_CONTACT_NUMBER=LOCAL_CONTACT
           SELECT CASE(LOCAL_CONTACT)
           CASE(1)
-            POINTS_CON%POINTS_CONNECTIVITY(POINT_IDX,COUPLED_MESHID)%COUPLED_MESH_CONTACT_XI_NORMAL=-2
+            POINTS_CON%POINTS_CONNECTIVITY(point_idx,COUPLED_MESHID)%COUPLED_MESH_CONTACT_XI_NORMAL=-2
           CASE(2)
-            POINTS_CON%POINTS_CONNECTIVITY(POINT_IDX,COUPLED_MESHID)%COUPLED_MESH_CONTACT_XI_NORMAL=2
+            POINTS_CON%POINTS_CONNECTIVITY(point_idx,COUPLED_MESHID)%COUPLED_MESH_CONTACT_XI_NORMAL=2
           CASE(3)
-            POINTS_CON%POINTS_CONNECTIVITY(POINT_IDX,COUPLED_MESHID)%COUPLED_MESH_CONTACT_XI_NORMAL=-1
+            POINTS_CON%POINTS_CONNECTIVITY(point_idx,COUPLED_MESHID)%COUPLED_MESH_CONTACT_XI_NORMAL=-1
           CASE(4)
-            POINTS_CON%POINTS_CONNECTIVITY(POINT_IDX,COUPLED_MESHID)%COUPLED_MESH_CONTACT_XI_NORMAL=1
+            POINTS_CON%POINTS_CONNECTIVITY(point_idx,COUPLED_MESHID)%COUPLED_MESH_CONTACT_XI_NORMAL=1
           CASE DEFAULT
             LOCAL_ERROR="Local line number should be < 4"
             CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
           END SELECT
         CASE(3)
-          DO XI_DIR=1,SIZE(POINTS_CON%POINTS_CONNECTIVITY(POINT_IDX,COUPLED_MESHID)%XI,1)
-            IF(POINT_IDX==POINTS_CON%NUMBER_OF_DATA_POINTS) THEN
-              XI_DIFF=POINTS_CON%POINTS_CONNECTIVITY(POINT_IDX,COUPLED_MESHID)%XI(XI_DIR,1)- &
-                & POINTS_CON%POINTS_CONNECTIVITY(POINT_IDX-1,COUPLED_MESHID)%XI(XI_DIR,1)
+          DO xi_dir=1,SIZE(POINTS_CON%POINTS_CONNECTIVITY(point_idx,COUPLED_MESHID)%XI,1)
+            IF(point_idx==POINTS_CON%NUMBER_OF_DATA_POINTS) THEN
+              XI_DIFF=POINTS_CON%POINTS_CONNECTIVITY(point_idx,COUPLED_MESHID)%XI(xi_dir,1)- &
+                & POINTS_CON%POINTS_CONNECTIVITY(point_idx-1,COUPLED_MESHID)%XI(xi_dir,1)
             ELSE
-              XI_DIFF=POINTS_CON%POINTS_CONNECTIVITY(POINT_IDX,COUPLED_MESHID)%XI(XI_DIR,1)- &
-                & POINTS_CON%POINTS_CONNECTIVITY(POINT_IDX+1,COUPLED_MESHID)%XI(XI_DIR,1)
+              XI_DIFF=POINTS_CON%POINTS_CONNECTIVITY(point_idx,COUPLED_MESHID)%XI(xi_dir,1)- &
+                & POINTS_CON%POINTS_CONNECTIVITY(point_idx+1,COUPLED_MESHID)%XI(xi_dir,1)
             ENDIF
             IF(XI_DIFF==0.0_DP) THEN
-              IF(POINTS_CON%POINTS_CONNECTIVITY(POINT_IDX,COUPLED_MESHID)%XI(XI_DIR,1) &
+              IF(POINTS_CON%POINTS_CONNECTIVITY(point_idx,COUPLED_MESHID)%XI(xi_dir,1) &
                 & ==0.0_DP) THEN
-                LOCAL_CONTACT=(XI_DIR-1)*2+2
+                LOCAL_CONTACT=(xi_dir-1)*2+2
               ELSE
-                LOCAL_CONTACT=(XI_DIR-1)*2+1
+                LOCAL_CONTACT=(xi_dir-1)*2+1
               END IF
             END IF
           ENDDO
-          POINTS_CON%POINTS_CONNECTIVITY(POINT_IDX,COUPLED_MESHID)%COUPLED_MESH_CONTACT_NUMBER=LOCAL_CONTACT
+          POINTS_CON%POINTS_CONNECTIVITY(point_idx,COUPLED_MESHID)%COUPLED_MESH_CONTACT_NUMBER=LOCAL_CONTACT
           SELECT CASE(LOCAL_CONTACT)
           CASE(1)
-            POINTS_CON%POINTS_CONNECTIVITY(POINT_IDX,COUPLED_MESHID)%COUPLED_MESH_CONTACT_XI_NORMAL=1
+            POINTS_CON%POINTS_CONNECTIVITY(point_idx,COUPLED_MESHID)%COUPLED_MESH_CONTACT_XI_NORMAL=1
           CASE(2)
-            POINTS_CON%POINTS_CONNECTIVITY(POINT_IDX,COUPLED_MESHID)%COUPLED_MESH_CONTACT_XI_NORMAL=-1
+            POINTS_CON%POINTS_CONNECTIVITY(point_idx,COUPLED_MESHID)%COUPLED_MESH_CONTACT_XI_NORMAL=-1
           CASE(3)
-            POINTS_CON%POINTS_CONNECTIVITY(POINT_IDX,COUPLED_MESHID)%COUPLED_MESH_CONTACT_XI_NORMAL=2
+            POINTS_CON%POINTS_CONNECTIVITY(point_idx,COUPLED_MESHID)%COUPLED_MESH_CONTACT_XI_NORMAL=2
           CASE(4)
-            POINTS_CON%POINTS_CONNECTIVITY(POINT_IDX,COUPLED_MESHID)%COUPLED_MESH_CONTACT_XI_NORMAL=-2
+            POINTS_CON%POINTS_CONNECTIVITY(point_idx,COUPLED_MESHID)%COUPLED_MESH_CONTACT_XI_NORMAL=-2
           CASE(5)
-            POINTS_CON%POINTS_CONNECTIVITY(POINT_IDX,COUPLED_MESHID)%COUPLED_MESH_CONTACT_XI_NORMAL=3
+            POINTS_CON%POINTS_CONNECTIVITY(point_idx,COUPLED_MESHID)%COUPLED_MESH_CONTACT_XI_NORMAL=3
           CASE(6)
-            POINTS_CON%POINTS_CONNECTIVITY(POINT_IDX,COUPLED_MESHID)%COUPLED_MESH_CONTACT_XI_NORMAL=-3  
+            POINTS_CON%POINTS_CONNECTIVITY(point_idx,COUPLED_MESHID)%COUPLED_MESH_CONTACT_XI_NORMAL=-3  
           CASE DEFAULT
             LOCAL_ERROR="Local face number should be < 6"
             CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
@@ -1601,7 +1661,7 @@ CONTAINS
     TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
     
     !Local Variables
-    INTEGER(INTG) :: XI_DIR !<Number of XI directions of the coupled mesh
+    INTEGER(INTG) :: xi_dir !<Number of XI directions of the coupled mesh
     TYPE(VARYING_STRING) :: LOCAL_ERROR
     
     CALL ENTERS("INTERFACE_POINTS_CONNECTIVITY_POINT_XI_CONTACT_SET",ERR,ERROR,*999)
@@ -2109,7 +2169,8 @@ CONTAINS
           CALL FLAG_ERROR("Interface points element connectivity is already allocated.",ERR,ERROR,*999)
         ELSE
           IF(INTERFACE%NUMBER_OF_COUPLED_MESHES<=0) CALL FLAG_ERROR("Interface coupled meshes are not associated.",ERR,ERROR,*999)
-          IF(INTERFACE%MESH_CONNECTIVITY%INTERFACE_MESH%NUMBER_OF_ELEMENTS<=0) CALL FLAG_ERROR("Interface coupled meshes are not & 
+          !Hard coded the first mesh to be interface mesh
+          IF(INTERFACE%MESHES%MESHES(1)%PTR%NUMBER_OF_ELEMENTS<=0) CALL FLAG_ERROR("Interface coupled meshes are not & 
             & associated.",ERR,ERROR,*999)
           INTERFACE%POINTS_CONNECTIVITY%NUMBER_OF_DATA_POINTS=INTERFACE%DATA_POINTS%NUMBER_OF_DATA_POINTS
           INTERFACE%POINTS_CONNECTIVITY%NUMBER_INT_DOM=INTERFACE%NUMBER_OF_COUPLED_MESHES

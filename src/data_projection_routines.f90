@@ -90,6 +90,8 @@ MODULE DATA_PROJECTION_ROUTINES
   
   PUBLIC DATA_PROJECTION_DATA_POINTS_EVALUATE
   
+  PUBLIC DATA_PROJECTION_GEOMETRIC_FIELD_SET
+  
   PUBLIC DATA_PROJECTION_MAXIMUM_ITERATION_UPDATE_GET,DATA_PROJECTION_MAXIMUM_ITERATION_UPDATE_SET
   
   PUBLIC DATA_PROJECTION_MAXIMUM_NUMBER_OF_ITERATIONS_GET,DATA_PROJECTION_MAXIMUM_NUMBER_OF_ITERATIONS_SET
@@ -101,6 +103,8 @@ MODULE DATA_PROJECTION_ROUTINES
   PUBLIC DATA_PROJECTION_RELATIVE_TOLERANCE_GET,DATA_PROJECTION_RELATIVE_TOLERANCE_SET
   
   PUBLIC DATA_PROJECTION_STARTING_XI_GET,DATA_PROJECTION_STARTING_XI_SET
+  
+  PUBLIC DATA_PROJECTION_XI_SET,DATA_PROJECTION_ELEMENT_SET
  
 CONTAINS
 
@@ -507,20 +511,16 @@ CONTAINS
     IF(ASSOCIATED(DATA_PROJECTION)) THEN !Has to be associated
       IF(ASSOCIATED(DATA_PROJECTION%DATA_POINTS)) THEN !Has to be associated
         IF(DATA_PROJECTION%DATA_POINTS%DATA_POINTS_FINISHED) THEN !Has to be finished
-          IF(ASSOCIATED(DATA_PROJECTION%GEOMETRIC_FIELD)) THEN !Has to be associated
-            IF(DATA_PROJECTION%GEOMETRIC_FIELD%FIELD_FINISHED) THEN !Has to be finished
-              IF(DATA_PROJECTION%DATA_PROJECTION_FINISHED) THEN !Cannot be finished
-                CALL FLAG_ERROR("Data projection have already been finished.",ERR,ERROR,*999)
-              ELSE
-                DATA_PROJECTION%DATA_PROJECTION_FINISHED=.TRUE.
-                CALL DATA_PROJECTION_DATA_POINTS_INITIALISE(DATA_PROJECTION%DATA_POINTS,DATA_PROJECTION%GLOBAL_NUMBER,ERR,ERROR, &
-                  & *999) !<Initialise data projection part in data points
-              ENDIF    
+          IF(ASSOCIATED(DATA_PROJECTION%MESH)) THEN !Has to be associated
+            IF(DATA_PROJECTION%DATA_PROJECTION_FINISHED) THEN !Cannot be finished
+              CALL FLAG_ERROR("Data projection have already been finished.",ERR,ERROR,*999)
             ELSE
-              CALL FLAG_ERROR("Data projection geometric field have not been finished.",ERR,ERROR,*999)
-            ENDIF      
+              DATA_PROJECTION%DATA_PROJECTION_FINISHED=.TRUE.
+              CALL DATA_PROJECTION_DATA_POINTS_INITIALISE(DATA_PROJECTION%DATA_POINTS,DATA_PROJECTION%GLOBAL_NUMBER,ERR,ERROR, &
+                & *999) !<Initialise data projection part in data points
+            ENDIF         
           ELSE
-            CALL FLAG_ERROR("Data projection geometric field is not associated.",ERR,ERROR,*999)
+            CALL FLAG_ERROR("Data projection mesh is not associated.",ERR,ERROR,*999)
           ENDIF
         ELSE
           CALL FLAG_ERROR("Data projection data points have not been finished.",ERR,ERROR,*999)
@@ -544,13 +544,13 @@ CONTAINS
   !================================================================================================================================
   !  
   !>Starts the process of creating data projection.
-  SUBROUTINE DATA_PROJECTION_CREATE_START_DATA_POINTS(DATA_PROJECTION_USER_NUMBER,DATA_POINTS,GEOMETRIC_FIELD,DATA_PROJECTION, &
+  SUBROUTINE DATA_PROJECTION_CREATE_START_DATA_POINTS(DATA_PROJECTION_USER_NUMBER,DATA_POINTS,MESH,DATA_PROJECTION, &
     & ERR,ERROR,*)
 
     !Argument variables
     INTEGER(INTG), INTENT(IN) :: DATA_PROJECTION_USER_NUMBER !<the user number of the data projection
     TYPE(DATA_POINTS_TYPE), POINTER :: DATA_POINTS !<A pointer to the data points in which to create data projection
-    TYPE(FIELD_TYPE), POINTER :: GEOMETRIC_FIELD !<A pointer to the geometric field to be interpolated
+    TYPE(MESH_TYPE), POINTER :: MESH !<A pointer to the mesh where the data points are projected
     TYPE(DATA_PROJECTION_TYPE), POINTER :: DATA_PROJECTION !<On exit, a pointer to the created data projection
     INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
     TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
@@ -561,7 +561,7 @@ CONTAINS
     !TYPE(FIELD_INTERPOLATION_PARAMETERS_TYPE), POINTER :: INTERPOLATION_PARAMETERS    
     !TYPE(FIELD_INTERPOLATED_POINT_TYPE), POINTER :: INTERPOLATED_POINT
     !INTEGER(INTG) :: TOTAL_NUMBER_OF_PROJECTION_ELEMENTS
-    INTEGER(INTG) :: NUMBER_OF_DATA_PROJECTIONS,DATA_POINTS_REGION_DIMENSIONS,GEOMETRIC_FIELD_REGION_DIMENSIONS,INSERT_STATUS
+    INTEGER(INTG) :: NUMBER_OF_DATA_PROJECTIONS,DATA_POINTS_REGION_DIMENSIONS,MESH_REGION_DIMENSIONS,INSERT_STATUS
     INTEGER(INTG) :: xi_idx,data_projection_idx
 
     CALL ENTERS("DATA_PROJECTION_CREATE_START_DATA_POINTS",ERR,ERROR,*999)
@@ -569,93 +569,89 @@ CONTAINS
     NULLIFY(DATA_PROJECTION)
     IF(ASSOCIATED(DATA_POINTS)) THEN !Has to be associated
       IF(DATA_POINTS%DATA_POINTS_FINISHED) THEN !Has to be finished
-        IF(ASSOCIATED(GEOMETRIC_FIELD)) THEN !Has to be associated
-          IF(GEOMETRIC_FIELD%FIELD_FINISHED) THEN !Has to be finished
-            IF(ASSOCIATED(DATA_PROJECTION)) THEN !Cannot be associated
-              CALL FLAG_ERROR("Data projection is already associated.",ERR,ERROR,*999)
-            ELSE
-              IF(ASSOCIATED(DATA_POINTS%REGION)) THEN
-                DATA_POINTS_REGION_DIMENSIONS=DATA_POINTS%REGION%COORDINATE_SYSTEM%NUMBER_OF_DIMENSIONS
-              ELSEIF(ASSOCIATED(DATA_POINTS%INTERFACE)) THEN
-                DATA_POINTS_REGION_DIMENSIONS=DATA_POINTS%INTERFACE%COORDINATE_SYSTEM%NUMBER_OF_DIMENSIONS
-              ENDIF
-              IF(ASSOCIATED(GEOMETRIC_FIELD%REGION)) THEN
-                GEOMETRIC_FIELD_REGION_DIMENSIONS=GEOMETRIC_FIELD%REGION%COORDINATE_SYSTEM%NUMBER_OF_DIMENSIONS
-              ELSEIF(ASSOCIATED(GEOMETRIC_FIELD%INTERFACE)) THEN
-                GEOMETRIC_FIELD_REGION_DIMENSIONS=GEOMETRIC_FIELD%INTERFACE%COORDINATE_SYSTEM%NUMBER_OF_DIMENSIONS
-              ENDIF
-              IF(DATA_POINTS_REGION_DIMENSIONS==GEOMETRIC_FIELD_REGION_DIMENSIONS) THEN !Dimension has to be equal
-                ! acquire an unallocated data projection inside data points
-                data_projection_idx=1
-                DO WHILE(data_projection_idx<=DATA_POINTS%NUMBER_OF_DATA_PROJECTIONS.AND..NOT.ASSOCIATED(DATA_PROJECTION))
-                  IF(.NOT.ASSOCIATED(DATA_POINTS%DATA_PROJECTIONS(data_projection_idx)%PTR)) THEN
-                    ALLOCATE(DATA_PROJECTION,STAT=ERR)
-                    IF(ERR/=0) CALL FLAG_ERROR("Could not allocate data points data projections("//TRIM(NUMBER_TO_VSTRING &
-                      & (data_projection_idx,"*",ERR,ERROR))//"). ptr",ERR,ERROR,*999)
-                  ENDIF
-                  IF(.NOT.ASSOCIATED(DATA_PROJECTION)) data_projection_idx=data_projection_idx+1        
-                END DO
-                IF(ASSOCIATED(DATA_PROJECTION)) THEN
-                  DATA_PROJECTION%GLOBAL_NUMBER=data_projection_idx
-                  DATA_PROJECTION%USER_NUMBER=DATA_PROJECTION_USER_NUMBER
-                  DATA_PROJECTION%LABEL=""
-                  CALL TREE_ITEM_INSERT(DATA_POINTS%DATA_PROJECTIONS_TREE,DATA_PROJECTION_USER_NUMBER,data_projection_idx, &
-                    & INSERT_STATUS,ERR,ERROR,*999)
-                  DATA_PROJECTION%DATA_PROJECTION_FINISHED=.FALSE.
-                  DATA_PROJECTION%DATA_POINTS=>DATA_POINTS
-                  DATA_PROJECTION%GEOMETRIC_FIELD=>GEOMETRIC_FIELD
-                  DATA_PROJECTION%COORDINATE_SYSTEM_DIMENSIONS=DATA_POINTS_REGION_DIMENSIONS
-                  DATA_PROJECTION%MAXIMUM_ITERATION_UPDATE=0.5_DP
-                  DATA_PROJECTION%MAXIMUM_NUMBER_OF_ITERATIONS=25                   
-                  !Default always project to boundaries faces/lines when mesh dimension is equal to region dimension. If mesh dimension is less, project to all elements            
-                  IF(GEOMETRIC_FIELD%DECOMPOSITION%MESH%NUMBER_OF_DIMENSIONS<DATA_POINTS_REGION_DIMENSIONS) THEN !mesh dimension < data dimension
-                    DATA_PROJECTION%NUMBER_OF_XI=GEOMETRIC_FIELD%DECOMPOSITION%MESH%NUMBER_OF_DIMENSIONS
-                    DATA_PROJECTION%PROJECTION_TYPE=DATA_PROJECTION_ALL_ELEMENTS_PROJECTION_TYPE
-                  ELSE
-                    SELECT CASE(GEOMETRIC_FIELD%DECOMPOSITION%MESH%NUMBER_OF_DIMENSIONS) !mesh dimension = data dimension
-                      CASE (2) 
-                        DATA_PROJECTION%NUMBER_OF_XI=1
-                        DATA_PROJECTION%PROJECTION_TYPE=DATA_PROJECTION_BOUNDARY_LINES_PROJECTION_TYPE
-                      CASE (3)
-                        DATA_PROJECTION%NUMBER_OF_XI=2
-                        DATA_PROJECTION%PROJECTION_TYPE=DATA_PROJECTION_BOUNDARY_FACES_PROJECTION_TYPE
-                      CASE DEFAULT
-                        CALL FLAG_ERROR("Mesh dimensions out of bond [1,3].",ERR,ERROR,*999)
-                      END SELECT
-                  ENDIF
-                  SELECT CASE(DATA_PROJECTION%NUMBER_OF_XI) !mesh dimension = data dimension
-                    CASE (1)
-                      DATA_PROJECTION%NUMBER_OF_CLOSEST_ELEMENTS=2
-                    CASE (2)
-                      DATA_PROJECTION%NUMBER_OF_CLOSEST_ELEMENTS=4  
-                    CASE (3)
-                      DATA_PROJECTION%NUMBER_OF_CLOSEST_ELEMENTS=8
-                    CASE DEFAULT
-                      CALL FLAG_ERROR("Mesh dimensions out of bond [1,3].",ERR,ERROR,*999)
-                  END SELECT 
-                  ALLOCATE(DATA_PROJECTION%STARTING_XI(DATA_PROJECTION%NUMBER_OF_XI),STAT=ERR)
-                  IF(ERR/=0) CALL FLAG_ERROR("Could not allocate data points data projection starting xi.",ERR,ERROR,*999)
-                  DO xi_idx=1,DATA_PROJECTION%NUMBER_OF_XI
-                    DATA_PROJECTION%STARTING_XI(xi_idx)=0.5_DP !<initialised to 0.5 in each xi direction
-                  ENDDO !xi_idx              
-                  DATA_PROJECTION%ABSOLUTE_TOLERANCE=1.0E-8_DP
-                  DATA_PROJECTION%RELATIVE_TOLERANCE=1.0E-6_DP
-                  !Return the pointer        
-                  DATA_POINTS%DATA_PROJECTIONS(data_projection_idx)%PTR=>DATA_PROJECTION
-                ELSE
-                  CALL FLAG_ERROR("All data points data projections are already associated.",ERR,ERROR,*999)
-                ENDIF !ASSOCIATED(DATA_PROJECTION)
-              ELSE
-                CALL FLAG_ERROR("Dimensions bewtween the geomtric field region and data points region does not match.",ERR,ERROR, &
-                  & *999)        
-              ENDIF !DATA_POINTS_REGION_DIMENSIONS==GEOMETRIC_FIELD_REGION_DIMENSIONS
-            ENDIF !ASSOCIATED(DATA_PROJECTION)
+        IF(ASSOCIATED(MESH)) THEN !Has to be associated
+          IF(ASSOCIATED(DATA_PROJECTION)) THEN !Cannot be associated
+            CALL FLAG_ERROR("Data projection is already associated.",ERR,ERROR,*999)
           ELSE
-            CALL FLAG_ERROR("Geometric field have not been finished.",ERR,ERROR,*999)
-          ENDIF !GEOMETRIC_FIELD%FIELD_FINISHED
+            IF(ASSOCIATED(DATA_POINTS%REGION)) THEN
+              DATA_POINTS_REGION_DIMENSIONS=DATA_POINTS%REGION%COORDINATE_SYSTEM%NUMBER_OF_DIMENSIONS
+            ELSEIF(ASSOCIATED(DATA_POINTS%INTERFACE)) THEN
+              DATA_POINTS_REGION_DIMENSIONS=DATA_POINTS%INTERFACE%COORDINATE_SYSTEM%NUMBER_OF_DIMENSIONS
+            ENDIF
+            IF(ASSOCIATED(MESH%REGION)) THEN
+              MESH_REGION_DIMENSIONS=MESH%REGION%COORDINATE_SYSTEM%NUMBER_OF_DIMENSIONS
+            ELSEIF(ASSOCIATED(MESH%INTERFACE)) THEN
+              MESH_REGION_DIMENSIONS=MESH%INTERFACE%COORDINATE_SYSTEM%NUMBER_OF_DIMENSIONS
+            ENDIF
+            IF(DATA_POINTS_REGION_DIMENSIONS==MESH_REGION_DIMENSIONS) THEN !Dimension has to be equal
+              ! acquire an unallocated data projection inside data points
+              data_projection_idx=1
+              DO WHILE(data_projection_idx<=DATA_POINTS%NUMBER_OF_DATA_PROJECTIONS.AND..NOT.ASSOCIATED(DATA_PROJECTION))
+                IF(.NOT.ASSOCIATED(DATA_POINTS%DATA_PROJECTIONS(data_projection_idx)%PTR)) THEN
+                  ALLOCATE(DATA_PROJECTION,STAT=ERR)
+                  IF(ERR/=0) CALL FLAG_ERROR("Could not allocate data points data projections("//TRIM(NUMBER_TO_VSTRING &
+                    & (data_projection_idx,"*",ERR,ERROR))//"). ptr",ERR,ERROR,*999)
+                ENDIF
+                IF(.NOT.ASSOCIATED(DATA_PROJECTION)) data_projection_idx=data_projection_idx+1        
+              END DO
+              IF(ASSOCIATED(DATA_PROJECTION)) THEN
+                DATA_PROJECTION%GLOBAL_NUMBER=data_projection_idx
+                DATA_PROJECTION%USER_NUMBER=DATA_PROJECTION_USER_NUMBER
+                DATA_PROJECTION%LABEL=""
+                CALL TREE_ITEM_INSERT(DATA_POINTS%DATA_PROJECTIONS_TREE,DATA_PROJECTION_USER_NUMBER,data_projection_idx, &
+                  & INSERT_STATUS,ERR,ERROR,*999)
+                DATA_PROJECTION%DATA_PROJECTION_FINISHED=.FALSE.
+                DATA_PROJECTION%DATA_POINTS=>DATA_POINTS
+                DATA_PROJECTION%MESH=>MESH
+                DATA_PROJECTION%COORDINATE_SYSTEM_DIMENSIONS=DATA_POINTS_REGION_DIMENSIONS
+                DATA_PROJECTION%MAXIMUM_ITERATION_UPDATE=0.5_DP
+                DATA_PROJECTION%MAXIMUM_NUMBER_OF_ITERATIONS=25                   
+                !Default always project to boundaries faces/lines when mesh dimension is equal to region dimension. If mesh dimension is less, project to all elements            
+                IF(MESH%NUMBER_OF_DIMENSIONS<DATA_POINTS_REGION_DIMENSIONS) THEN !mesh dimension < data dimension
+                  DATA_PROJECTION%NUMBER_OF_XI=MESH%NUMBER_OF_DIMENSIONS
+                  DATA_PROJECTION%PROJECTION_TYPE=DATA_PROJECTION_ALL_ELEMENTS_PROJECTION_TYPE
+                ELSE
+                  SELECT CASE(MESH%NUMBER_OF_DIMENSIONS) !mesh dimension = data dimension
+                  CASE (2) 
+                    DATA_PROJECTION%NUMBER_OF_XI=1
+                    DATA_PROJECTION%PROJECTION_TYPE=DATA_PROJECTION_BOUNDARY_LINES_PROJECTION_TYPE
+                  CASE (3)
+                    DATA_PROJECTION%NUMBER_OF_XI=2
+                    DATA_PROJECTION%PROJECTION_TYPE=DATA_PROJECTION_BOUNDARY_FACES_PROJECTION_TYPE
+                  CASE DEFAULT
+                    CALL FLAG_ERROR("Mesh dimensions out of bond [1,3].",ERR,ERROR,*999)
+                  END SELECT
+                ENDIF
+                SELECT CASE(DATA_PROJECTION%NUMBER_OF_XI) !mesh dimension = data dimension
+                CASE (1)
+                  DATA_PROJECTION%NUMBER_OF_CLOSEST_ELEMENTS=2
+                CASE (2)
+                  DATA_PROJECTION%NUMBER_OF_CLOSEST_ELEMENTS=4  
+                CASE (3)
+                  DATA_PROJECTION%NUMBER_OF_CLOSEST_ELEMENTS=8
+                CASE DEFAULT
+                  CALL FLAG_ERROR("Mesh dimensions out of bond [1,3].",ERR,ERROR,*999)
+                END SELECT 
+                ALLOCATE(DATA_PROJECTION%STARTING_XI(DATA_PROJECTION%NUMBER_OF_XI),STAT=ERR)
+                IF(ERR/=0) CALL FLAG_ERROR("Could not allocate data points data projection starting xi.",ERR,ERROR,*999)
+                DO xi_idx=1,DATA_PROJECTION%NUMBER_OF_XI
+                  DATA_PROJECTION%STARTING_XI(xi_idx)=0.5_DP !<initialised to 0.5 in each xi direction
+                ENDDO !xi_idx              
+                DATA_PROJECTION%ABSOLUTE_TOLERANCE=1.0E-8_DP
+                DATA_PROJECTION%RELATIVE_TOLERANCE=1.0E-6_DP
+                !Return the pointer        
+                DATA_POINTS%DATA_PROJECTIONS(data_projection_idx)%PTR=>DATA_PROJECTION
+              ELSE
+                CALL FLAG_ERROR("All data points data projections are already associated.",ERR,ERROR,*999)
+              ENDIF !ASSOCIATED(DATA_PROJECTION)
+            ELSE
+              CALL FLAG_ERROR("Dimensions bewtween the geomtric field region and data points region does not match.",ERR,ERROR, &
+                & *999)        
+            ENDIF !DATA_POINTS_REGION_DIMENSIONS==MESH_REGION_DIMENSIONS
+          ENDIF !ASSOCIATED(DATA_PROJECTION)
         ELSE
-          CALL FLAG_ERROR("Geometric field is not associated.",ERR,ERROR,*999)
-        ENDIF !ASSOCIATED(GEOMETRIC_FIELD)
+          CALL FLAG_ERROR("Mesh is not associated.",ERR,ERROR,*999)
+        ENDIF !ASSOCIATED(MESH)
       ELSE
         CALL FLAG_ERROR("Data points have not been finished.",ERR,ERROR,*999)
       ENDIF !DATA_POINTS%DATA_POINTS_FINISHED
@@ -808,8 +804,8 @@ CONTAINS
     
     NULLIFY(INTERPOLATION_PARAMETERS)
     NULLIFY(INTERPOLATED_POINTS)
-    IF(ASSOCIATED(DATA_PROJECTION)) THEN
-      IF(DATA_PROJECTION%DATA_PROJECTION_FINISHED) THEN
+    IF(ASSOCIATED(DATA_PROJECTION) .AND. ASSOCIATED(DATA_PROJECTION%GEOMETRIC_FIELD)) THEN
+      IF(DATA_PROJECTION%DATA_PROJECTION_FINISHED .AND. DATA_PROJECTION%GEOMETRIC_FIELD%FIELD_FINISHED) THEN
         DATA_PROJECTION_GLOBAL_NUMBER=DATA_PROJECTION%GLOBAL_NUMBER
         DATA_POINTS=>DATA_PROJECTION%DATA_POINTS
         CALL FIELD_INTERPOLATION_PARAMETERS_INITIALISE(DATA_PROJECTION%GEOMETRIC_FIELD,INTERPOLATION_PARAMETERS,ERR,ERROR,*999)
@@ -1196,10 +1192,10 @@ CONTAINS
         ENDIF !NUMBER_COMPUTATIONAL_NODES>1
         DATA_PROJECTION%DATA_PROJECTION_PROJECTED=.TRUE.  
       ELSE
-        CALL FLAG_ERROR("Data projection have not been finished.",ERR,ERROR,*999)
+        CALL FLAG_ERROR("Data projection or geometric field have not been finished.",ERR,ERROR,*999)
       ENDIF !DATA_PROJECTION%DATA_PROJECTION_FINISHED
     ELSE
-      CALL FLAG_ERROR("Data projection is not associated.",ERR,ERROR,*999)
+      CALL FLAG_ERROR("Data projection or geometric field is not associated.",ERR,ERROR,*999)
     ENDIF !ASSOCIATED(DATA_PROJECTION)  
 
     CALL EXITS("DATA_PROJECTION_DATA_POINTS_EVALUATE")
@@ -1209,6 +1205,44 @@ CONTAINS
     RETURN 1
 
   END SUBROUTINE DATA_PROJECTION_DATA_POINTS_EVALUATE
+  
+  !
+  !================================================================================================================================
+  !
+  
+  !>Gets the maximum iteration update for a data projection.
+  SUBROUTINE DATA_PROJECTION_GEOMETRIC_FIELD_SET(DATA_PROJECTION,GEOMETRIC_FIELD,ERR,ERROR,*)
+
+    !Argument variables
+    TYPE(DATA_PROJECTION_TYPE), POINTER :: DATA_PROJECTION !<A pointer to the data projection to get the maximum iteration update for
+    TYPE(FIELD_TYPE), POINTER :: GEOMETRIC_FIELD !<On exit, the maximum iteration update of the specified data projection
+    INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
+    !Local Variables    
+    
+    CALL ENTERS("DATA_PROJECTION_MAXIMUM_ITERATION_UPDATE_GET",ERR,ERROR,*999)
+
+    IF(ASSOCIATED(DATA_PROJECTION)) THEN
+      IF(ASSOCIATED(GEOMETRIC_FIELD)) THEN
+        IF(GEOMETRIC_FIELD%FIELD_FINISHED) THEN !Has to be finished)
+          DATA_PROJECTION%GEOMETRIC_FIELD=>GEOMETRIC_FIELD
+        ELSE
+          CALL FLAG_ERROR("Data points have not been finished.",ERR,ERROR,*999)
+        ENDIF
+      ELSE
+        CALL FLAG_ERROR("Geometric field is not associated.",ERR,ERROR,*999)
+      ENDIF
+    ELSE
+      CALL FLAG_ERROR("Data projection is not associated.",ERR,ERROR,*999)
+    ENDIF
+    
+    CALL EXITS("DATA_PROJECTION_GEOMETRIC_FIELD_SET")
+    RETURN
+999 CALL ERRORS("DATA_PROJECTION_GEOMETRIC_FIELD_SET",ERR,ERROR)    
+    CALL EXITS("DATA_PROJECTION_GEOMETRIC_FIELD_SET")
+    RETURN 1
+
+  END SUBROUTINE DATA_PROJECTION_GEOMETRIC_FIELD_SET
   
   !
   !================================================================================================================================
@@ -2721,6 +2755,91 @@ CONTAINS
     RETURN 1
 
   END SUBROUTINE DATA_PROJECTION_STARTING_XI_SET
+  
+  !
+  !================================================================================================================================
+  !
+  
+  !>Sets the starting xi for a data projection.
+  SUBROUTINE DATA_PROJECTION_ELEMENT_SET(DATA_PROJECTION,DATA_POINT_NUMBER,ELEMENT_NUMBER,ERR,ERROR,*)
+
+    !Argument variables
+    TYPE(DATA_PROJECTION_TYPE), POINTER :: DATA_PROJECTION !<A pointer to the data projection to set the xi for
+    INTEGER(INTG), INTENT(IN) :: DATA_POINT_NUMBER !<data point number
+    INTEGER(INTG), INTENT(IN) :: ELEMENT_NUMBER !<the element number to set
+    INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
+    !Local Variables
+    INTEGER(INTG) :: ni,DATA_PROJECTION_GLOBAL_NUMBER
+    LOGICAL :: VALID_INPUT
+    
+    CALL ENTERS("DATA_PROJECTION_ELEMENT_SET",ERR,ERROR,*999)
+
+    IF(ASSOCIATED(DATA_PROJECTION)) THEN
+      DATA_PROJECTION_GLOBAL_NUMBER=DATA_PROJECTION%GLOBAL_NUMBER
+      IF((ELEMENT_NUMBER<DATA_PROJECTION%MESH%NUMBER_OF_ELEMENTS) .OR. (ELEMENT_NUMBER>0)) THEN
+        DATA_PROJECTION%DATA_POINTS%DATA_POINTS(DATA_POINT_NUMBER)%DATA_PROJECTIONS_RESULT(DATA_PROJECTION_GLOBAL_NUMBER)% &
+          & ELEMENT_NUMBER=ELEMENT_NUMBER
+      ELSE
+        CALL FLAG_ERROR("Data projection element number out of range.",ERR,ERROR,*999)
+      ENDIF
+    ELSE
+      CALL FLAG_ERROR("Data projection is not associated.",ERR,ERROR,*999)
+    ENDIF
+    
+    CALL EXITS("DATA_PROJECTION_ELEMENT_SET")
+    RETURN
+999 CALL ERRORS("DATA_PROJECTION_ELEMENT_SET",ERR,ERROR)    
+    CALL EXITS("DATA_PROJECTION_ELEMENT_SET")
+    RETURN 1
+
+  END SUBROUTINE DATA_PROJECTION_ELEMENT_SET
+  
+  !
+  !================================================================================================================================
+  !
+  
+  !>Sets the starting xi for a data projection.
+  SUBROUTINE DATA_PROJECTION_XI_SET(DATA_PROJECTION,DATA_POINT_NUMBER,XI,ERR,ERROR,*)
+
+    !Argument variables
+    TYPE(DATA_PROJECTION_TYPE), POINTER :: DATA_PROJECTION !<A pointer to the data projection to set the xi for
+    INTEGER(INTG), INTENT(IN) :: DATA_POINT_NUMBER !<data point number
+    REAL(DP), INTENT(IN) :: XI(:) !<the xi position to set
+    INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
+    !Local Variables
+    INTEGER(INTG) :: ni,DATA_PROJECTION_GLOBAL_NUMBER
+    LOGICAL :: VALID_INPUT
+    
+    CALL ENTERS("DATA_PROJECTION_XI_SET",ERR,ERROR,*999)
+
+    IF(ASSOCIATED(DATA_PROJECTION)) THEN
+      DATA_PROJECTION_GLOBAL_NUMBER=DATA_PROJECTION%GLOBAL_NUMBER
+      IF(SIZE(XI,1)==SIZE(DATA_PROJECTION%STARTING_XI,1)) THEN
+        VALID_INPUT=.TRUE.
+        DO ni=1,SIZE(XI,1)
+          IF((XI(ni)<=0).OR.(XI(ni)>=1)) VALID_INPUT=.FALSE.
+        ENDDO
+        IF(VALID_INPUT) THEN
+          DATA_PROJECTION%DATA_POINTS%DATA_POINTS(DATA_POINT_NUMBER)%DATA_PROJECTIONS_RESULT(DATA_PROJECTION_GLOBAL_NUMBER)%XI=XI
+        ELSE
+          CALL FLAG_ERROR("Data projection xi must be between 0 and 1.",ERR,ERROR,*999)
+        ENDIF
+      ELSE
+        CALL FLAG_ERROR("Data projection xi dimension mismatch.",ERR,ERROR,*999)
+      ENDIF
+    ELSE
+      CALL FLAG_ERROR("Data projection is not associated.",ERR,ERROR,*999)
+    ENDIF
+    
+    CALL EXITS("DATA_PROJECTION_XI_SET")
+    RETURN
+999 CALL ERRORS("DATA_PROJECTION_XI_SET",ERR,ERROR)    
+    CALL EXITS("DATA_PROJECTION_XI_SET")
+    RETURN 1
+
+  END SUBROUTINE DATA_PROJECTION_XI_SET
         
   !
   !================================================================================================================================
