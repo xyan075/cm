@@ -860,6 +860,12 @@ MODULE OPENCMISS
     MODULE PROCEDURE CMISSBoundaryConditions_SetElementNumber
     MODULE PROCEDURE CMISSBoundaryConditions_SetElementObj
   END INTERFACE !CMISSBoundaryConditions_SetElement
+  
+  !>Sets the value of the specified element as a boundary condition on the specified element.
+  INTERFACE CMISSBoundaryConditions_SetDataPoint
+    MODULE PROCEDURE CMISSBoundaryConditions_SetDataPointNumber
+    MODULE PROCEDURE CMISSBoundaryConditions_SetDataPointObj
+  END INTERFACE !CMISSBoundaryConditions_SetDataPoint
 
   !>Adds to the value of the node constant and sets this as a boundary condition on the specified node.
   INTERFACE CMISSBoundaryConditions_AddNode
@@ -895,6 +901,8 @@ MODULE OPENCMISS
   PUBLIC CMISSBoundaryConditions_AddConstant,CMISSBoundaryConditions_SetConstant
 
   PUBLIC CMISSBoundaryConditions_AddElement,CMISSBoundaryConditions_SetElement
+  
+  PUBLIC CMISSBoundaryConditions_SetDataPoint
 
   PUBLIC CMISSBoundaryConditions_AddNode,CMISSBoundaryConditions_SetNode
 
@@ -11190,6 +11198,115 @@ CONTAINS
     RETURN
 
   END SUBROUTINE CMISSBoundaryConditions_SetElementObj
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Sets the value of the specified data point as a boundary condition on the specified data point for boundary conditions identified by a user number.
+  SUBROUTINE CMISSBoundaryConditions_SetDataPointNumber(regionUserNumber,problemUserNumber,controlLoopIdentifiers,solverIndex, &
+    & fieldUserNumber,variableType,dataPointUserNumber,componentNumber,condition,value,err)
+
+    !Argument variables
+    INTEGER(INTG), INTENT(IN) :: regionUserNumber !<The user number of the region containing the equations set to set the boundary conditions for.
+    INTEGER(INTG), INTENT(IN) :: problemUserNumber !<The user number of the problem containing the solver equations to destroy the boundary conditions for.
+    INTEGER(INTG), INTENT(IN) :: controlLoopIdentifiers(:) !<controlLoopIdentifiers(i). The i'th control loop identifier to get the solver equations boundary conditions for.
+    INTEGER(INTG), INTENT(IN) :: solverIndex !<The solver index to get the solver equations for.
+    INTEGER(INTG), INTENT(IN) :: fieldUserNumber !<The user number of the dependent field for the boundary condition.
+    INTEGER(INTG), INTENT(IN) :: variableType !<The variable type of the dependent field to set the boundary condition at. \see OPENCMISS_FieldVariableTypes
+    INTEGER(INTG), INTENT(IN) :: dataPointUserNumber !<The user number of the data point to set the boundary conditions for.
+    INTEGER(INTG), INTENT(IN) :: componentNumber !<The component number of the dependent field to set the boundary condition at.
+    INTEGER(INTG), INTENT(IN) :: condition !<The boundary condition type to set \see OPENCMISS_BoundaryConditions,OPENCMISS
+    REAL(DP), INTENT(IN) :: value !<The value of the boundary condition to set.
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code.
+    !Local variables
+    TYPE(REGION_TYPE), POINTER :: REGION
+    TYPE(PROBLEM_TYPE), POINTER :: PROBLEM
+    TYPE(SOLVER_EQUATIONS_TYPE), POINTER :: SOLVER_EQUATIONS
+    TYPE(BOUNDARY_CONDITIONS_TYPE), POINTER :: BOUNDARY_CONDITIONS
+    TYPE(FIELD_TYPE), POINTER :: DEPENDENT_FIELD
+    TYPE(VARYING_STRING) :: LOCAL_ERROR
+
+    CALL ENTERS("CMISSBoundaryConditions_SetDataPointNumber",err,error,*999)
+
+    NULLIFY(REGION)
+    NULLIFY(PROBLEM)
+    NULLIFY(SOLVER_EQUATIONS)
+    NULLIFY(BOUNDARY_CONDITIONS)
+    NULLIFY(DEPENDENT_FIELD)
+    CALL REGION_USER_NUMBER_FIND(regionUserNumber,REGION,err,error,*999)
+    IF(ASSOCIATED(REGION)) THEN
+      CALL PROBLEM_USER_NUMBER_FIND(problemUserNumber,PROBLEM,err,error,*999)
+      IF(ASSOCIATED(PROBLEM)) THEN
+        CALL PROBLEM_SOLVER_EQUATIONS_GET(PROBLEM,controlLoopIdentifiers,solverIndex,SOLVER_EQUATIONS,err,error,*999)
+        IF(ASSOCIATED(SOLVER_EQUATIONS)) THEN
+          CALL SOLVER_EQUATIONS_BOUNDARY_CONDITIONS_GET(SOLVER_EQUATIONS,BOUNDARY_CONDITIONS,err,error,*999)
+          IF(ASSOCIATED(BOUNDARY_CONDITIONS)) THEN
+            CALL FIELD_USER_NUMBER_FIND(fieldUserNumber,REGION,DEPENDENT_FIELD,err,error,*999)
+            IF(ASSOCIATED(DEPENDENT_FIELD)) THEN
+              CALL BOUNDARY_CONDITIONS_SET_DATA_POINT(BOUNDARY_CONDITIONS,DEPENDENT_FIELD,variableType,dataPointUserNumber, &
+                & componentNumber,condition,value,err,error,*999)
+            ELSE
+              LOCAL_ERROR="A field with a user number of "//TRIM(NUMBER_TO_VSTRING(fieldUserNumber,"*",err,error))// &
+                & " does not exist."
+              CALL FLAG_ERROR(LOCAL_ERROR,err,error,*999)
+            END IF
+          ELSE
+            CALL FLAG_ERROR("The solver equations boundary conditions are not associated.",err,error,*999)
+          END IF
+        ELSE
+          CALL FLAG_ERROR("The solver equations are not associated.",err,error,*999)
+        END IF
+      ELSE
+        LOCAL_ERROR="A problem with a user number of "//TRIM(NUMBER_TO_VSTRING(problemUserNumber,"*",err,error))//" does not exist."
+        CALL FLAG_ERROR(LOCAL_ERROR,err,error,*999)
+      END IF
+    ELSE
+      LOCAL_ERROR="A region with a user number of "//TRIM(NUMBER_TO_VSTRING(regionUserNumber,"*",err,error))//" does not exist."
+      CALL FLAG_ERROR(LOCAL_ERROR,err,error,*999)
+    END IF
+
+    CALL EXITS("CMISSBoundaryConditions_SetDataPointNumber")
+    RETURN
+999 CALL ERRORS("CMISSBoundaryConditions_SetDataPointNumber",err,error)
+    CALL EXITS("CMISSBoundaryConditions_SetDataPointNumber")
+    CALL CMISS_HANDLE_ERROR(err,error)
+    RETURN
+
+  END SUBROUTINE CMISSBoundaryConditions_SetDataPointNumber
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Sets the value of the specified data point and sets this as a boundary condition on the specified data points for boundary conditions identified by an object.
+  SUBROUTINE CMISSBoundaryConditions_SetDataPointObj(boundaryConditions,field,variableType,dataPointUserNumber,componentNumber, &
+    & condition,value,err)
+
+    !Argument variables
+    TYPE(CMISSBoundaryConditionsType), INTENT(IN) :: boundaryConditions !<The boundary conditions to set the data point to.
+    TYPE(CMISSFieldType), INTENT(IN) :: field !<The dependent field to set the boundary condition on.
+    INTEGER(INTG), INTENT(IN) :: variableType !<The variable type of the dependent field to set the boundary condition at. \see OPENCMISS_FieldVariableTypes
+    INTEGER(INTG), INTENT(IN) :: dataPointUserNumber !<The user number of the data point to set the boundary conditions for.
+    INTEGER(INTG), INTENT(IN) :: componentNumber !<The component number of the dependent field to set the boundary condition at.
+    INTEGER(INTG), INTENT(IN) :: condition !<The boundary condition type to set \see OPENCMISS_BoundaryConditions,OPENCMISS
+    REAL(DP), INTENT(IN) :: value !<The value of the boundary condition to set.
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code.
+    !Local variables
+
+    CALL ENTERS("CMISSBoundaryConditions_SetDataPointObj",err,error,*999)
+
+    CALL BOUNDARY_CONDITIONS_SET_DATA_POINT(boundaryConditions%BOUNDARY_CONDITIONS,field%FIELD,variableType,dataPointUserNumber, &
+      & componentNumber,condition,value,err,error,*999)
+
+    CALL EXITS("CMISSBoundaryConditions_SetDataPointObj")
+    RETURN
+999 CALL ERRORS("CMISSBoundaryConditions_SetDataPointObj",err,error)
+    CALL EXITS("CMISSBoundaryConditions_SetDataPointObj")
+    CALL CMISS_HANDLE_ERROR(err,error)
+    RETURN
+
+  END SUBROUTINE CMISSBoundaryConditions_SetDataPointObj
 
   !
   !================================================================================================================================

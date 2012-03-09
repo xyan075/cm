@@ -552,7 +552,8 @@ MODULE FIELD_ROUTINES
 
   PUBLIC FIELD_COORDINATE_SYSTEM_GET
 
-  PUBLIC FIELD_COMPONENT_DOF_GET_CONSTANT,FIELD_COMPONENT_DOF_GET_USER_ELEMENT,FIELD_COMPONENT_DOF_GET_USER_NODE
+  PUBLIC FIELD_COMPONENT_DOF_GET_CONSTANT,FIELD_COMPONENT_DOF_GET_USER_ELEMENT,FIELD_COMPONENT_DOF_GET_USER_NODE, &
+    & FIELD_COMPONENT_DOF_GET_USER_DATA_POINT
 
   PUBLIC FIELD_COMPONENT_INTERPOLATION_CHECK,FIELD_COMPONENT_INTERPOLATION_GET,FIELD_COMPONENT_INTERPOLATION_SET, &
     & FIELD_COMPONENT_INTERPOLATION_SET_AND_LOCK
@@ -1074,6 +1075,137 @@ CONTAINS
     CALL EXITS("FIELD_COMPONENT_DOF_GET_CONSTANT")
     RETURN 1
   END SUBROUTINE FIELD_COMPONENT_DOF_GET_CONSTANT
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Returns the dof numbers for a field component that corresponds to the specified user element.
+  SUBROUTINE FIELD_COMPONENT_DOF_GET_USER_DATA_POINT(FIELD,VARIABLE_TYPE,USER_DATA_POINT_NUMBER,COMPONENT_NUMBER,LOCAL_DOF, &
+    & GLOBAL_DOF,ERR,ERROR,*)
+
+    !Argument variables
+    TYPE(FIELD_TYPE), POINTER :: FIELD !<A pointer to the field to get the dof for
+    INTEGER(INTG), INTENT(IN) :: VARIABLE_TYPE !<The field variable type to get the dof for \see FIELD_ROUTINES_VariableTypes,FIELD_ROUTINES
+    INTEGER(INTG), INTENT(IN) :: USER_DATA_POINT_NUMBER !<The user element number to get the dof for
+    INTEGER(INTG), INTENT(IN) :: COMPONENT_NUMBER !<The field component number to get the dof for
+    INTEGER(INTG), INTENT(OUT) :: LOCAL_DOF !<On exit, the local dof corresponding to the user element
+    INTEGER(INTG), INTENT(OUT) :: GLOBAL_DOF !<On exit, the global dof corresponding to the user element
+    INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
+    !Local Variables
+    INTEGER(INTG) :: DOMAIN_LOCAL_DATA_POINT_NUMBER
+    LOGICAL :: GHOST_DATA_POINT,USER_DATA_POINT_EXISTS
+    TYPE(DOMAIN_TYPE), POINTER :: DOMAIN
+    TYPE(DOMAIN_TOPOLOGY_TYPE), POINTER :: DOMAIN_TOPOLOGY
+    TYPE(FIELD_VARIABLE_TYPE), POINTER :: FIELD_VARIABLE
+    TYPE(VARYING_STRING) :: LOCAL_ERROR
+    
+    CALL ENTERS("FIELD_COMPONENT_DOF_GET_USER_DATA_POINT",ERR,ERROR,*999)
+
+    IF(ASSOCIATED(FIELD)) THEN
+      IF(FIELD%FIELD_FINISHED) THEN
+        IF(VARIABLE_TYPE>=1.AND.VARIABLE_TYPE<=FIELD_NUMBER_OF_VARIABLE_TYPES) THEN
+          FIELD_VARIABLE=>FIELD%VARIABLE_TYPE_MAP(VARIABLE_TYPE)%PTR
+          IF(ASSOCIATED(FIELD_VARIABLE)) THEN
+            IF(COMPONENT_NUMBER>=1.AND.COMPONENT_NUMBER<=FIELD_VARIABLE%NUMBER_OF_COMPONENTS) THEN
+              SELECT CASE(FIELD_VARIABLE%COMPONENTS(COMPONENT_NUMBER)%INTERPOLATION_TYPE)
+              CASE(FIELD_CONSTANT_INTERPOLATION)
+                LOCAL_ERROR="Can not get the dof by user data point for component number "// &
+                  & TRIM(NUMBER_TO_VSTRING(COMPONENT_NUMBER,"*",ERR,ERROR))//" of variable type "// &
+                  & TRIM(NUMBER_TO_VSTRING(VARIABLE_TYPE,"*",ERR,ERROR))//" of field number "// &
+                  & TRIM(NUMBER_TO_VSTRING(FIELD%USER_NUMBER,"*",ERR,ERROR))//" which has constant interpolation."
+                CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
+              CASE(FIELD_ELEMENT_BASED_INTERPOLATION)
+                LOCAL_ERROR="Can not get the dof by user data point for component number "// &
+                  & TRIM(NUMBER_TO_VSTRING(COMPONENT_NUMBER,"*",ERR,ERROR))//" of variable type "// &
+                  & TRIM(NUMBER_TO_VSTRING(VARIABLE_TYPE,"*",ERR,ERROR))//" of field number "// &
+                  & TRIM(NUMBER_TO_VSTRING(FIELD%USER_NUMBER,"*",ERR,ERROR))//" which has element based interpolation."
+                CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
+              CASE(FIELD_NODE_BASED_INTERPOLATION)
+                LOCAL_ERROR="Can not get the dof by user data point for component number "// &
+                  & TRIM(NUMBER_TO_VSTRING(COMPONENT_NUMBER,"*",ERR,ERROR))//" of variable type "// &
+                  & TRIM(NUMBER_TO_VSTRING(VARIABLE_TYPE,"*",ERR,ERROR))//" of field number "// &
+                  & TRIM(NUMBER_TO_VSTRING(FIELD%USER_NUMBER,"*",ERR,ERROR))//" which has node based interpolation."
+                CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
+              CASE(FIELD_GRID_POINT_BASED_INTERPOLATION)
+                LOCAL_ERROR="Can not get the dof by user data point for component number "// &
+                  & TRIM(NUMBER_TO_VSTRING(COMPONENT_NUMBER,"*",ERR,ERROR))//" of variable type "// &
+                  & TRIM(NUMBER_TO_VSTRING(VARIABLE_TYPE,"*",ERR,ERROR))//" of field number "// &
+                  & TRIM(NUMBER_TO_VSTRING(FIELD%USER_NUMBER,"*",ERR,ERROR))//" which has grid point based interpolation."
+                CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
+              CASE(FIELD_GAUSS_POINT_BASED_INTERPOLATION)
+                LOCAL_ERROR="Can not get the dof by user data point for component number "// &
+                  & TRIM(NUMBER_TO_VSTRING(COMPONENT_NUMBER,"*",ERR,ERROR))//" of variable type "// &
+                  & TRIM(NUMBER_TO_VSTRING(VARIABLE_TYPE,"*",ERR,ERROR))//" of field number "// &
+                  & TRIM(NUMBER_TO_VSTRING(FIELD%USER_NUMBER,"*",ERR,ERROR))//" which has Gauss point based interpolation."
+                CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
+              CASE(FIELD_DATA_POINT_BASED_INTERPOLATION)
+                DOMAIN=>FIELD_VARIABLE%COMPONENTS(COMPONENT_NUMBER)%DOMAIN
+                IF(ASSOCIATED(DOMAIN)) THEN
+                  DOMAIN_TOPOLOGY=>DOMAIN%TOPOLOGY
+                  CALL DOMAIN_TOPOLOGY_DATA_POINT_CHECK_EXISTS(DOMAIN_TOPOLOGY,USER_DATA_POINT_NUMBER,USER_DATA_POINT_EXISTS, &
+                    & DOMAIN_LOCAL_DATA_POINT_NUMBER,GHOST_DATA_POINT,ERR,ERROR,*999)
+                  IF(USER_DATA_POINT_EXISTS) THEN
+                    IF(ASSOCIATED(FIELD_VARIABLE%DOMAIN_MAPPING)) THEN
+                      LOCAL_DOF=FIELD_VARIABLE%COMPONENTS(COMPONENT_NUMBER)%PARAM_TO_DOF_MAP% &
+                        & DATA_POINT_PARAM2DOF_MAP%DATA_POINTS(DOMAIN_LOCAL_DATA_POINT_NUMBER)
+                      GLOBAL_DOF=FIELD_VARIABLE%DOMAIN_MAPPING%LOCAL_TO_GLOBAL_MAP(LOCAL_DOF)
+                    ELSE
+                      CALL FLAG_ERROR("The field variable domain mapping is not associated.",ERR,ERROR,*999)
+                    ENDIF
+                  ELSE
+                    LOCAL_ERROR="The specified user data point number of "// &
+                      & TRIM(NUMBER_TO_VSTRING(USER_DATA_POINT_NUMBER,"*",ERR,ERROR))// &
+                      & " does not exist in the domain for field component number "// &
+                      & TRIM(NUMBER_TO_VSTRING(COMPONENT_NUMBER,"*",ERR,ERROR))//" of field variable "// &
+                      & TRIM(NUMBER_TO_VSTRING(VARIABLE_TYPE,"*",ERR,ERROR))//" of field number "// &
+                      & TRIM(NUMBER_TO_VSTRING(FIELD%USER_NUMBER,"*",ERR,ERROR))//"."
+                    CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
+                  ENDIF
+                ENDIF
+              CASE DEFAULT
+                LOCAL_ERROR="The field component interpolation type of "//TRIM(NUMBER_TO_VSTRING(FIELD_VARIABLE% &
+                  & COMPONENTS(COMPONENT_NUMBER)%INTERPOLATION_TYPE,"*",ERR,ERROR))// &
+                  & " is invalid for component number "//TRIM(NUMBER_TO_VSTRING(COMPONENT_NUMBER,"*",ERR,ERROR))// &
+                  & " of variable type "//TRIM(NUMBER_TO_VSTRING(VARIABLE_TYPE,"*",ERR,ERROR))// &
+                  & " of field number "//TRIM(NUMBER_TO_VSTRING(FIELD%USER_NUMBER,"*",ERR,ERROR))//"."
+                CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
+              END SELECT
+            ELSE
+              LOCAL_ERROR="Component number "//TRIM(NUMBER_TO_VSTRING(COMPONENT_NUMBER,"*",ERR,ERROR))// &
+                & " is invalid for variable type "//TRIM(NUMBER_TO_VSTRING(VARIABLE_TYPE,"*",ERR,ERROR))// &
+                & " of field number "//TRIM(NUMBER_TO_VSTRING(FIELD%USER_NUMBER,"*",ERR,ERROR))//" which has "// &
+                & TRIM(NUMBER_TO_VSTRING(FIELD_VARIABLE%NUMBER_OF_COMPONENTS,"*",ERR,ERROR))// &
+                & " components."
+              CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
+            ENDIF
+          ELSE
+            LOCAL_ERROR="The specified field variable type of "//TRIM(NUMBER_TO_VSTRING(VARIABLE_TYPE,"*",ERR,ERROR))// &
+              & " has not been defined on field number "//TRIM(NUMBER_TO_VSTRING(FIELD%USER_NUMBER,"*",ERR,ERROR))//"."
+            CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
+          ENDIF
+        ELSE
+          LOCAL_ERROR="The specified variable type of "//TRIM(NUMBER_TO_VSTRING(VARIABLE_TYPE,"*",ERR,ERROR))// &
+            & " is invalid. The variable type must be between 1 and  "// &
+            & TRIM(NUMBER_TO_VSTRING(FIELD_NUMBER_OF_VARIABLE_TYPES,"*",ERR,ERROR))//"."
+          CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
+        ENDIF
+      ELSE
+        LOCAL_ERROR="Field number "//TRIM(NUMBER_TO_VSTRING(FIELD%USER_NUMBER,"*",ERR,ERROR))// &
+          & " has not been finished."
+        CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
+      ENDIF
+    ELSE
+      CALL FLAG_ERROR("Field is not associated.",ERR,ERROR,*999)
+    ENDIF
+    
+    CALL EXITS("FIELD_COMPONENT_DOF_GET_USER_DATA_POINT")
+    RETURN
+999 CALL ERRORS("FIELD_COMPONENT_DOF_GET_USER_DATA_POINT",ERR,ERROR)
+    CALL EXITS("FIELD_COMPONENT_DOF_GET_USER_DATA_POINT")
+    RETURN 1
+  END SUBROUTINE FIELD_COMPONENT_DOF_GET_USER_DATA_POINT
 
   !
   !================================================================================================================================
