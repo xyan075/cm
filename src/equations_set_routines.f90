@@ -176,7 +176,7 @@ CONTAINS
           !Finish the equations set specific analytic setup
           CALL EQUATIONS_SET_SETUP(EQUATIONS_SET,EQUATIONS_SET_SETUP_INFO,ERR,ERROR,*999)
           !Finalise the setup
-          CALL EQUATIONS_SET_SETUP_FINALISE(EQUATIONS_SET_SETUP_INFO,ERR,ERROR,*999)          
+          CALL EQUATIONS_SET_SETUP_FINALISE(EQUATIONS_SET_SETUP_INFO,ERR,ERROR,*999)
           !Finish the analytic creation
           EQUATIONS_SET%ANALYTIC%ANALYTIC_FINISHED=.TRUE.
         ENDIF
@@ -220,7 +220,7 @@ CONTAINS
 
     IF(ASSOCIATED(EQUATIONS_SET)) THEN
       IF(ASSOCIATED(EQUATIONS_SET%ANALYTIC)) THEN
-        CALL FLAG_ERROR("The equations set analytic is already associated.",ERR,ERROR,*998)        
+        CALL FLAG_ERROR("The equations set analytic is already associated.",ERR,ERROR,*998)
       ELSE
         REGION=>EQUATIONS_SET%REGION
         IF(ASSOCIATED(REGION)) THEN
@@ -484,7 +484,7 @@ CONTAINS
                               local_ny=FIELD_VARIABLE%COMPONENTS(component_idx)%PARAM_TO_DOF_MAP% &
                                 & ELEMENT_PARAM2DOF_MAP%ELEMENTS(element_idx)
                               CALL FIELD_PARAMETER_SET_UPDATE_LOCAL_DOF(DEPENDENT_FIELD,variable_type, &
-                                & FIELD_ANALYTIC_VALUES_SET_TYPE,local_ny,VALUE,ERR,ERROR,*999) 
+                                & FIELD_ANALYTIC_VALUES_SET_TYPE,local_ny,VALUE,ERR,ERROR,*999)
                             ENDDO !element_idx
                           ELSE
                             CALL FLAG_ERROR("Domain topology elements is not associated.",ERR,ERROR,*999)
@@ -1090,7 +1090,7 @@ CONTAINS
                 CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
               END SELECT
             CASE(EQUATIONS_NONLINEAR)
-              CALL FLAG_ERROR("Not implemented.",ERR,ERROR,*999)             
+              CALL FLAG_ERROR("Not implemented.",ERR,ERROR,*999)
             CASE(EQUATIONS_NONLINEAR_BCS)
               CALL FLAG_ERROR("Not implemented.",ERR,ERROR,*999)
             CASE DEFAULT
@@ -1185,7 +1185,7 @@ CONTAINS
               CALL EQUATIONS_MATRICES_ELEMENT_CALCULATE(EQUATIONS_MATRICES,ne,ERR,ERROR,*999)
               CALL EQUATIONS_SET_FINITE_ELEMENT_CALCULATE(EQUATIONS_SET,ne,ERR,ERROR,*999)
               CALL EQUATIONS_MATRICES_ELEMENT_ADD(EQUATIONS_MATRICES,ERR,ERROR,*999)
-            ENDDO !element_idx                  
+            ENDDO !element_idx
             !Output timing information if required
             IF(EQUATIONS%OUTPUT_TYPE>=EQUATIONS_TIMING_OUTPUT) THEN
               CALL CPU_TIMER(USER_CPU,USER_TIME3,ERR,ERROR,*999)
@@ -1209,7 +1209,7 @@ CONTAINS
               CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"User time for parameter transfer completion = ",USER_ELAPSED, &
                 & ERR,ERROR,*999)
               CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"System time for parameter transfer completion = ",SYSTEM_ELAPSED, &
-                & ERR,ERROR,*999)              
+                & ERR,ERROR,*999)
             ENDIF
             !Loop over the boundary and ghost elements
             DO element_idx=ELEMENTS_MAPPING%BOUNDARY_START,ELEMENTS_MAPPING%GHOST_FINISH
@@ -1299,7 +1299,7 @@ CONTAINS
     
 !#ifdef TAUPROF
 !    CHARACTER(28) :: CVAR
-!    INTEGER :: PHASE(2) = (/ 0, 0 /)
+!    INTEGER :: PHASE(2)= (/ 0, 0 /)
 !    SAVE PHASE
 !#endif
 
@@ -1396,7 +1396,7 @@ CONTAINS
               CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"User time for parameter transfer completion = ",USER_ELAPSED, &
                 & ERR,ERROR,*999)
               CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"System time for parameter transfer completion = ",SYSTEM_ELAPSED, &
-                & ERR,ERROR,*999)              
+                & ERR,ERROR,*999)
             ENDIF
             !Loop over the boundary and ghost elements
 #ifdef TAUPROF
@@ -1537,7 +1537,7 @@ CONTAINS
               CALL EQUATIONS_MATRICES_ELEMENT_CALCULATE(EQUATIONS_MATRICES,ne,ERR,ERROR,*999)
               CALL EQUATIONS_SET_FINITE_ELEMENT_RESIDUAL_EVALUATE(EQUATIONS_SET,ne,ERR,ERROR,*999)
               CALL EQUATIONS_MATRICES_ELEMENT_ADD(EQUATIONS_MATRICES,ERR,ERROR,*999)
-            ENDDO !element_idx                  
+            ENDDO !element_idx
             !Output timing information if required
             IF(EQUATIONS%OUTPUT_TYPE>=EQUATIONS_TIMING_OUTPUT) THEN
               CALL CPU_TIMER(USER_CPU,USER_TIME3,ERR,ERROR,*999)
@@ -1561,7 +1561,7 @@ CONTAINS
               CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"User time for parameter transfer completion = ",USER_ELAPSED, &
                 & ERR,ERROR,*999)
               CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"System time for parameter transfer completion = ",SYSTEM_ELAPSED, &
-                & ERR,ERROR,*999)              
+                & ERR,ERROR,*999)
             ENDIF
             !Loop over the boundary and ghost elements
             DO element_idx=ELEMENTS_MAPPING%BOUNDARY_START,ELEMENTS_MAPPING%GHOST_FINISH
@@ -1632,7 +1632,6 @@ CONTAINS
   !================================================================================================================================
   !
 
-  ! sander, 26/03/10
   !>Assembles the equations stiffness matrix, residuals and rhs for a nonlinear quasistatic equations set using the finite element method.
   !> currently the same as the static nonlinear case
   SUBROUTINE EQUATIONS_SET_ASSEMBLE_QUASISTATIC_NONLINEAR_FEM(EQUATIONS_SET,ERR,ERROR,*)
@@ -1654,7 +1653,6 @@ CONTAINS
   !================================================================================================================================
   !
 
-! chrm, 17/09/09
   !>Assembles the equations stiffness matrix and rhs for a linear quasistatic equations set using the finite element method.
   SUBROUTINE EQUATIONS_SET_ASSEMBLE_QUASISTATIC_LINEAR_FEM(EQUATIONS_SET,ERR,ERROR,*)
 
@@ -1713,7 +1711,7 @@ CONTAINS
               CALL EQUATIONS_MATRICES_ELEMENT_CALCULATE(EQUATIONS_MATRICES,ne,ERR,ERROR,*999)
               CALL EQUATIONS_SET_FINITE_ELEMENT_CALCULATE(EQUATIONS_SET,ne,ERR,ERROR,*999)
               CALL EQUATIONS_MATRICES_ELEMENT_ADD(EQUATIONS_MATRICES,ERR,ERROR,*999)
-            ENDDO !element_idx                  
+            ENDDO !element_idx
             !Output timing information if required
             IF(EQUATIONS%OUTPUT_TYPE>=EQUATIONS_TIMING_OUTPUT) THEN
               CALL CPU_TIMER(USER_CPU,USER_TIME3,ERR,ERROR,*999)
@@ -1737,7 +1735,7 @@ CONTAINS
               CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"User time for parameter transfer completion = ",USER_ELAPSED, &
                 & ERR,ERROR,*999)
               CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"System time for parameter transfer completion = ",SYSTEM_ELAPSED, &
-                & ERR,ERROR,*999)              
+                & ERR,ERROR,*999)
             ENDIF
             !Loop over the boundary and ghost elements
             DO element_idx=ELEMENTS_MAPPING%BOUNDARY_START,ELEMENTS_MAPPING%GHOST_FINISH
@@ -1954,7 +1952,7 @@ CONTAINS
                                           CASE(DISTRIBUTED_MATRIX_DIAGONAL_STORAGE_TYPE)
                                             CALL FLAG_ERROR("Not implemented.",ERR,ERROR,*999)
                                           CASE(DISTRIBUTED_MATRIX_COLUMN_MAJOR_STORAGE_TYPE)
-                                            CALL FLAG_ERROR("Not implemented.",ERR,ERROR,*999)                      
+                                            CALL FLAG_ERROR("Not implemented.",ERR,ERROR,*999)
                                           CASE(DISTRIBUTED_MATRIX_ROW_MAJOR_STORAGE_TYPE)
                                             CALL FLAG_ERROR("Not implemented.",ERR,ERROR,*999)
                                           CASE(DISTRIBUTED_MATRIX_COMPRESSED_ROW_STORAGE_TYPE)
@@ -2001,9 +1999,9 @@ CONTAINS
                                                 & FIELD_VALUES_SET_TYPE,rhs_variable_dof,RHS_VALUE,ERR,ERROR,*999)
                                             ENDDO !equations_row_number
                                           CASE(DISTRIBUTED_MATRIX_COMPRESSED_COLUMN_STORAGE_TYPE)
-                                            CALL FLAG_ERROR("Not implemented.",ERR,ERROR,*999)                        
+                                            CALL FLAG_ERROR("Not implemented.",ERR,ERROR,*999)
                                           CASE(DISTRIBUTED_MATRIX_ROW_COLUMN_STORAGE_TYPE)
-                                            CALL FLAG_ERROR("Not implemented.",ERR,ERROR,*999)                      
+                                            CALL FLAG_ERROR("Not implemented.",ERR,ERROR,*999)
                                           CASE DEFAULT
                                             LOCAL_ERROR="The matrix storage type of "// &
                                               & TRIM(NUMBER_TO_VSTRING(EQUATIONS_STORAGE_TYPE,"*",ERR,ERROR))//" is invalid."
@@ -2079,7 +2077,7 @@ CONTAINS
           
     CALL EXITS("EQUATIONS_SET_BACKSUBSTITUTE")
     RETURN
-999 CALL ERRORS("EQUATIONS_SET_BACKSUBSTITUTE",ERR,ERROR)    
+999 CALL ERRORS("EQUATIONS_SET_BACKSUBSTITUTE",ERR,ERROR)
     CALL EXITS("EQUATIONS_SET_BACKSUBSTITUTE")
     RETURN 1
    
@@ -2317,7 +2315,7 @@ CONTAINS
         !Finish the equations set specific geometry setup
         CALL EQUATIONS_SET_SETUP(EQUATIONS_SET,EQUATIONS_SET_SETUP_INFO,ERR,ERROR,*999)
         !Finalise the setup
-        CALL EQUATIONS_SET_SETUP_FINALISE(EQUATIONS_SET_SETUP_INFO,ERR,ERROR,*999)          
+        CALL EQUATIONS_SET_SETUP_FINALISE(EQUATIONS_SET_SETUP_INFO,ERR,ERROR,*999)
         !Finish the equations set creation
         EQUATIONS_SET%EQUATIONS_SET_FINISHED=.TRUE.
       ENDIF
@@ -2327,7 +2325,7 @@ CONTAINS
        
     CALL EXITS("EQUATIONS_SET_CREATE_FINISH")
     RETURN
-999 CALL ERRORS("EQUATIONS_SET_CREATE_FINISH",ERR,ERROR)    
+999 CALL ERRORS("EQUATIONS_SET_CREATE_FINISH",ERR,ERROR)
     CALL EXITS("EQUATIONS_SET_CREATE_FINISH")
     RETURN 1
    
@@ -2465,7 +2463,7 @@ CONTAINS
                       NEW_EQUATIONS_SET%REGION=>REGION
                       !Set the equations set class, type and subtype
                       CALL EQUATIONS_SET_SPECIFICATION_SET(NEW_EQUATIONS_SET,EQUATIONS_SET_CLASS,EQUATIONS_SET_TYPE_, &
-                        & EQUATIONS_SET_SUBTYPE,ERR,ERROR,*999)      
+                        & EQUATIONS_SET_SUBTYPE,ERR,ERROR,*999)
                       NEW_EQUATIONS_SET%EQUATIONS_SET_FINISHED=.FALSE.
                       !Initialise the setup
                       CALL EQUATIONS_SET_SETUP_INITIALISE(EQUATIONS_SET_SETUP_INFO,ERR,ERROR,*999)
@@ -2476,7 +2474,7 @@ CONTAINS
                       EQUATIONS_SET_SETUP_INFO%FIELD=>EQUATIONS_SET_FIELD_FIELD
                       !Start equations set specific setup
                       CALL EQUATIONS_SET_SETUP(NEW_EQUATIONS_SET,EQUATIONS_SET_SETUP_INFO,ERR,ERROR,*999)
-                      CALL EQUATIONS_SET_SETUP_FINALISE(EQUATIONS_SET_SETUP_INFO,ERR,ERROR,*999)          
+                      CALL EQUATIONS_SET_SETUP_FINALISE(EQUATIONS_SET_SETUP_INFO,ERR,ERROR,*999)
                       !Set up the equations set geometric fields
                       CALL EQUATIONS_SET_GEOMETRY_INITIALISE(NEW_EQUATIONS_SET,ERR,ERROR,*999)
                       IF(GEOM_FIBRE_FIELD%TYPE==FIELD_GEOMETRIC_TYPE) THEN
@@ -2493,7 +2491,7 @@ CONTAINS
                       !Set up equations set specific geometry
                       CALL EQUATIONS_SET_SETUP(NEW_EQUATIONS_SET,EQUATIONS_SET_SETUP_INFO,ERR,ERROR,*999)
                       !Finalise the setup
-                      CALL EQUATIONS_SET_SETUP_FINALISE(EQUATIONS_SET_SETUP_INFO,ERR,ERROR,*999)          
+                      CALL EQUATIONS_SET_SETUP_FINALISE(EQUATIONS_SET_SETUP_INFO,ERR,ERROR,*999)
                       !Add new equations set into list of equations set in the region
                       ALLOCATE(NEW_EQUATIONS_SETS(REGION%EQUATIONS_SETS%NUMBER_OF_EQUATIONS_SETS+1),STAT=ERR)
                       IF(ERR/=0) CALL FLAG_ERROR("Could not allocate new equations sets.",ERR,ERROR,*999)
@@ -2506,8 +2504,8 @@ CONTAINS
                       REGION%EQUATIONS_SETS%NUMBER_OF_EQUATIONS_SETS=REGION%EQUATIONS_SETS%NUMBER_OF_EQUATIONS_SETS+1
                       EQUATIONS_SET=>NEW_EQUATIONS_SET
                       EQUATIONS_EQUATIONS_SET_FIELD=>EQUATIONS_SET%EQUATIONS_SET_FIELD
-                      !Set pointers: ASK_CHRIS
-                      IF(EQUATIONS_EQUATIONS_SET_FIELD%EQUATIONS_SET_FIELD_AUTO_CREATED) THEN            
+                      !\todo check pointer setup
+                      IF(EQUATIONS_EQUATIONS_SET_FIELD%EQUATIONS_SET_FIELD_AUTO_CREATED) THEN
                         EQUATIONS_SET_FIELD_FIELD=>EQUATIONS_SET%EQUATIONS_SET_FIELD%EQUATIONS_SET_FIELD_FIELD
                       ELSE
                         EQUATIONS_SET%EQUATIONS_SET_FIELD%EQUATIONS_SET_FIELD_FIELD=>EQUATIONS_SET_FIELD_FIELD
@@ -2544,7 +2542,7 @@ CONTAINS
     
     CALL EXITS("EQUATIONS_SET_CREATE_START")
     RETURN
-999 IF(ASSOCIATED(NEW_EQUATIONS_SET)) CALL EQUATIONS_SET_FINALISE(NEW_EQUATIONS_SET,DUMMY_ERR,DUMMY_ERROR,*998)
+999 IF(ASSOCIATED(NEW_EQUATIONS_SET))CALL EQUATIONS_SET_FINALISE(NEW_EQUATIONS_SET,DUMMY_ERR,DUMMY_ERROR,*998)
 998 IF(ASSOCIATED(NEW_EQUATIONS_SETS)) DEALLOCATE(NEW_EQUATIONS_SETS)
 997 CALL ERRORS("EQUATIONS_SET_CREATE_START",ERR,ERROR)
     CALL EXITS("EQUATIONS_SET_CREATE_START")
@@ -2582,7 +2580,7 @@ CONTAINS
         equations_set_position=0
         DO WHILE(equations_set_position<REGION%EQUATIONS_SETS%NUMBER_OF_EQUATIONS_SETS.AND..NOT.FOUND)
           equations_set_position=equations_set_position+1
-          IF(REGION%EQUATIONS_SETS%EQUATIONS_SETS(equations_set_position)%PTR%USER_NUMBER==USER_NUMBER) FOUND=.TRUE.
+          IF(REGION%EQUATIONS_SETS%EQUATIONS_SETS(equations_set_position)%PTR%USER_NUMBER==USER_NUMBER)FOUND=.TRUE.
         ENDDO
         
         IF(FOUND) THEN
@@ -2722,7 +2720,7 @@ CONTAINS
       CALL EQUATIONS_SET_SOURCE_FINALISE(EQUATIONS_SET%SOURCE,ERR,ERROR,*999)
       CALL EQUATIONS_SET_ANALYTIC_FINALISE(EQUATIONS_SET%ANALYTIC,ERR,ERROR,*999)
       CALL EQUATIONS_SET_EQUATIONS_SET_FIELD_FINALISE(EQUATIONS_SET%EQUATIONS_SET_FIELD,ERR,ERROR,*999)
-      IF(ASSOCIATED(EQUATIONS_SET%EQUATIONS)) CALL EQUATIONS_DESTROY(EQUATIONS_SET%EQUATIONS,ERR,ERROR,*999)
+      IF(ASSOCIATED(EQUATIONS_SET%EQUATIONS))CALL EQUATIONS_DESTROY(EQUATIONS_SET%EQUATIONS,ERR,ERROR,*999)
       DEALLOCATE(EQUATIONS_SET)
     ENDIF
        
@@ -2794,11 +2792,11 @@ CONTAINS
         IF(EQUATIONS%OUTPUT_TYPE>=EQUATIONS_ELEMENT_MATRIX_OUTPUT) THEN
           EQUATIONS_MATRICES=>EQUATIONS%EQUATIONS_MATRICES
           IF(ASSOCIATED(EQUATIONS_MATRICES)) THEN
-            CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"Finite element stiffness matrices:",ERR,ERROR,*999)          
+            CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"Finite element stiffness matrices:",ERR,ERROR,*999)
             CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"Element number = ",ELEMENT_NUMBER,ERR,ERROR,*999)
             DYNAMIC_MATRICES=>EQUATIONS_MATRICES%DYNAMIC_MATRICES
             IF(ASSOCIATED(DYNAMIC_MATRICES)) THEN
-              CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"Dynamic matrices:",ERR,ERROR,*999)                        
+              CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"Dynamic matrices:",ERR,ERROR,*999)
               CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"Number of element matrices = ",DYNAMIC_MATRICES% &
                 & NUMBER_OF_DYNAMIC_MATRICES,ERR,ERROR,*999)
               DO matrix_idx=1,DYNAMIC_MATRICES%NUMBER_OF_DYNAMIC_MATRICES
@@ -2827,7 +2825,7 @@ CONTAINS
             ENDIF
             LINEAR_MATRICES=>EQUATIONS_MATRICES%LINEAR_MATRICES
             IF(ASSOCIATED(LINEAR_MATRICES)) THEN
-              CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"Linear matrices:",ERR,ERROR,*999)                        
+              CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"Linear matrices:",ERR,ERROR,*999)
               CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"Number of element matrices = ",LINEAR_MATRICES% &
                 & NUMBER_OF_LINEAR_MATRICES,ERR,ERROR,*999)
               DO matrix_idx=1,LINEAR_MATRICES%NUMBER_OF_LINEAR_MATRICES
@@ -2866,7 +2864,7 @@ CONTAINS
                 CALL WRITE_STRING_VECTOR(GENERAL_OUTPUT_TYPE,1,1,ELEMENT_VECTOR%NUMBER_OF_ROWS,8,8,ELEMENT_VECTOR%ROW_DOFS, &
                   & '("  Row dofs     :",8(X,I13))','(16X,8(X,I13))',ERR,ERROR,*999)
                 CALL WRITE_STRING_VECTOR(GENERAL_OUTPUT_TYPE,1,1,ELEMENT_VECTOR%NUMBER_OF_ROWS,8,8,ELEMENT_VECTOR%VECTOR, &
-                  & '("  Vector(:)    :",8(X,E13.6))','(16X,8(X,E13.6))',ERR,ERROR,*999)
+                  & '("  Vector(:):",8(X,E13.6))','(16X,8(X,E13.6))',ERR,ERROR,*999)
               ENDIF
             ENDIF
             SOURCE_VECTOR=>EQUATIONS_MATRICES%SOURCE_VECTOR
@@ -2881,7 +2879,7 @@ CONTAINS
                 CALL WRITE_STRING_VECTOR(GENERAL_OUTPUT_TYPE,1,1,ELEMENT_VECTOR%NUMBER_OF_ROWS,8,8,ELEMENT_VECTOR%ROW_DOFS, &
                   & '("  Row dofs     :",8(X,I13))','(16X,8(X,I13))',ERR,ERROR,*999)
                 CALL WRITE_STRING_VECTOR(GENERAL_OUTPUT_TYPE,1,1,ELEMENT_VECTOR%NUMBER_OF_ROWS,8,8,ELEMENT_VECTOR%VECTOR, &
-                  & '("  Vector(:)    :",8(X,E13.6))','(16X,8(X,E13.6))',ERR,ERROR,*999)
+                  & '("  Vector(:):",8(X,E13.6))','(16X,8(X,E13.6))',ERR,ERROR,*999)
               ENDIF
             ENDIF
           ELSE
@@ -3239,7 +3237,7 @@ CONTAINS
                 CALL WRITE_STRING_VECTOR(GENERAL_OUTPUT_TYPE,1,1,ELEMENT_VECTOR%NUMBER_OF_ROWS,8,8,ELEMENT_VECTOR%ROW_DOFS, &
                   & '("  Row dofs     :",8(X,I13))','(16X,8(X,I13))',ERR,ERROR,*999)
                 CALL WRITE_STRING_VECTOR(GENERAL_OUTPUT_TYPE,1,1,ELEMENT_VECTOR%NUMBER_OF_ROWS,8,8,ELEMENT_VECTOR%VECTOR, &
-                  & '("  Vector(:)    :",8(X,E13.6))','(16X,8(X,E13.6))',ERR,ERROR,*999)
+                  & '("  Vector(:):",8(X,E13.6))','(16X,8(X,E13.6))',ERR,ERROR,*999)
               ENDIF
               RHS_VECTOR=>EQUATIONS_MATRICES%RHS_VECTOR
               IF(ASSOCIATED(RHS_VECTOR)) THEN
@@ -3329,7 +3327,7 @@ CONTAINS
             CALL FLAG_ERROR("Equations set independent independent field is not associated.",ERR,ERROR,*999)
           ENDIF
           !Finalise the setup
-          CALL EQUATIONS_SET_SETUP_FINALISE(EQUATIONS_SET_SETUP_INFO,ERR,ERROR,*999)          
+          CALL EQUATIONS_SET_SETUP_FINALISE(EQUATIONS_SET_SETUP_INFO,ERR,ERROR,*999)
           !Finish independent creation
           EQUATIONS_SET%INDEPENDENT%INDEPENDENT_FINISHED=.TRUE.
         ENDIF
@@ -3371,7 +3369,7 @@ CONTAINS
 
     IF(ASSOCIATED(EQUATIONS_SET)) THEN
       IF(ASSOCIATED(EQUATIONS_SET%INDEPENDENT)) THEN
-        CALL FLAG_ERROR("The equations set independent is already associated",ERR,ERROR,*998)        
+        CALL FLAG_ERROR("The equations set independent is already associated",ERR,ERROR,*998)
       ELSE
         REGION=>EQUATIONS_SET%REGION
         IF(ASSOCIATED(REGION)) THEN
@@ -3698,7 +3696,7 @@ CONTAINS
             CALL FLAG_ERROR("Equations set materials materials field is not associated.",ERR,ERROR,*999)
           ENDIF
           !Finalise the setup
-          CALL EQUATIONS_SET_SETUP_FINALISE(EQUATIONS_SET_SETUP_INFO,ERR,ERROR,*999)          
+          CALL EQUATIONS_SET_SETUP_FINALISE(EQUATIONS_SET_SETUP_INFO,ERR,ERROR,*999)
           !Finish materials creation
           EQUATIONS_SET%MATERIALS%MATERIALS_FINISHED=.TRUE.
         ENDIF
@@ -3740,7 +3738,7 @@ CONTAINS
 
     IF(ASSOCIATED(EQUATIONS_SET)) THEN
       IF(ASSOCIATED(EQUATIONS_SET%MATERIALS)) THEN
-        CALL FLAG_ERROR("The equations set materials is already associated",ERR,ERROR,*998)        
+        CALL FLAG_ERROR("The equations set materials is already associated",ERR,ERROR,*998)
       ELSE
         REGION=>EQUATIONS_SET%REGION
         IF(ASSOCIATED(REGION)) THEN
@@ -3962,7 +3960,7 @@ CONTAINS
           CALL FLAG_ERROR("Equations set dependent dependent field is not associated.",ERR,ERROR,*999)
         ENDIF
         !Finalise the setup
-        CALL EQUATIONS_SET_SETUP_FINALISE(EQUATIONS_SET_SETUP_INFO,ERR,ERROR,*999)          
+        CALL EQUATIONS_SET_SETUP_FINALISE(EQUATIONS_SET_SETUP_INFO,ERR,ERROR,*999)
         !Finish the equations set creation
         EQUATIONS_SET%DEPENDENT%DEPENDENT_FINISHED=.TRUE.
       ENDIF
@@ -4390,7 +4388,7 @@ CONTAINS
     CALL ENTERS("EQUATIONS_SET_EQUATIONS_DESTROY",ERR,ERROR,*999)
 
     IF(ASSOCIATED(EQUATIONS_SET)) THEN
-      IF(ASSOCIATED(EQUATIONS_SET%EQUATIONS)) THEN        
+      IF(ASSOCIATED(EQUATIONS_SET%EQUATIONS)) THEN
         CALL EQUATIONS_FINALISE(EQUATIONS_SET%EQUATIONS,ERR,ERROR,*999)
       ELSE
         CALL FLAG_ERROR("Equations set equations is not associated.",ERR,ERROR,*999)
@@ -4428,7 +4426,7 @@ CONTAINS
       IF(ASSOCIATED(EQUATIONS)) THEN
         IF(EQUATIONS%EQUATIONS_FINISHED) THEN
           SELECT CASE(EQUATIONS%LINEARITY)
-          CASE(EQUATIONS_LINEAR)            
+          CASE(EQUATIONS_LINEAR)
             SELECT CASE(EQUATIONS%TIME_DEPENDENCE)
             CASE(EQUATIONS_STATIC)
               SELECT CASE(EQUATIONS_SET%SOLUTION_METHOD)
@@ -4676,7 +4674,7 @@ CONTAINS
               CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"User time for parameter transfer completion = ",USER_ELAPSED, &
                 & ERR,ERROR,*999)
               CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"System time for parameter transfer completion = ",SYSTEM_ELAPSED, &
-                & ERR,ERROR,*999)              
+                & ERR,ERROR,*999)
             ENDIF
             !Loop over the boundary and ghost elements
             DO element_idx=ELEMENTS_MAPPING%BOUNDARY_START,ELEMENTS_MAPPING%GHOST_FINISH
@@ -4806,7 +4804,7 @@ CONTAINS
               CALL EQUATIONS_MATRICES_ELEMENT_CALCULATE(EQUATIONS_MATRICES,ne,ERR,ERROR,*999)
               CALL EQUATIONS_SET_FINITE_ELEMENT_JACOBIAN_EVALUATE(EQUATIONS_SET,ne,ERR,ERROR,*999)
               CALL EQUATIONS_MATRICES_JACOBIAN_ELEMENT_ADD(EQUATIONS_MATRICES,ERR,ERROR,*999)
-            ENDDO !element_idx                  
+            ENDDO !element_idx
             !Output timing information if required
             IF(EQUATIONS%OUTPUT_TYPE>=EQUATIONS_TIMING_OUTPUT) THEN
               CALL CPU_TIMER(USER_CPU,USER_TIME3,ERR,ERROR,*999)
@@ -4830,7 +4828,7 @@ CONTAINS
               CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"User time for parameter transfer completion = ",USER_ELAPSED, &
                 & ERR,ERROR,*999)
               CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"System time for parameter transfer completion = ",SYSTEM_ELAPSED, &
-                & ERR,ERROR,*999)              
+                & ERR,ERROR,*999)
             ENDIF
             !Loop over the boundary and ghost elements
             DO element_idx=ELEMENTS_MAPPING%BOUNDARY_START,ELEMENTS_MAPPING%GHOST_FINISH
@@ -4926,11 +4924,11 @@ CONTAINS
       IF(ASSOCIATED(EQUATIONS)) THEN
         IF(EQUATIONS%EQUATIONS_FINISHED) THEN
           SELECT CASE(EQUATIONS%LINEARITY)
-          CASE(EQUATIONS_LINEAR)            
+          CASE(EQUATIONS_LINEAR)
             CALL FLAG_ERROR("Can not evaluate a residual for linear equations.",ERR,ERROR,*999)
           CASE(EQUATIONS_NONLINEAR)
             SELECT CASE(EQUATIONS%TIME_DEPENDENCE)
-            CASE(EQUATIONS_STATIC,EQUATIONS_QUASISTATIC) !Quasistatic handled like static
+            CASE(EQUATIONS_STATIC,EQUATIONS_QUASISTATIC)!Quasistatic handled like static
               SELECT CASE(EQUATIONS_SET%SOLUTION_METHOD)
               CASE(EQUATIONS_SET_FEM_SOLUTION_METHOD)
                 CALL EQUATIONS_SET_RESIDUAL_EVALUATE_STATIC_FEM(EQUATIONS_SET,ERR,ERROR,*999)
@@ -5124,7 +5122,7 @@ CONTAINS
               CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"User time for parameter transfer completion = ",USER_ELAPSED, &
                 & ERR,ERROR,*999)
               CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"System time for parameter transfer completion = ",SYSTEM_ELAPSED, &
-                & ERR,ERROR,*999)              
+                & ERR,ERROR,*999)
             ENDIF
             !Loop over the boundary and ghost elements
             DO element_idx=ELEMENTS_MAPPING%BOUNDARY_START,ELEMENTS_MAPPING%GHOST_FINISH
@@ -5278,7 +5276,7 @@ CONTAINS
               CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"User time for parameter transfer completion = ",USER_ELAPSED, &
                 & ERR,ERROR,*999)
               CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"System time for parameter transfer completion = ",SYSTEM_ELAPSED, &
-                & ERR,ERROR,*999)              
+                & ERR,ERROR,*999)
             ENDIF
             !Loop over the boundary and ghost elements
             DO element_idx=ELEMENTS_MAPPING%BOUNDARY_START,ELEMENTS_MAPPING%GHOST_FINISH
@@ -5526,7 +5524,7 @@ CONTAINS
             CALL FLAG_ERROR("Equations set source source field is not associated.",ERR,ERROR,*999)
           ENDIF
           !Finalise the setup
-          CALL EQUATIONS_SET_SETUP_FINALISE(EQUATIONS_SET_SETUP_INFO,ERR,ERROR,*999)          
+          CALL EQUATIONS_SET_SETUP_FINALISE(EQUATIONS_SET_SETUP_INFO,ERR,ERROR,*999)
           !Finish the source creation
           EQUATIONS_SET%SOURCE%SOURCE_FINISHED=.TRUE.
         ENDIF
@@ -5568,7 +5566,7 @@ CONTAINS
 
     IF(ASSOCIATED(EQUATIONS_SET)) THEN
       IF(ASSOCIATED(EQUATIONS_SET%SOURCE)) THEN
-        CALL FLAG_ERROR("The equations set source is already associated.",ERR,ERROR,*998)        
+        CALL FLAG_ERROR("The equations set source is already associated.",ERR,ERROR,*998)
       ELSE
         REGION=>EQUATIONS_SET%REGION
         IF(ASSOCIATED(REGION)) THEN
@@ -5851,7 +5849,7 @@ CONTAINS
 !         !Peform the initial equations set setup
 !         CALL EQUATIONS_SET_SETUP(EQUATIONS_SET,EQUATIONS_SET_SETUP_INFO,ERR,ERROR,*999)
 !         !Finalise the setup
-!         CALL EQUATIONS_SET_SETUP_FINALISE(EQUATIONS_SET_SETUP_INFO,ERR,ERROR,*999)          
+!         CALL EQUATIONS_SET_SETUP_FINALISE(EQUATIONS_SET_SETUP_INFO,ERR,ERROR,*999)
       ENDIF
     ELSE
       CALL FLAG_ERROR("Equations set is not associated.",ERR,ERROR,*999)
@@ -6025,7 +6023,6 @@ CONTAINS
 
     MY_COMPUTATIONAL_NODE_NUMBER=COMPUTATIONAL_NODE_NUMBER_GET(ERR,ERROR)
     
-! write(*,*) "iteration_number=",ITERATION_NUMBER
     !Take the stored load, scale it down appropriately then apply to the unknown variables
     IF(ASSOCIATED(EQUATIONS_SET)) THEN
       IF(DIAGNOSTICS1) THEN
@@ -6126,7 +6123,7 @@ CONTAINS
                       !   previous: FIELD_PREVIOUS_PRESSURE_SET_TYPE - holds the previously applied increment
                       !Grab the pointers for both
                       CALL FIELD_PARAMETER_SET_DATA_GET(DEPENDENT_FIELD,variable_type,FIELD_PREVIOUS_PRESSURE_SET_TYPE, &
-                        & PREV_LOADS,ERR,ERROR,*999)                    
+                        & PREV_LOADS,ERR,ERROR,*999)
                       CALL FIELD_PARAMETER_SET_DATA_GET(DEPENDENT_FIELD,variable_type,FIELD_PRESSURE_VALUES_SET_TYPE, &
                         & CURRENT_LOADS,ERR,ERROR,*999)
                       !Calculate the new load, update the old load
@@ -6144,7 +6141,7 @@ CONTAINS
                             IF(0<pressure_incremented_dof_idx.AND.pressure_incremented_dof_idx<DOMAIN_MAPPING%GHOST_START) THEN
                               NEW_LOAD=CURRENT_LOADS(pressure_incremented_dof_idx)
                               NEW_LOAD=NEW_LOAD/MAXIMUM_NUMBER_OF_ITERATIONS
-!if (pressure_incremented_idx==1) write(*,*) "new load=",new_load
+!if (pressure_incremented_idx==1)write(*,*)"new load=",new_load
                               !Update current and previous loads
                               CALL FIELD_PARAMETER_SET_UPDATE_LOCAL_DOF(DEPENDENT_FIELD,variable_type, &
                                 & FIELD_PRESSURE_VALUES_SET_TYPE,pressure_incremented_dof_idx,NEW_LOAD,ERR,ERROR,*999)
@@ -6174,8 +6171,8 @@ CONTAINS
                             IF(0<pressure_incremented_dof_idx.AND.pressure_incremented_dof_idx<DOMAIN_MAPPING%GHOST_START) THEN
                               PREV_LOAD=PREV_LOADS(pressure_incremented_dof_idx)
                               CURRENT_LOAD=CURRENT_LOADS(pressure_incremented_dof_idx)
-                              NEW_LOAD=CURRENT_LOAD+(CURRENT_LOAD-PREV_LOAD)  !This may be subject to numerical errors...
-!if (pressure_incremented_idx==1) write(*,*) "new load=",new_load
+                              NEW_LOAD=CURRENT_LOAD+(CURRENT_LOAD-PREV_LOAD)!This may be subject to numerical errors...
+!if (pressure_incremented_idx==1)write(*,*)"new load=",new_load
                           !Update current and previous loads
                               CALL FIELD_PARAMETER_SET_UPDATE_LOCAL_DOF(DEPENDENT_FIELD,variable_type, &
                                 & FIELD_PRESSURE_VALUES_SET_TYPE,pressure_incremented_dof_idx,NEW_LOAD,ERR,ERROR,*999)
