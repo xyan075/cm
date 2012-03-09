@@ -34045,7 +34045,6 @@ INTEGER(INTG) :: DATA_POINT_GLOBAL_NUMBER !<The global number of the data point.
   !================================================================================================================================
   !
 
-
   SUBROUTINE CMISSInterfaceMeshConnectivity_BasisSetNumber(regionUserNumber,interfaceUserNumber,interfaceBasisNumber,err)
 
     !Argument variables
@@ -34093,7 +34092,7 @@ INTEGER(INTG) :: DATA_POINT_GLOBAL_NUMBER !<The global number of the data point.
     CALL CMISS_HANDLE_ERROR(err,error)
     RETURN
     
-  END SUBROUTINE CMISSInterfaceMeshConnectivity_SetBasisNumber
+  END SUBROUTINE CMISSInterfaceMeshConnectivity_BasisSetNumber
   
   !  
   !================================================================================================================================
