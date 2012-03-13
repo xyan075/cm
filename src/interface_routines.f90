@@ -1859,12 +1859,12 @@ CONTAINS
             DO data_projection_idx=1,DATA_POINTS%NUMBER_OF_DATA_PROJECTIONS-1 !The last data projection was on the interface mesh for setting up lagrange field
               IF(DATA_POINTS%DATA_PROJECTIONS(data_projection_idx)%PTR%DATA_PROJECTION_PROJECTED) THEN
                 DO data_point_idx=1,DATA_POINTS%NUMBER_OF_DATA_POINTS
-                  DATA_PROJECTION_RESULT=>DATA_POINTS%DATA_POINTS(data_point_idx)%DATA_PROJECTIONS_RESULT(data_projection_idx)
-                  CALL INTERFACE_POINTS_CONNECTIVITY_ELEMENT_NUMBER_SET(POINTS_CON,data_point_idx,data_projection_idx, &
-                    & DATA_PROJECTION_RESULT%ELEMENT_NUMBER,ERR,ERROR,*999)
-                  CALL INTERFACE_POINTS_CONNECTIVITY_POINT_XI_CONTACT_SET(POINTS_CON,data_point_idx,data_projection_idx, &
-                    & DATA_PROJECTION_RESULT%ELEMENT_NUMBER,DATA_PROJECTION_RESULT%ELEMENT_LINE_NUMBER,COMP_NO, &
-                    & DATA_PROJECTION_RESULT%XI,ERR,ERROR,*999)
+                  !DATA_PROJECTION_RESULT=>DATA_POINTS%DATA_PROJECTIONS(data_projection_idx)%DATA_PROJECTION_RESULTS(data_point_idx)
+                  !CALL INTERFACE_POINTS_CONNECTIVITY_ELEMENT_NUMBER_SET(POINTS_CON,data_point_idx,data_projection_idx, &
+                  !  & DATA_PROJECTION_RESULT%ELEMENT_NUMBER,ERR,ERROR,*999)
+                  !CALL INTERFACE_POINTS_CONNECTIVITY_POINT_XI_CONTACT_SET(POINTS_CON,data_point_idx,data_projection_idx, &
+                  !  & DATA_PROJECTION_RESULT%ELEMENT_NUMBER,DATA_PROJECTION_RESULT%ELEMENT_LINE_NUMBER,COMP_NO, &
+                  !  & DATA_PROJECTION_RESULT%XI,ERR,ERROR,*999)
                 ENDDO !data_point_idx      
               ELSE
                 LOCAL_ERROR="Data Projection  "//TRIM(NUMBER_TO_VSTRING(data_projection_idx,"*",ERR,ERROR))//" is not projected."        

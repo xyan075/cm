@@ -2526,8 +2526,7 @@ CONTAINS
         ENDDO        
         !Calculate number of projected data points on an element
         DO data_point_idx=1,DATA_POINTS%NUMBER_OF_DATA_POINTS
-          DATA_PROJECTION_RESULT=>DATA_POINTS%DATA_POINTS(data_point_idx)% &
-            & DATA_PROJECTIONS_RESULT(PROJECTION_NUMBER)
+          DATA_PROJECTION_RESULT=>DATA_PROJECTION%DATA_PROJECTION_RESULTS(data_point_idx)
           ELEMENT_NUMBER=DATA_PROJECTION_RESULT%ELEMENT_NUMBER
           DO element_idx=1,DATA_POINTS_TOPOLOGY%NUMBER_OF_ELEMENTS
             IF(DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(element_idx)%ELEMENT_NUMBER==ELEMENT_NUMBER) THEN
@@ -2547,8 +2546,7 @@ CONTAINS
         !Record the indecies of the data that projected on the elements 
         DO data_point_idx=1,DATA_POINTS%NUMBER_OF_DATA_POINTS
           !The last projection is hard-coded to be the interface mesh projection
-          DATA_PROJECTION_RESULT=>DATA_POINTS%DATA_POINTS(data_point_idx)% &
-            & DATA_PROJECTIONS_RESULT(PROJECTION_NUMBER)
+          DATA_PROJECTION_RESULT=>DATA_PROJECTION%DATA_PROJECTION_RESULTS(data_point_idx)
           ELEMENT_NUMBER=DATA_PROJECTION_RESULT%ELEMENT_NUMBER
           DO element_idx=1,DATA_POINTS_TOPOLOGY%NUMBER_OF_ELEMENTS
             count_idx=1         
@@ -8405,8 +8403,7 @@ CONTAINS
         ENDDO        
         !Calculate number of projected data points on an element
         DO data_point_idx=1,DATA_POINTS%NUMBER_OF_DATA_POINTS
-          DATA_PROJECTION_RESULT=>DATA_POINTS%DATA_POINTS(data_point_idx)% &
-            & DATA_PROJECTIONS_RESULT(PROJECTION_NUMBER)
+          DATA_PROJECTION_RESULT=>DATA_PROJECTION%DATA_PROJECTION_RESULTS(data_point_idx)
           ELEMENT_NUMBER=DATA_PROJECTION_RESULT%ELEMENT_NUMBER
           DO element_idx=1,DATA_POINTS_TOPOLOGY%NUMBER_OF_ELEMENTS
             IF(DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(element_idx)%ELEMENT_NUMBER==ELEMENT_NUMBER) THEN
@@ -8428,8 +8425,7 @@ CONTAINS
         global_count_idx=0
         DO data_point_idx=1,DATA_POINTS%NUMBER_OF_DATA_POINTS
           !The last projection is hard-coded to be the interface mesh projection
-          DATA_PROJECTION_RESULT=>DATA_POINTS%DATA_POINTS(data_point_idx)% &
-            & DATA_PROJECTIONS_RESULT(PROJECTION_NUMBER)
+          DATA_PROJECTION_RESULT=>DATA_PROJECTION%DATA_PROJECTION_RESULTS(data_point_idx)
           ELEMENT_NUMBER=DATA_PROJECTION_RESULT%ELEMENT_NUMBER
           DO element_idx=1,DATA_POINTS_TOPOLOGY%NUMBER_OF_ELEMENTS
             count_idx=1         
