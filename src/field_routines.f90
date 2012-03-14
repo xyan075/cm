@@ -13091,7 +13091,7 @@ CONTAINS
                         & TRIM(NUMBER_TO_VSTRING(VARIABLE_TYPE,"*",ERR,ERROR))//" of field number "// &
                         & TRIM(NUMBER_TO_VSTRING(FIELD%USER_NUMBER,"*",ERR,ERROR))//" which has Gauss point based interpolation."
                       CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
-                    CASE(FIELD_data_POINT_BASED_INTERPOLATION)
+                    CASE(FIELD_DATA_POINT_BASED_INTERPOLATION)
                       LOCAL_ERROR="Can not add element for component number "// &
                         & TRIM(NUMBER_TO_VSTRING(COMPONENT_NUMBER,"*",ERR,ERROR))//" of variable type "// &
                         & TRIM(NUMBER_TO_VSTRING(VARIABLE_TYPE,"*",ERR,ERROR))//" of field number "// &
