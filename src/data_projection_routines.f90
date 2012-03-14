@@ -581,8 +581,8 @@ CONTAINS
               CALL FLAG_ERROR("Mesh is not associated with a region or a interface.",ERR,ERROR,*999)
             ENDIF
             IF(DATA_POINTS_REGION_DIMENSIONS==MESH_REGION_DIMENSIONS) THEN !Dimension has to be equal
-              IF(.NOT. ASSOCIATED(DATA_PROJECTION)) THEN
                 ALLOCATE(DATA_PROJECTION,STAT=ERR)
+                !indentation
                 DATA_PROJECTION%GLOBAL_NUMBER=data_projection_idx
                 DATA_PROJECTION%USER_NUMBER=DATA_PROJECTION_USER_NUMBER
                 DATA_PROJECTION%LABEL=""
@@ -626,13 +626,7 @@ CONTAINS
                   DATA_PROJECTION%STARTING_XI(xi_idx)=0.5_DP !<initialised to 0.5 in each xi direction
                 ENDDO !xi_idx              
                 DATA_PROJECTION%ABSOLUTE_TOLERANCE=1.0E-8_DP
-                DATA_PROJECTION%RELATIVE_TOLERANCE=1.0E-6_DP
-                !Return the pointer        
-                ALLOCATE(DATA_POINTS%DATA_PROJECTIONS(data_projection_idx)%PTR,STAT=ERR)
-                DATA_POINTS%DATA_PROJECTIONS(data_projection_idx)%PTR=>DATA_PROJECTION
-              ELSE
-                CALL FLAG_ERROR("Data projection is already associated.",ERR,ERROR,*999)
-              ENDIF !ASSOCIATED(DATA_PROJECTION)
+                DATA_PROJECTION%RELATIVE_TOLERANCE=1.0E-6_DP  
               IF(DATA_POINTS%NUMBER_OF_DATA_PROJECTIONS>0) THEN
                 ALLOCATE(NEW_DATA_PROJECTIONS_PTR(DATA_POINTS%NUMBER_OF_DATA_PROJECTIONS+1),STAT=ERR)
                 IF(ERR/=0) CALL FLAG_ERROR("Could not allocate new data projections.",ERR,ERROR,*999)
