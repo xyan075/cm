@@ -344,7 +344,8 @@ CONTAINS
                         ROWS_FIELD_VARIABLE=>INTERFACE_MAPPING%INTERFACE_MATRIX_ROWS_TO_VAR_MAPS(matrix_idx)%VARIABLE
                         COLS_FIELD_VARIABLE=>INTERFACE_MAPPING%LAGRANGE_VARIABLE !TEMPORARY: Needs generalising
                         ROWS_MESH_INDEX=INTERFACE_MAPPING%INTERFACE_MATRIX_ROWS_TO_VAR_MAPS(matrix_idx)%MESH_INDEX
-                        ROWS_ELEMENT_NUMBERS=MESH_CONNECTIVITY%ELEMENT_CONNECTIVITY(ELEMENT_NUMBER,ROWS_MESH_INDEX)% &
+                        ALLOCATE(ROWS_ELEMENT_NUMBERS(1),STAT=ERR)
+                        ROWS_ELEMENT_NUMBERS(1)=MESH_CONNECTIVITY%ELEMENT_CONNECTIVITY(ELEMENT_NUMBER,ROWS_MESH_INDEX)% &
                           & COUPLED_MESH_ELEMENT_NUMBER
                         CALL EQUATIONS_MATRICES_ELEMENT_MATRIX_CALCULATE(INTERFACE_MATRIX%ELEMENT_MATRIX, &
                           & INTERFACE_MATRIX%UPDATE_MATRIX,ROWS_ELEMENT_NUMBERS,ELEMENT_NUMBERS,ROWS_FIELD_VARIABLE, &
@@ -354,6 +355,8 @@ CONTAINS
                           & " is not associated."
                         CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
                       ENDIF
+                      IF(ALLOCATED(ELEMENT_NUMBERS)) DEALLOCATE(ELEMENT_NUMBERS)
+                      IF(ALLOCATED(ROWS_ELEMENT_NUMBERS)) DEALLOCATE(ROWS_ELEMENT_NUMBERS)
                     ENDDO !matrix_idx
                   ELSE
                     !If mesh connectivity is not defined, then use the same element numbers for both interface and coupled mesh variables.
@@ -373,6 +376,7 @@ CONTAINS
                           & " is not associated."
                         CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
                       ENDIF
+                      IF(ALLOCATED(ELEMENT_NUMBERS)) DEALLOCATE(ELEMENT_NUMBERS)
                     ENDDO !matrix_idx
                   ENDIF            
                   RHS_VECTOR=>INTERFACE_MATRICES%RHS_VECTOR
@@ -434,6 +438,7 @@ CONTAINS
                           & INTERFACE_MATRIX%UPDATE_MATRIX,COUPLED_MESH_ELEMENT_NUMBERS(1:NUMBER_OF_COUPLED_MESH_ELEMENTS), &
                           & ELEMENT_NUMBERS,ROWS_FIELD_VARIABLE,COLS_FIELD_VARIABLE,ERR,ERROR,*999)
                         DEALLOCATE(COUPLED_MESH_ELEMENT_NUMBERS)
+                        IF(ALLOCATED(ELEMENT_NUMBERS)) DEALLOCATE(ELEMENT_NUMBERS)
                       ELSE
                         LOCAL_ERROR="Interface matrix number "//TRIM(NUMBER_TO_VSTRING(matrix_idx,"*",ERR,ERROR))// &
                           & " is not associated."
