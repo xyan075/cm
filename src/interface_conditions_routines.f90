@@ -2679,18 +2679,7 @@ CONTAINS
                       ENDDO !rowParameterIdx
                     ENDDO !colParameterIdx
                   ENDDO !colComponentIdx        
-                  
-                  
-                    
-                !Only penalise the gap function if the initial gap is a penetration.
-                !DO colIdx=1,RHS_VEC%ELEMENT_VECTOR%NUMBER_OF_ROWS
-                !  IF(RHS_VEC%ELEMENT_VECTOR%VECTOR(colIdx)>0.0_DP) THEN
-                !   RHS_VEC%ELEMENT_VECTOR%VECTOR(colIdx)=0.0_DP
-                !  ENDIF
-                !ENDDO
-                  
-                                   
-                
+                               
                 !@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ CODE FINISH HERE @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
                 
                 !Points connectivity
