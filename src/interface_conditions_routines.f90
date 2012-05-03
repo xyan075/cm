@@ -2921,7 +2921,7 @@ CONTAINS
                 END SELECT
               ENDIF !UPDATE_MATRIX
             ENDDO ! interface_matrix_idx
-            RHS_VEC%ELEMENT_VECTOR%VECTOR=0 !finite elasticity RHS=0
+            RHS_VEC%ELEMENT_VECTOR%VECTOR=0 !finite elasticity RHS=0  
           ENDIF
            
           

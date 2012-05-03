@@ -793,11 +793,14 @@ MODULE OPENCMISS
   !> \brief Boundary conditions constants.
   !>@{
   !> \addtogroup OPENCMISS_BoundaryConditionsTypes OPENCMISS::BoundaryConditions::Types
-  !> \brief Specific boundary condition types, which might only be applicable to certain equation sets.
+  !> \brief Boundary conditions type parameters.
   !> \see OPENCMISS::BoundaryConditions,OPENCMISS
   !>@{
-  INTEGER(INTG), PARAMETER :: CMISS_BOUNDARY_CONDITION_FREE = BOUNDARY_CONDITION_FREE !<The dof is free.
-  INTEGER(INTG), PARAMETER :: CMISS_BOUNDARY_CONDITION_FIXED = BOUNDARY_CONDITION_FIXED !<The dof is fixed as a boundary condition.
+  INTEGER(INTG), PARAMETER :: CMISS_BOUNDARY_CONDITION_FREE = BOUNDARY_CONDITION_FREE !<The dof is free. \see OPENCMISS_BoundaryConditionsTypes,OPENCMISS
+  INTEGER(INTG), PARAMETER :: CMISS_BOUNDARY_CONDITION_FIXED = BOUNDARY_CONDITION_FIXED !<The dof is fixed as a boundary condition. \see OPENCMISS_BoundaryConditionsTypes,OPENCMISS
+  INTEGER(INTG), PARAMETER :: CMISS_BOUNDARY_CONDITION_MIXED = BOUNDARY_CONDITION_MIXED !<The dof is set as a mixed boundary condition. \see OPENCMISS_BoundaryConditionsTypes,OPENCMISS
+
+  !Temporary boundary flags (to be removed when general boundary object becomes available!)
   INTEGER(INTG), PARAMETER :: CMISS_BOUNDARY_CONDITION_FIXED_WALL = BOUNDARY_CONDITION_FIXED_WALL
   INTEGER(INTG), PARAMETER :: CMISS_BOUNDARY_CONDITION_FIXED_INLET = BOUNDARY_CONDITION_FIXED_INLET
   INTEGER(INTG), PARAMETER :: CMISS_BOUNDARY_CONDITION_FIXED_OUTLET = BOUNDARY_CONDITION_FIXED_OUTLET
@@ -877,8 +880,15 @@ MODULE OPENCMISS
     MODULE PROCEDURE CMISSBoundaryConditions_SetNodeObj
   END INTERFACE !CMISSBoundaryConditions_SetNode
 
-  PUBLIC CMISS_BOUNDARY_CONDITION_FREE,CMISS_BOUNDARY_CONDITION_FIXED, &
-    & CMISS_BOUNDARY_CONDITION_FIXED_WALL,CMISS_BOUNDARY_CONDITION_FIXED_INLET,CMISS_BOUNDARY_CONDITION_MOVED_WALL, &
+ !>Add DOF and value to boundary condition object.
+ INTERFACE CMISSBoundaryConditions_AddDOFToBoundary
+   MODULE PROCEDURE CMISSBoundaryConditions_AddDOFToBoundaryNumber
+   MODULE PROCEDURE CMISSBoundaryConditions_AddDOFToBoundaryObj
+ END INTERFACE !CMISSBoundaryConditions_AddDOFToBoundary
+
+  PUBLIC CMISS_BOUNDARY_CONDITION_FREE,CMISS_BOUNDARY_CONDITION_FIXED,CMISS_BOUNDARY_CONDITION_MIXED
+  !Temporary boundary flags (to be removed when general boundary object becomes available!)
+  PUBLIC CMISS_BOUNDARY_CONDITION_FIXED_WALL,CMISS_BOUNDARY_CONDITION_FIXED_INLET,CMISS_BOUNDARY_CONDITION_MOVED_WALL, &
     & CMISS_BOUNDARY_CONDITION_FREE_WALL,CMISS_BOUNDARY_CONDITION_FIXED_OUTLET,CMISS_BOUNDARY_CONDITION_MOVED_WALL_INCREMENTED, &
     & CMISS_BOUNDARY_CONDITION_CORRECTION_MASS_INCREASE,CMISS_BOUNDARY_CONDITION_IMPERMEABLE_WALL
 
@@ -895,6 +905,8 @@ MODULE OPENCMISS
   PUBLIC CMISSBoundaryConditions_SetDataPoint
 
   PUBLIC CMISSBoundaryConditions_AddNode,CMISSBoundaryConditions_SetNode
+
+  PUBLIC CMISSBoundaryConditions_AddDOFToBoundary
 
 !!==================================================================================================================================
 !!
@@ -3875,18 +3887,6 @@ MODULE OPENCMISS
     MODULE PROCEDURE CMISSInterface_CreateStartNumber
     MODULE PROCEDURE CMISSInterface_CreateStartObj
   END INTERFACE !CMISSInterface_CreateStart
-  
-  !>Set the coordinate system of an inteface
-  INTERFACE CMISSInterface_CoordinateSystemSet
-    MODULE PROCEDURE CMISSInterface_CoordinateSystemSetNumber
-    MODULE PROCEDURE CMISSInterface_CoordinateSystemSetObj
-  END INTERFACE !CMISSInterfaceCoordinateSystemSet
-  
-  !>Get the coordinate system of an inteface
-  INTERFACE CMISSInterface_CoordinateSystemGet
-    MODULE PROCEDURE CMISSInterface_CoordinateSystemGetNumber
-    MODULE PROCEDURE CMISSInterface_CoordinateSystemGetObj
-  END INTERFACE !CMISSInterface_CoordinateSystemGet
 
   !>Destroys an interface.
   INTERFACE CMISSInterface_Destroy
@@ -3909,6 +3909,18 @@ MODULE OPENCMISS
     MODULE PROCEDURE CMISSInterface_LabelSetVSNumber
     MODULE PROCEDURE CMISSInterface_LabelSetVSObj
   END INTERFACE !CMISSInterface_LabelSet
+  
+  !Set interface coordinate system
+  INTERFACE CMISSInterface_CoordinateSystemSet
+    MODULE PROCEDURE CMISSInterface_CoordinateSystemSetNumber
+    MODULE PROCEDURE CMISSInterface_CoordinateSystemSetObj
+  END INTERFACE !CMISSInterface_CoordinateSystemSet
+  
+  !Get interface coordinate system
+  INTERFACE CMISSInterface_CoordinateSystemGet
+    MODULE PROCEDURE CMISSInterface_CoordinateSystemGetNumber
+    MODULE PROCEDURE CMISSInterface_CoordinateSystemGetObj
+  END INTERFACE !CMISSInterface_CoordinateSystemGet
   
   INTERFACE CMISSInterface_SelfContactSet
     MODULE PROCEDURE CMISSInterface_SelfContactSetNumber
@@ -10787,7 +10799,7 @@ CONTAINS
     INTEGER(INTG), INTENT(IN) :: fieldUserNumber !<The user number of the dependent field for the boundary condition.
     INTEGER(INTG), INTENT(IN) :: variableType !<The variable type of the dependent field to add the boundary condition at. \see OPENCMISS_FieldVariableTypes
     INTEGER(INTG), INTENT(IN) :: componentNumber !<The component number of the dependent field to add the boundary condition at.
-    INTEGER(INTG), INTENT(IN) :: condition !<The boundary condition type to set \see OPENCMISS_BoundaryConditionsTypes,OPENCMISS
+    INTEGER(INTG), INTENT(IN) :: condition !<The boundary condition type to set \see OPENCMISS_BoundaryConditions,OPENCMISS
     REAL(DP), INTENT(IN) :: value !<The value of the boundary condition to add.
     INTEGER(INTG), INTENT(OUT) :: err !<The error code.
     !Local variables
@@ -10858,7 +10870,7 @@ CONTAINS
     TYPE(CMISSFieldType), INTENT(IN) :: field !<The dependent field to set the boundary condition on.
     INTEGER(INTG), INTENT(IN) :: variableType !<The variable type of the dependent field to set the boundary condition at. \see OPENCMISS_FieldVariableTypes
     INTEGER(INTG), INTENT(IN) :: componentNumber !<The component number of the dependent field to set the boundary condition at.
-    INTEGER(INTG), INTENT(IN) :: condition !<The boundary condition type to set \see OPENCMISS_BoundaryConditionsTypes,OPENCMISS
+    INTEGER(INTG), INTENT(IN) :: condition !<The boundary condition type to set \see OPENCMISS_BoundaryConditions,OPENCMISS
     REAL(DP), INTENT(IN) :: value !<The value of the boundary condition to add.
     INTEGER(INTG), INTENT(OUT) :: err !<The error code.
     !Local variables
@@ -10894,7 +10906,7 @@ CONTAINS
     INTEGER(INTG), INTENT(IN) :: fieldUserNumber !<The user number of the dependent field for the boundary condition.
     INTEGER(INTG), INTENT(IN) :: variableType !<The variable type of the dependent field to set the boundary condition at. \see OPENCMISS_FieldVariableTypes
     INTEGER(INTG), INTENT(IN) :: componentNumber !<The component number of the dependent field to set the boundary condition at.
-    INTEGER(INTG), INTENT(IN) :: condition !<The boundary condition type to set \see OPENCMISS_BoundaryConditionsTypes,OPENCMISS
+    INTEGER(INTG), INTENT(IN) :: condition !<The boundary condition type to set \see OPENCMISS_BoundaryConditions,OPENCMISS
     REAL(DP), INTENT(IN) :: value !<The value of the boundary condition to set.
     INTEGER(INTG), INTENT(OUT) :: err !<The error code.
     !Local variables
@@ -10965,7 +10977,7 @@ CONTAINS
     TYPE(CMISSFieldType), INTENT(IN) :: field !<The dependent field to set the boundary condition on.
     INTEGER(INTG), INTENT(IN) :: variableType !<The variable type of the dependent field to set the boundary condition at. \see OPENCMISS_FieldVariableTypes
     INTEGER(INTG), INTENT(IN) :: componentNumber !<The component number of the dependent field to set the boundary condition at.
-    INTEGER(INTG), INTENT(IN) :: condition !<The boundary condition type to set \see OPENCMISS_BoundaryConditionsTypes,OPENCMISS
+    INTEGER(INTG), INTENT(IN) :: condition !<The boundary condition type to set \see OPENCMISS_BoundaryConditions,OPENCMISS
     REAL(DP), INTENT(IN) :: value !<The value of the boundary condition to set.
     INTEGER(INTG), INTENT(OUT) :: err !<The error code.
     !Local variables
@@ -11001,7 +11013,7 @@ CONTAINS
     INTEGER(INTG), INTENT(IN) :: variableType !<The variable type of the dependent field to add the boundary condition at. \see OPENCMISS_FieldVariableTypes
     INTEGER(INTG), INTENT(IN) :: elementUserNumber !<The user number of the element to add the boundary conditions for.
     INTEGER(INTG), INTENT(IN) :: componentNumber !<The component number of the dependent field to add the boundary condition at.
-    INTEGER(INTG), INTENT(IN) :: condition !<The boundary condition type to set \see OPENCMISS_BoundaryConditionsTypes,OPENCMISS
+    INTEGER(INTG), INTENT(IN) :: condition !<The boundary condition type to set \see OPENCMISS_BoundaryConditions,OPENCMISS
     REAL(DP), INTENT(IN) :: value !<The value of the boundary condition to add.
     INTEGER(INTG), INTENT(OUT) :: err !<The error code.
     !Local variables
@@ -11074,7 +11086,7 @@ CONTAINS
     INTEGER(INTG), INTENT(IN) :: variableType !<The variable type of the dependent field to add the boundary condition at. \see OPENCMISS_FieldVariableTypes
     INTEGER(INTG), INTENT(IN) :: elementUserNumber !<The user number of the element to add the boundary conditions for.
     INTEGER(INTG), INTENT(IN) :: componentNumber !<The component number of the dependent field to set the boundary condition at.
-    INTEGER(INTG), INTENT(IN) :: condition !<The boundary condition type to set \see OPENCMISS_BoundaryConditionsTypes,OPENCMISS
+    INTEGER(INTG), INTENT(IN) :: condition !<The boundary condition type to set \see OPENCMISS_BoundaryConditions,OPENCMISS
     REAL(DP), INTENT(IN) :: value !<The value of the boundary condition to add.
     INTEGER(INTG), INTENT(OUT) :: err !<The error code.
     !Local variables
@@ -11110,7 +11122,7 @@ CONTAINS
     INTEGER(INTG), INTENT(IN) :: variableType !<The variable type of the dependent field to set the boundary condition at. \see OPENCMISS_FieldVariableTypes
     INTEGER(INTG), INTENT(IN) :: elementUserNumber !<The user number of the element to set the boundary conditions for.
     INTEGER(INTG), INTENT(IN) :: componentNumber !<The component number of the dependent field to set the boundary condition at.
-    INTEGER(INTG), INTENT(IN) :: condition !<The boundary condition type to set \see OPENCMISS_BoundaryConditionsTypes,OPENCMISS
+    INTEGER(INTG), INTENT(IN) :: condition !<The boundary condition type to set \see OPENCMISS_BoundaryConditions,OPENCMISS
     REAL(DP), INTENT(IN) :: value !<The value of the boundary condition to set.
     INTEGER(INTG), INTENT(OUT) :: err !<The error code.
     !Local variables
@@ -11183,7 +11195,7 @@ CONTAINS
     INTEGER(INTG), INTENT(IN) :: variableType !<The variable type of the dependent field to set the boundary condition at. \see OPENCMISS_FieldVariableTypes
     INTEGER(INTG), INTENT(IN) :: elementUserNumber !<The user number of the element to set the boundary conditions for.
     INTEGER(INTG), INTENT(IN) :: componentNumber !<The component number of the dependent field to set the boundary condition at.
-    INTEGER(INTG), INTENT(IN) :: condition !<The boundary condition type to set \see OPENCMISS_BoundaryConditionsTypes,OPENCMISS
+    INTEGER(INTG), INTENT(IN) :: condition !<The boundary condition type to set \see OPENCMISS_BoundaryConditions,OPENCMISS
     REAL(DP), INTENT(IN) :: value !<The value of the boundary condition to set.
     INTEGER(INTG), INTENT(OUT) :: err !<The error code.
     !Local variables
@@ -11330,7 +11342,7 @@ CONTAINS
     INTEGER(INTG), INTENT(IN) :: derivativeNumber !<The user number of the node derivative to add the boundary conditions for.
     INTEGER(INTG), INTENT(IN) :: nodeUserNumber !<The user number of the node to add the boundary conditions for.
     INTEGER(INTG), INTENT(IN) :: componentNumber !<The component number of the dependent field to add the boundary condition at.
-    INTEGER(INTG), INTENT(IN) :: condition !<The boundary condition type to set \see OPENCMISS_BoundaryConditionsTypes,OPENCMISS
+    INTEGER(INTG), INTENT(IN) :: condition !<The boundary condition type to set \see OPENCMISS_BoundaryConditions,OPENCMISS
     REAL(DP), INTENT(IN) :: value !<The value of the boundary condition to add.
     INTEGER(INTG), INTENT(OUT) :: err !<The error code.
     !Local variables
@@ -11405,7 +11417,7 @@ CONTAINS
     INTEGER(INTG), INTENT(IN) :: derivativeNumber !<The user number of the node derivative to add the boundary conditions for.
     INTEGER(INTG), INTENT(IN) :: nodeUserNumber !<The user number of the node to add the boundary conditions for.
     INTEGER(INTG), INTENT(IN) :: componentNumber !<The component number of the dependent field to set the boundary condition at.
-    INTEGER(INTG), INTENT(IN) :: condition !<The boundary condition type to set \see OPENCMISS_BoundaryConditionsTypes,OPENCMISS
+    INTEGER(INTG), INTENT(IN) :: condition !<The boundary condition type to set \see OPENCMISS_BoundaryConditions,OPENCMISS
     REAL(DP), INTENT(IN) :: value !<The value of the boundary condition to add.
     INTEGER(INTG), INTENT(OUT) :: err !<The error code.
     !Local variables
@@ -11443,7 +11455,7 @@ CONTAINS
     INTEGER(INTG), INTENT(IN) :: derivativeNumber !<The user number of the node derivative to set the boundary conditions for.
     INTEGER(INTG), INTENT(IN) :: nodeUserNumber !<The user number of the node to set the boundary conditions for.
     INTEGER(INTG), INTENT(IN) :: componentNumber !<The component number of the dependent field to set the boundary condition at.
-    INTEGER(INTG), INTENT(IN) :: condition !<The boundary condition type to set \see OPENCMISS_BoundaryConditionsTypes,OPENCMISS
+    INTEGER(INTG), INTENT(IN) :: condition !<The boundary condition type to set \see OPENCMISS_BoundaryConditions,OPENCMISS
     REAL(DP), INTENT(IN) :: value !<The value of the boundary condition to set.
     INTEGER(INTG), INTENT(OUT) :: err !<The error code.
     !Local variables
@@ -11521,7 +11533,7 @@ CONTAINS
     INTEGER(INTG), INTENT(IN) :: derivativeNumber !<The user number of the node derivative to set the boundary conditions for.
     INTEGER(INTG), INTENT(IN) :: nodeUserNumber !<The user number of the node to set the boundary conditions for.
     INTEGER(INTG), INTENT(IN) :: componentNumber !<The component number of the dependent field to set the boundary condition at.
-    INTEGER(INTG), INTENT(IN) :: condition !<The boundary condition type to set \see OPENCMISS_BoundaryConditionsTypes,OPENCMISS
+    INTEGER(INTG), INTENT(IN) :: condition !<The boundary condition type to set \see OPENCMISS_BoundaryConditions,OPENCMISS
     REAL(DP), INTENT(IN) :: value !<The value of the boundary condition to set.
     INTEGER(INTG), INTENT(OUT) :: err !<The error code.
     !Local variables
@@ -11596,7 +11608,7 @@ CONTAINS
     INTEGER(INTG), INTENT(IN) :: derivativeNumber !<The user number of the node derivative to set the boundary conditions for.
     INTEGER(INTG), INTENT(IN) :: nodeUserNumber !<The user number of the node to set the boundary conditions for.
     INTEGER(INTG), INTENT(IN) :: componentNumber !<The component number of the dependent field to set the boundary condition at.
-    INTEGER(INTG), INTENT(IN) :: condition !<The boundary condition type to set \see OPENCMISS_BoundaryConditionsTypes,OPENCMISS
+    INTEGER(INTG), INTENT(IN) :: condition !<The boundary condition type to set \see OPENCMISS_BoundaryConditions,OPENCMISS
     REAL(DP), INTENT(IN) :: value !<The value of the boundary condition to set.
     INTEGER(INTG), INTENT(OUT) :: err !<The error code.
     !Local variables
@@ -11614,6 +11626,112 @@ CONTAINS
     RETURN
 
   END SUBROUTINE CMISSBoundaryConditions_SetNodeObj
+
+  !
+  !================================================================================================================================
+  !
+
+  !>Sets the value of the specified dof as a boundary condition on the specified dof for boundary conditions identified by a user number.
+  SUBROUTINE CMISSBoundaryConditions_AddDOFToBoundaryNumber(regionUserNumber,problemUserNumber,controlLoopIdentifiers,solverIndex, &
+    & fieldUserNumber,variableType,DOFNumber,value,condition,err)
+
+    !Argument variables
+    INTEGER(INTG), INTENT(IN) :: regionUserNumber !<The user number of the region containing the equations set to add the boundary conditions for.
+    INTEGER(INTG), INTENT(IN) :: problemUserNumber !<The user number of the problem containing the solver equations to destroy the boundary conditions for.
+    INTEGER(INTG), INTENT(IN) :: controlLoopIdentifiers(:) !<controlLoopIdentifiers(i). The i'th control loop identifier to get the solver equations boundary conditions for.
+    INTEGER(INTG), INTENT(IN) :: solverIndex !<The solver index to get the solver equations for.
+    INTEGER(INTG), INTENT(IN) :: fieldUserNumber !<The user number of the dependent field for the boundary condition.
+    INTEGER(INTG), INTENT(IN) :: variableType !<The variable type of the dependent field to add the boundary condition for.
+    INTEGER(INTG), INTENT(IN) :: DOFNumber(:) !<The global number of the dof to add the boundary conditions for.
+    REAL(DP), INTENT(IN) :: value(:) !<The value of the boundary condition to add.
+    INTEGER(INTG), INTENT(IN) :: condition(:) !<The boundary condition type to set \see OPENCMISS_BoundaryConditions,OPENCMISS
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code.
+    !Local variables
+    TYPE(REGION_TYPE), POINTER :: REGION
+    TYPE(PROBLEM_TYPE), POINTER :: PROBLEM
+    TYPE(SOLVER_EQUATIONS_TYPE), POINTER :: SOLVER_EQUATIONS
+    TYPE(BOUNDARY_CONDITIONS_TYPE), POINTER :: BOUNDARY_CONDITIONS
+    TYPE(FIELD_TYPE), POINTER :: DEPENDENT_FIELD
+    TYPE(VARYING_STRING) :: LOCAL_ERROR
+
+    CALL ENTERS("CMISSBoundaryConditions_AddDOFToBoundaryNumber",err,error,*999)
+
+    NULLIFY(REGION)
+    NULLIFY(PROBLEM)
+    NULLIFY(SOLVER_EQUATIONS)
+    NULLIFY(BOUNDARY_CONDITIONS)
+    NULLIFY(DEPENDENT_FIELD)
+    CALL REGION_USER_NUMBER_FIND(regionUserNumber,REGION,err,error,*999)
+    IF(ASSOCIATED(REGION)) THEN
+      CALL PROBLEM_USER_NUMBER_FIND(problemUserNumber,PROBLEM,err,error,*999)
+      IF(ASSOCIATED(PROBLEM)) THEN
+        CALL PROBLEM_SOLVER_EQUATIONS_GET(PROBLEM,controlLoopIdentifiers,solverIndex,SOLVER_EQUATIONS,err,error,*999)
+        IF(ASSOCIATED(SOLVER_EQUATIONS)) THEN
+          CALL SOLVER_EQUATIONS_BOUNDARY_CONDITIONS_GET(SOLVER_EQUATIONS,BOUNDARY_CONDITIONS,err,error,*999)
+          IF(ASSOCIATED(BOUNDARY_CONDITIONS)) THEN
+            CALL FIELD_USER_NUMBER_FIND(fieldUserNumber,REGION,DEPENDENT_FIELD,err,error,*999)
+            IF(ASSOCIATED(DEPENDENT_FIELD)) THEN
+              CALL BOUNDARY_CONDITIONS_BOUNDARY_ADD_DOF(BOUNDARY_CONDITIONS,DEPENDENT_FIELD,variableType,DOFNumber,value, &
+                & condition,err,error,*999)
+            ELSE
+              LOCAL_ERROR="A field with a user number of "//TRIM(NUMBER_TO_VSTRING(fieldUserNumber,"*",err,error))// &
+                & " does not exist."
+              CALL FLAG_ERROR(LOCAL_ERROR,err,error,*999)
+            END IF
+          ELSE
+            CALL FLAG_ERROR("The solver equations boundary conditions are not associated.",err,error,*999)
+          END IF
+        ELSE
+          CALL FLAG_ERROR("The solver equations are not associated.",err,error,*999)
+        END IF
+      ELSE
+        LOCAL_ERROR="A problem with a user number of "//TRIM(NUMBER_TO_VSTRING(problemUserNumber,"*",err,error))//" does not exist."
+        CALL FLAG_ERROR(LOCAL_ERROR,err,error,*999)
+      END IF
+    ELSE
+      LOCAL_ERROR="A region with a user number of "//TRIM(NUMBER_TO_VSTRING(regionUserNumber,"*",err,error))//" does not exist."
+      CALL FLAG_ERROR(LOCAL_ERROR,err,error,*999)
+    END IF
+
+    CALL EXITS("CMISSBoundaryConditions_AddDOFToBoundaryNumber")
+    RETURN
+999 CALL ERRORS("CMISSBoundaryConditions_AddDOFToBoundaryNumber",err,error)
+    CALL EXITS("CMISSBoundaryConditions_AddDOFToBoundaryNumber")
+    CALL CMISS_HANDLE_ERROR(err,error)
+    RETURN
+
+  END SUBROUTINE CMISSBoundaryConditions_AddDOFToBoundaryNumber
+
+  !
+  !================================================================================================================================
+  !
+
+  !>Sets the value of the specified dof and sets this as a boundary condition on the specified dof for boundary conditions identified by an object.
+  SUBROUTINE CMISSBoundaryConditions_AddDOFToBoundaryObj(boundaryConditions,field,variableType,DOFNumber,value,condition,err)
+
+    !Argument variables
+    TYPE(CMISSBoundaryConditionsType), INTENT(IN) :: boundaryConditions !<The boundary conditions to add the node to.
+    TYPE(CMISSFieldType), INTENT(IN) :: field !<The dependent field to set the boundary condition on.
+    INTEGER(INTG), INTENT(IN) :: variableType !<The variable type of the dependent field to set the boundary condition at.
+    INTEGER(INTG), INTENT(IN) :: DOFNumber(:) !<The number of the dof to set the boundary conditions for.
+    REAL(DP), INTENT(IN) :: value(:) !<The value of the boundary condition to add.
+    INTEGER(INTG), INTENT(IN) :: condition(:) !<The boundary condition type to set \see OPENCMISS_BoundaryConditions,OPENCMISS
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code.
+    !Local variables
+
+    CALL ENTERS("CMISSBoundaryConditions_AddDOFToBoundaryObj",err,error,*999)
+
+    CALL BOUNDARY_CONDITIONS_BOUNDARY_ADD_DOF(boundaryConditions%BOUNDARY_CONDITIONS,field%FIELD,variableType,DOFNumber,value,&
+       & condition,err,error,*999)
+
+    CALL EXITS("CMISSBoundaryConditions_AddDOFToBoundaryObj")
+    RETURN
+999 CALL ERRORS("CMISSBoundaryConditions_AddDOFToBoundaryObj",err,error)
+    CALL EXITS("CMISSBoundaryConditions_AddDOFToBoundaryObj")
+    CALL CMISS_HANDLE_ERROR(err,error)
+    RETURN
+
+  END SUBROUTINE CMISSBoundaryConditions_AddDOFToBoundaryObj
 
 !!==================================================================================================================================
 !!

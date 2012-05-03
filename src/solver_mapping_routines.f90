@@ -422,8 +422,9 @@ CONTAINS
                                 !\todo This is wrong as we only have the mappings for the local rank not the global ranks. See below
                                 !\todo For now assume 1-1 mapping between rows and dofs.
                                 global_dof=global_row
-                                INCLUDE_ROW=INCLUDE_ROW.AND.(BOUNDARY_CONDITIONS_VARIABLE%DOF_TYPES(global_dof)== &
-                                  & BOUNDARY_CONDITION_DOF_FREE)
+                                INCLUDE_ROW=INCLUDE_ROW.AND.(BOUNDARY_CONDITIONS_VARIABLE%GLOBAL_BOUNDARY_CONDITIONS(global_dof)== &
+                                  & BOUNDARY_CONDITION_FREE.OR.BOUNDARY_CONDITIONS_VARIABLE% & 
+                                  & GLOBAL_BOUNDARY_CONDITIONS(global_dof)==BOUNDARY_CONDITION_FREE_WALL)
                               ELSE
                                 CALL FLAG_ERROR("Boundary condition variable is not associated.",ERR,ERROR,*999)
                               ENDIF
@@ -438,8 +439,9 @@ CONTAINS
                                 !\todo This is wrong as we only have the mappings for the local rank not the global ranks. See below
                                 !\todo For now assume 1-1 mapping between rows and dofs.
                                 global_dof=global_row
-                                INCLUDE_ROW=INCLUDE_ROW.AND.(BOUNDARY_CONDITIONS_VARIABLE%DOF_TYPES(global_dof)== &
-                                  & BOUNDARY_CONDITION_DOF_FREE)
+                                INCLUDE_ROW=INCLUDE_ROW.AND.(BOUNDARY_CONDITIONS_VARIABLE%GLOBAL_BOUNDARY_CONDITIONS(global_dof)== &
+                                  & BOUNDARY_CONDITION_FREE.OR.BOUNDARY_CONDITIONS_VARIABLE% &
+                                  & GLOBAL_BOUNDARY_CONDITIONS(global_dof)==BOUNDARY_CONDITION_FREE_WALL)
                               ELSE
                                 CALL FLAG_ERROR("Boundary condition variable is not associated.",ERR,ERROR,*999)
                               ENDIF
@@ -460,8 +462,9 @@ CONTAINS
                                   !variable_type=EQUATIONS_MAPPING%MATRIX_VARIABLE_TYPES(equations_matrix_idx)
                                   !global_dof=DEPENDENT_VARIABLE%DOMAIN_MAPPING%LOCAL_TO_GLOBAL_MAP(local_dof)
                                   global_dof=global_row
-                                  INCLUDE_ROW=INCLUDE_ROW.AND.(BOUNDARY_CONDITIONS_VARIABLE%DOF_TYPES(global_dof)== &
-                                    & BOUNDARY_CONDITION_DOF_FREE)
+                                  INCLUDE_ROW=INCLUDE_ROW.AND.(BOUNDARY_CONDITIONS_VARIABLE%GLOBAL_BOUNDARY_CONDITIONS( &
+                                    & global_dof)==BOUNDARY_CONDITION_FREE.OR.BOUNDARY_CONDITIONS_VARIABLE% &
+                                    & GLOBAL_BOUNDARY_CONDITIONS(global_dof)==BOUNDARY_CONDITION_FREE_WALL)
                                 ELSE
                                   CALL FLAG_ERROR("Boundary condition variable is not associated.",ERR,ERROR,*999)
                                 ENDIF
@@ -1303,7 +1306,9 @@ CONTAINS
                             local_dof=COL_DOFS_MAPPING%GLOBAL_TO_LOCAL_MAP(global_dof)%LOCAL_NUMBER(rank_idx)
                             dof_type=COL_DOFS_MAPPING%GLOBAL_TO_LOCAL_MAP(global_dof)%LOCAL_TYPE(rank_idx)
                             COLUMN_RANK=COL_DOFS_MAPPING%GLOBAL_TO_LOCAL_MAP(global_dof)%DOMAIN_NUMBER(rank_idx)
-                            INCLUDE_COLUMN=BOUNDARY_CONDITIONS_VARIABLE%DOF_TYPES(global_dof)==BOUNDARY_CONDITION_DOF_FREE
+                            INCLUDE_COLUMN=BOUNDARY_CONDITIONS_VARIABLE%GLOBAL_BOUNDARY_CONDITIONS(global_dof)== &
+                              & BOUNDARY_CONDITION_FREE.OR.BOUNDARY_CONDITIONS_VARIABLE%GLOBAL_BOUNDARY_CONDITIONS( &
+                              & global_dof)==BOUNDARY_CONDITION_FREE_WALL
                             COLUMN_LIST_ITEM(1)=global_dof
                             COLUMN_LIST_ITEM(2)=local_dof
                             IF(dof_type/=DOMAIN_LOCAL_GHOST) THEN
@@ -1571,7 +1576,9 @@ CONTAINS
                                   local_dof=COL_DOFS_MAPPING%GLOBAL_TO_LOCAL_MAP(global_dof)%LOCAL_NUMBER(rank_idx)
                                   dof_type=COL_DOFS_MAPPING%GLOBAL_TO_LOCAL_MAP(global_dof)%LOCAL_TYPE(rank_idx)
                                   COLUMN_RANK=COL_DOFS_MAPPING%GLOBAL_TO_LOCAL_MAP(global_dof)%DOMAIN_NUMBER(rank_idx)
-                                  INCLUDE_COLUMN=BOUNDARY_CONDITIONS_VARIABLE%DOF_TYPES(global_dof)==BOUNDARY_CONDITION_DOF_FREE
+                                  INCLUDE_COLUMN=BOUNDARY_CONDITIONS_VARIABLE%GLOBAL_BOUNDARY_CONDITIONS(global_dof)== &
+                                    & BOUNDARY_CONDITION_FREE.OR.BOUNDARY_CONDITIONS_VARIABLE%GLOBAL_BOUNDARY_CONDITIONS( &
+                                    & global_dof)==BOUNDARY_CONDITION_FREE_WALL
                                   COLUMN_LIST_ITEM(1)=global_dof
                                   COLUMN_LIST_ITEM(2)=local_dof
                                   IF(dof_type/=DOMAIN_LOCAL_GHOST) THEN

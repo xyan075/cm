@@ -1916,9 +1916,9 @@ CONTAINS
                           LOCAL_ERROR="The local contact number for coupled mesh "// &
                               & TRIM(NUMBER_TO_VSTRING(COUPLED_MESHID,"*",ERR,ERROR))//" is invalid for element number "// &
                               & TRIM(NUMBER_TO_VSTRING(COUPLED_ELEM,"*",ERR,ERROR))//"."
-                          CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
+                          CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999) 
                         END SELECT
-                      CASE DEFAULT
+                      CASE DEFAULT 
                         LOCAL_ERROR="interface dimension should be < 3"
                         CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
                       END SELECT
