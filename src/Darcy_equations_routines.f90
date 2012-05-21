@@ -211,6 +211,7 @@ CONTAINS
     NULLIFY(GEOMETRIC_DECOMPOSITION)
     NULLIFY(EQUATIONS_EQUATIONS_SET_FIELD)
     NULLIFY(EQUATIONS_SET_FIELD_FIELD)
+    NULLIFY(EQUATIONS_SET_FIELD_DATA)
 
     IF(ASSOCIATED(EQUATIONS_SET)) THEN
       SELECT CASE(EQUATIONS_SET%SUBTYPE)
@@ -1834,6 +1835,7 @@ CONTAINS
     NULLIFY(DECOMPOSITION,MESH_ELEMENT)
     NULLIFY(BOUNDARY_CONDITIONS,BOUNDARY_CONDITIONS_VARIABLE)
     NULLIFY(SOURCE_VECTOR,SOURCE_FIELD)
+    NULLIFY(EQUATIONS_SET_FIELD_DATA)
 
 
     IF(ASSOCIATED(EQUATIONS_SET)) THEN
@@ -3280,7 +3282,8 @@ CONTAINS
               DO faceNodeIdx=1,faceBasis%NUMBER_OF_NODES
                 elementNodeIdx=dependentBasis%NODE_NUMBERS_IN_LOCAL_FACE(faceNodeIdx,faceIdx)
                 DO faceNodeDerivativeIdx=1,faceBasis%NUMBER_OF_DERIVATIVES(faceNodeIdx)
-                  nodeDerivativeIdx=dependentBasis%DERIVATIVE_NUMBERS_IN_LOCAL_FACE(faceNodeDerivativeIdx,faceIdx)
+                  !\todo DERIVATIVE_NUMBERS_IN_LOCAL_FACE has been indexed incorrectly here. Assumes 2nd' dimension is face_node_derivative_idx when it is in fact face_node_idx. Will be corrected once DERIVATIVE_NUMBERS_IN_LOCAL_FACE type structure is updated.
+                  nodeDerivativeIdx=dependentBasis%DERIVATIVE_NUMBERS_IN_LOCAL_FACE(1,faceNodeDerivativeIdx,faceIdx)
                   parameterIdx=dependentBasis%ELEMENT_PARAMETER_INDEX(nodeDerivativeIdx,elementNodeIdx)
                   faceParameterIdx=faceBasis%ELEMENT_PARAMETER_INDEX(faceNodeDerivativeIdx,faceNodeIdx)
                   elementDofIdx=elementBaseDofIdx+parameterIdx
@@ -7852,7 +7855,8 @@ CONTAINS
                 element_node_idx_1=DEPENDENT_BASIS%NODE_NUMBERS_IN_LOCAL_FACE(face_node_idx_1,element_face_idx) !nn
 
                 DO face_node_derivative_idx_1=1,FACE_BASIS%NUMBER_OF_DERIVATIVES(face_node_idx_1) !nkf
-                  element_node_derivative_idx_1=DEPENDENT_BASIS%DERIVATIVE_NUMBERS_IN_LOCAL_FACE(face_node_derivative_idx_1, &
+                  !\todo DERIVATIVE_NUMBERS_IN_LOCAL_FACE has been indexed incorrectly here. Assumes 2nd' dimension is face_node_derivative_idx when it is in fact face_node_idx.  Will be corrected once DERIVATIVE_NUMBERS_IN_LOCAL_FACE type structure is updated.
+                  element_node_derivative_idx_1=DEPENDENT_BASIS%DERIVATIVE_NUMBERS_IN_LOCAL_FACE(1,face_node_derivative_idx_1, &
                     & element_face_idx)
 
                   parameter_idx_1=DEPENDENT_BASIS%ELEMENT_PARAMETER_INDEX(element_node_derivative_idx_1,element_node_idx_1)
@@ -7876,8 +7880,9 @@ CONTAINS
                       element_node_idx_2=DEPENDENT_BASIS%NODE_NUMBERS_IN_LOCAL_FACE(face_node_idx_2,element_face_idx) !nn
 
                       DO face_node_derivative_idx_2=1,FACE_BASIS%NUMBER_OF_DERIVATIVES(face_node_idx_2) !nkf
-                        element_node_derivative_idx_2=DEPENDENT_BASIS%DERIVATIVE_NUMBERS_IN_LOCAL_FACE(face_node_derivative_idx_2, &
-                          & element_face_idx)
+                        !\todo DERIVATIVE_NUMBERS_IN_LOCAL_FACE has been indexed incorrectly here. Assumes 2nd' dimension is face_node_derivative_idx when it is in fact face_node_idx. Will be corrected once DERIVATIVE_NUMBERS_IN_LOCAL_FACE type structure is updated.
+                        element_node_derivative_idx_2=DEPENDENT_BASIS% &
+                          & DERIVATIVE_NUMBERS_IN_LOCAL_FACE(1,face_node_derivative_idx_2,element_face_idx)
 
                         parameter_idx_2=DEPENDENT_BASIS%ELEMENT_PARAMETER_INDEX(element_node_derivative_idx_2,element_node_idx_2)
 

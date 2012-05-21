@@ -289,10 +289,8 @@ ifeq ($(OPERATING_SYSTEM),linux)
 
   # Set the flags for the various different CC compilers
   ifeq ($(CC),gcc)# gcc
-    C_FLGS += -pipe -m$(ABI)
-    # Position independent code is actually only required for objects
-    # in shared libraries but debug version may be built as shared libraries.
-    DBGC_FLGS += -fPIC
+    # Position independent code is required for the Python bindings
+    C_FLGS += -pipe -m$(ABI) -fPIC
     ifeq ($(MACHNAME),x86_64)
       ifneq ($(shell grep Intel /proc/cpuinfo 2>/dev/null),)
         C_FLGS += -march=nocona
@@ -311,7 +309,7 @@ ifeq ($(OPERATING_SYSTEM),linux)
   endif
   ifeq ($(CC),icc)
     # Turn on all warnings
-    C_FLGS += -Wall -m$(ABI)
+    C_FLGS += -Wall -m$(ABI) -fPIC
     ifeq ($(MACHNAME),x86_64)
       ifneq ($(shell grep Intel /proc/cpuinfo 2>/dev/null),)
         ifneq ($(shell grep Duo /proc/cpuinfo 2>/dev/null),)
@@ -368,14 +366,11 @@ ifeq ($(OPERATING_SYSTEM),linux)
   ifeq ($(FC),gfortran)
     #FC = /home/users/local/packages/gfortran/irun/bin/gfortran
     # -fstatck-check
-    F_FLGS += -pipe -m$(ABI) -fno-second-underscore -Wall -x f95-cpp-input
+    F_FLGS += -pipe -m$(ABI) -fno-second-underscore -Wall -x f95-cpp-input -fPIC
     # Restrict line length to 132
     F_FLGS += -ffree-line-length-132
     # for now change max identifier length. Should restrict to 63 (F2003) in future
     F_FLGS += -fmax-identifier-length=63
-    # Position independent code is actually only required for objects
-    # in shared libraries but debug version may be built as shared libraries.
-    DBGF_FLGS += -fPIC
     ifeq ($(MACHNAME),x86_64)
       ifneq ($(shell grep Intel /proc/cpuinfo 2>/dev/null),)
         F_FLGS += -march=nocona
@@ -402,8 +397,7 @@ ifeq ($(OPERATING_SYSTEM),linux)
     ELFLAGS += -m$(ABI)
   endif
   ifeq ($(FC),g95)
-    F_FLAGS += -fno-second-underscore -Wall -m$(ABI) -std=f2003
-    DBGF_FLGS += -fPIC
+    F_FLAGS += -fno-second-underscore -Wall -m$(ABI) -std=f2003 -fPIC
     DBGF_FLGS += -O0 -fbounds-check
     OPTF_FLGS = -O3 -Wuninitialized -funroll-all-loops
     ELFLAGS += -m$(ABI)
@@ -413,7 +407,7 @@ ifeq ($(OPERATING_SYSTEM),linux)
     # turn on preprocessing,
     # turn on warnings,
     # warn about non-standard Fortran 95
-    F_FLGS += -cpp -warn all -m$(ABI)
+    F_FLGS += -cpp -warn all -m$(ABI) -fPIC
     ifeq ($(MACHNAME),x86_64)
       ifneq ($(shell grep Intel /proc/cpuinfo 2>/dev/null),)
         ifneq ($(shell grep Duo /proc/cpuinfo 2>/dev/null),)
@@ -569,17 +563,16 @@ endif
 TAO_INCLUDE_PATH =#
 TAO_LIBRARIES =#
 TAO_LIB_PATH =#
-# Disable temporarily until TAO compatible with PETSc 3.2
-#ifeq ($(OPERATING_SYSTEM),linux)# Linux
-#  TAO_LIBRARIES = -ltaofortran -ltaopetsc -ltao
-#  TAO_LIB_PATH += $(addprefix -L, $(EXTERNAL_CM_DIR)/lib/ )
-#else
-#  ifeq ($(OPERATING_SYSTEM),aix)# AIX
-#    TAO_LIB_PATH += $(addprefix -L, $(EXTERNAL_CM_DIR)/lib/ )
-#  else# windows
-#    TAO_LIB_PATH += $(addprefix -L, /home/users/local/lib/ )
-#  endif
-#endif
+ifeq ($(OPERATING_SYSTEM),linux)# Linux
+  TAO_LIBRARIES = -ltao
+  TAO_LIB_PATH += $(addprefix -L, $(EXTERNAL_CM_DIR)/lib/ )
+else
+  ifeq ($(OPERATING_SYSTEM),aix)# AIX
+    TAO_LIB_PATH += $(addprefix -L, $(EXTERNAL_CM_DIR)/lib/ )
+  else# windows
+    TAO_LIB_PATH += $(addprefix -L, /home/users/local/lib/ )
+  endif
+endif
 
 #PETSc
 PETSC_INCLUDE_PATH =#
@@ -814,6 +807,23 @@ else
   endif
 endif
 
+#CUBPACK
+CUBPACK_INCLUDE_PATH =#
+CUBPACK_LIBRARIES = -lcubpack
+CUBPAK_LIB_PATH =#
+ifeq ($(OPERATING_SYSTEM),linux)# Linux
+  CUBPACK_INCLUDE_PATH += $(addprefix -L, $(EXTERNAL_CM_DIR)/include/ )
+  CUBPACK_LIB_PATH += $(addprefix -L, $(EXTERNAL_CM_DIR)/lib/ )
+else
+  ifeq ($(OPERATING_SYSTEM),aix)# AIX
+    CUBPACK_INCLUDE_PATH += $(addprefix -L, $(EXTERNAL_CM_DIR)/include/ )
+    CUBPACK_LIB_PATH += $(addprefix -L, $(EXTERNAL_CM_DIR)/lib/ )
+  else# windows
+    CUBPACK_INCLUDE_PATH += $(addprefix -L, $(EXTERNAL_CM_DIR)/include/ )
+    CUBPACK_LIB_PATH += $(addprefix -L, $(EXTERNAL_CM_DIR)/lib/ )
+  endif
+endif
+
 #TAU/PAPI
 TAU_LIBRARIES =#
 TAU_LIB_PATH =#
@@ -864,7 +874,7 @@ FIELDML_LIBRARIES =#
 FIELDML_LIB_PATH =#
 ifeq ($(USEFIELDML),true)
   MOD_FIELDML_TARGET = MOD_FIELDML
-  FIELDML_LIBRARIES += -lfieldml -lxml2 -lz
+  FIELDML_LIBRARIES += -lfieldml_api -lfieldml_io_api -lxml2 -lz
   ifeq ($(OPERATING_SYSTEM),linux)# Linux
     ifdef COMPILER_VERSION
       FIELDML_INCLUDE_PATH += $(addprefix -I, $(GLOBAL_FIELDML_ROOT)/$(LIB_ARCH_DIR)$(MT_SUFFIX)$(DEBUG_SUFFIX)$(PROF_SUFFIX)/$(COMPILER)_$(COMPILER_VERSION)/include/ )
@@ -905,7 +915,7 @@ ifeq ($(OPERATING_SYSTEM),linux)# Linux
     ifeq ($(MPIPROF),true)
       MPI_LIBRARIES += -lmpe_f2cmpi -llmpe -lmpe
     endif
-    MPL_LIB = $(call searchdirs, $(EXTERNAL_CM_DIR)/lib/, libmpl* )
+    MPL_LIB = $(call searchdirs, $(MPI_DIR)/lib/, libmpl* )
     MPI_LIBRARIES += -lmpich
     ifneq (,$(MPL_LIB))
       MPI_LIBRARIES += -lmpl
@@ -992,8 +1002,8 @@ ifeq ($(USEFIELDML),true)
   CPPFLAGS += -DUSEFIELDML
 endif
 
-EXTERNAL_LIBRARIES += $(strip $(TAO_LIBRARIES) $(PETSC_LIBRARIES) $(SUNDIALS_LIBRARIES) $(HYPRE_LIBRARIES) $(SUPERLU_LIBRARIES) $(SUPERLU_DIST_LIBRARIES) $(PASTIX_LIBRARIES) $(SCOTCH_LIBRARIES) $(PLAPACK_LIBRARIES) $(MUMPS_LIBRARIES) $(SCALAPACK_LIBRARIES) $(BLACS_LIBRARIES) $(PARMETIS_LIBRARIES) $(TAU_LIBRARIES) $(MPI_LIBRARIES) $(BLAS_LIBRARIES))
-EXTERNAL_LIB_PATH += $(strip $(TAO_LIB_PATH) $(PETSC_LIB_PATH) $(SUNDIALS_LIB_PATH) $(HYPRE_LIB_PATH) $(SUPERLU_LIB_PATH) $(SUPERLU_DIST_LIB_PATH) $(PASTIX_LIB_PATH) $(SCOTCH_LIB_PATH) $(PASTIX_LIB_PATH) $(MUMPS_LIB_PATH) $(SCALAPACK_LIB_PATH) $(BLACS_LIB_PATH) $(PARMETIS_LIB_PATH) $(TAU_LIB_PATH) $(MPI_LIB_PATH) $(BLAS_LIB_PATH))
-EXTERNAL_INCLUDE_PATH += $(strip $(TAO_INCLUDE_PATH) $(PETSC_INCLUDE_PATH) $(SUNDIALS_INCLUDE_PATH) $(HYPRE_INCLUDE_PATH) $(MUMPS_INCLUDE_PATH) $(SCALAPACK_INCLUDE_PATH) $(BLACS_INCLUDE_PATH) $(PARMETIS_INCLUDE_PATH) $(MPI_INCLUDE_PATH) $(BLAS_INCLUDE_PATH))
+EXTERNAL_LIBRARIES += $(strip $(TAO_LIBRARIES) $(PETSC_LIBRARIES) $(SUNDIALS_LIBRARIES) $(HYPRE_LIBRARIES) $(SUPERLU_LIBRARIES) $(SUPERLU_DIST_LIBRARIES) $(PASTIX_LIBRARIES) $(SCOTCH_LIBRARIES) $(PLAPACK_LIBRARIES) $(MUMPS_LIBRARIES) $(SCALAPACK_LIBRARIES) $(BLACS_LIBRARIES) $(PARMETIS_LIBRARIES) $(CUBPACK_LIBRARIES) $(TAU_LIBRARIES) $(MPI_LIBRARIES) $(BLAS_LIBRARIES))
+EXTERNAL_LIB_PATH += $(strip $(TAO_LIB_PATH) $(PETSC_LIB_PATH) $(SUNDIALS_LIB_PATH) $(HYPRE_LIB_PATH) $(SUPERLU_LIB_PATH) $(SUPERLU_DIST_LIB_PATH) $(PASTIX_LIB_PATH) $(SCOTCH_LIB_PATH) $(PASTIX_LIB_PATH) $(MUMPS_LIB_PATH) $(SCALAPACK_LIB_PATH) $(BLACS_LIB_PATH) $(PARMETIS_LIB_PATH) $(CUBPACK_LIB_PATH) $(TAU_LIB_PATH) $(MPI_LIB_PATH) $(BLAS_LIB_PATH))
+EXTERNAL_INCLUDE_PATH += $(strip $(TAO_INCLUDE_PATH) $(PETSC_INCLUDE_PATH) $(SUNDIALS_INCLUDE_PATH) $(HYPRE_INCLUDE_PATH) $(MUMPS_INCLUDE_PATH) $(SCALAPACK_INCLUDE_PATH) $(BLACS_INCLUDE_PATH) $(PARMETIS_INCLUDE_PATH) $(CUBPACK_INCLUDE_PATH) $(MPI_INCLUDE_PATH) $(BLAS_INCLUDE_PATH))
 
 # vim:filetype=make
