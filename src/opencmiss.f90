@@ -53,6 +53,7 @@ MODULE OPENCMISS
   USE ANALYTIC_ANALYSIS_ROUTINES
   USE BASE_ROUTINES
   USE BASIS_ROUTINES
+  USE BIOELECTRIC_FINITE_ELASTICITY_ROUTINES
   USE BOUNDARY_CONDITIONS_ROUTINES
   USE CMISS
   USE CMISS_CELLML
@@ -1733,7 +1734,7 @@ MODULE OPENCMISS
   !> \see OPENCMISS::DataProjection,OPENCMISS
   !>@{
   INTEGER(INTG), PARAMETER :: CMISS_DATA_PROJECTION_BOUNDARY_LINES_PROJECTION_TYPE = DATA_PROJECTION_BOUNDARY_LINES_PROJECTION_TYPE!<The boundary line projection type for data projection, only projects to boundary lines of the mesh. \see OPENCMISS_DataProjectionProjectionTypes,OPENCMISS
-  INTEGER(INTG), PARAMETER :: CMISS_DATA_PROJECTION_BOUNDARY_FACES_PROJECTION_TYPE = DATA_PROJECTION_BOUNDARY_FACES_PROJECTION_TYPE !<The boundary face projection type for data projection, only projects to boundary faces of the mesh. \see OPENCMISS_DataProjectionProjectionTypes,OPENCMISS
+  INTEGER(INTG), PARAMETER :: CMISS_DATA_PROJECTION_BOUNDARY_FACES_PROJECTION_TYPE = DATA_PROJECTION_BOUNDARY_FACES_PROJECTION_TYPE!<The boundary face projection type for data projection, only projects to boundary faces of the mesh. \see OPENCMISS_DataProjectionProjectionTypes,OPENCMISS
   INTEGER(INTG), PARAMETER :: CMISS_DATA_PROJECTION_ALL_ELEMENTS_PROJECTION_TYPE = DATA_PROJECTION_ALL_ELEMENTS_PROJECTION_TYPE !<The element projection type for data projection, projects to all elements in mesh. \see OPENCMISS_DataProjectionProjectionTypes,OPENCMISS
 
   !Module types
@@ -2303,6 +2304,8 @@ MODULE OPENCMISS
     & EQUATIONS_SET_COUPLED_SOURCE_DIFFUSION_DIFFUSION_SUBTYPE !<Coupled source diffusion-diffusion equations set subtype \see OPENCMISS_EquationsSetSubtypes,OPENCMISS
   INTEGER(INTG), PARAMETER :: CMISS_EQUATIONS_SET_STANDARD_MONODOMAIN_ELASTICITY_SUBTYPE =  &
     & EQUATIONS_SET_STANDARD_MONODOMAIN_ELASTICITY_SUBTYPE !<Standard Monodomain Elasticity equations set subtype \see OPENCMISS_EquationsSetSubtypes,OPENCMISS
+  INTEGER(INTG), PARAMETER :: CMISS_EQUATIONS_SET_1D3D_MONODOMAIN_ELASTICITY_SUBTYPE =  &
+    & EQUATIONS_SET_1D3D_MONODOMAIN_ELASTICITY_SUBTYPE !<Coupled 1D Monodomain 3D Elasticity equations set subtype \see OPENCMISS_EquationsSetSubtypes,OPENCMISS
 
   !>@}
   !> \addtogroup OPENCMISS_EquationsSetSolutionMethods OPENCMISS::EquationsSet::SolutionMethods
@@ -2603,7 +2606,8 @@ MODULE OPENCMISS
     & CMISS_EQUATIONS_SET_COUPLED_SOURCE_DIFFUSION_ADVEC_DIFF_SUBTYPE, &
     & CMISS_EQUATIONS_SET_BURGERS_SUBTYPE,CMISS_EQUATIONS_SET_GENERALISED_BURGERS_SUBTYPE, &
     & CMISS_EQUATIONS_SET_STATIC_BURGERS_SUBTYPE, &
-    & CMISS_EQUATIONS_SET_INVISCID_BURGERS_SUBTYPE,CMISS_EQUATIONS_SET_STANDARD_MONODOMAIN_ELASTICITY_SUBTYPE
+    & CMISS_EQUATIONS_SET_INVISCID_BURGERS_SUBTYPE,CMISS_EQUATIONS_SET_STANDARD_MONODOMAIN_ELASTICITY_SUBTYPE, &
+    & CMISS_EQUATIONS_SET_1D3D_MONODOMAIN_ELASTICITY_SUBTYPE
 
 
   PUBLIC CMISS_EQUATIONS_SET_CELLML_REAC_SPLIT_REAC_DIFF_SUBTYPE, CMISS_EQUATIONS_SET_CELLML_REAC_NO_SPLIT_REAC_DIFF_SUBTYPE, &
@@ -4808,6 +4812,8 @@ MODULE OPENCMISS
     & PROBLEM_STANDARD_ELASTICITY_FLUID_PRESSURE_SUBTYPE !<Standard elasticity fluid pressure problem subtype \see OPENCMISS_ProblemSubtypes,OPENCMISS
   INTEGER(INTG), PARAMETER :: CMISS_PROBLEM_GUDUNOV_MONODOMAIN_SIMPLE_ELASTICITY_SUBTYPE = &
     & PROBLEM_GUDUNOV_MONODOMAIN_SIMPLE_ELASTICITY_SUBTYPE !<Transient monodomain simple elasticity problem subtype \see OPENCMISS_ProblemSubtypes,OPENCMISS
+  INTEGER(INTG), PARAMETER :: CMISS_PROBLEM_GUDUNOV_MONODOMAIN_1D3D_ELASTICITY_SUBTYPE = & 
+    & PROBLEM_GUDUNOV_MONODOMAIN_1D3D_ELASTICITY_SUBTYPE !<Transient monodomain simple elasticity problem subtype \see OPENCMISS_ProblemSubtypes,OPENCMISS
 
   INTEGER(INTG), PARAMETER :: CMISS_PROBLEM_QUASISTATIC_FINITE_ELASTICITY_SUBTYPE = PROBLEM_QUASISTATIC_FINITE_ELASTICITY_SUBTYPE !<Quasistatic finite elasticity subtype \see OPENCMISS_ProblemSubtypes,OPENCMISS
   INTEGER(INTG), PARAMETER :: CMISS_PROBLEM_FINITE_ELASTICITY_CELLML_SUBTYPE = PROBLEM_FINITE_ELASTICITY_CELLML_SUBTYPE !<Quasistatic finite elasticity subtype \see OPENCMISS_ProblemSubtypes,OPENCMISS
@@ -4934,7 +4940,7 @@ MODULE OPENCMISS
    & CMISS_PROBLEM_QUASISTATIC_ELASTICITY_TRANSIENT_DARCY_SUBTYPE,CMISS_PROBLEM_QUASISTATIC_ELAST_TRANS_DARCY_MAT_SOLVE_SUBTYPE, &
    & CMISS_PROBLEM_COUPLED_SOURCE_DIFFUSION_DIFFUSION_SUBTYPE, CMISS_PROBLEM_COUPLED_SOURCE_DIFFUSION_ADVEC_DIFFUSION_SUBTYPE, &
    & CMISS_PROBLEM_STANDARD_MULTI_COMPARTMENT_TRANSPORT_SUBTYPE,CMISS_PROBLEM_STANDARD_ELASTICITY_FLUID_PRESSURE_SUBTYPE, &
-   & CMISS_PROBLEM_GUDUNOV_MONODOMAIN_SIMPLE_ELASTICITY_SUBTYPE
+   & CMISS_PROBLEM_GUDUNOV_MONODOMAIN_SIMPLE_ELASTICITY_SUBTYPE,CMISS_PROBLEM_GUDUNOV_MONODOMAIN_1D3D_ELASTICITY_SUBTYPE
 
   PUBLIC CMISS_PROBLEM_QUASISTATIC_FINITE_ELASTICITY_SUBTYPE,CMISS_PROBLEM_FINITE_ELASTICITY_CELLML_SUBTYPE
 !!==================================================================================================================================
@@ -5960,6 +5966,8 @@ MODULE OPENCMISS
 
   PUBLIC CMISSSolverEquations_BoundaryConditionsGet
 
+  PUBLIC CMISSBioelectricsFiniteElasticity_UpdateGeometricField
+  
 !!==================================================================================================================================
 !!
 !! FieldML routines
@@ -48699,6 +48707,31 @@ CONTAINS
   !================================================================================================================================
   !
 
+  !>Update the bioelectrics geometric field by interpolating the finite elasticity geometric field
+  SUBROUTINE CMISSBioelectricsFiniteElasticity_UpdateGeometricField(controlLoop,calcClosestGaussPoint,err)
+  
+    !Argument variables
+    TYPE(CMISSControlLoopType), INTENT(INOUT) :: controlLoop !<The bioelectrics control loop
+    LOGICAL, INTENT(IN) :: calcClosestGaussPoint
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code.
+
+    CALL ENTERS("CMISSBioelectricsFiniteElasticity_UpdateGeometricField",err,error,*999)
+
+    CALL BIOELECTRIC_FINITE_ELASTICITY_UPDATE_GEOMETRIC_FIELD(controlLoop%CONTROL_LOOP,calcClosestGaussPoint,err,error,*999)
+
+    CALL EXITS("CMISSBioelectricsFiniteElasticity_UpdateGeometricField")
+    RETURN
+999 CALL ERRORS("CMISSBioelectricsFiniteElasticity_UpdateGeometricField",err,error)
+    CALL EXITS("CMISSBioelectricsFiniteElasticity_UpdateGeometricField")
+    CALL CMISS_HANDLE_ERROR(err,error)
+    RETURN
+
+  END SUBROUTINE CMISSBioelectricsFiniteElasticity_UpdateGeometricField
+
+  !
+  !================================================================================================================================
+  !
+
   !> Initialise the given FieldML context using the given FieldML XML file.
   SUBROUTINE CMISSFieldML_InputCreateFromFileVS( filename, fieldml, err )
     !Arguments
@@ -50626,3 +50659,4 @@ CONTAINS
 
 
 END MODULE OPENCMISS
+

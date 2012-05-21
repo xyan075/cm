@@ -8437,12 +8437,11 @@ CONTAINS
             MAX_NGP = -1
             DO element_idx=1,DOMAIN_TOPOLOGY%ELEMENTS%NUMBER_OF_ELEMENTS
               BASIS=>DOMAIN_TOPOLOGY%ELEMENTS%ELEMENTS(element_idx)%BASIS
-              NGP = BASIS%QUADRATURE%QUADRATURE_SCHEME_MAP(BASIS_DEFAULT_QUADRATURE_SCHEME)%PTR%NUMBER_OF_GAUSS
-              MAX_NGP = MAX(MAX_NGP,NGP)
+              NGP=BASIS%QUADRATURE%QUADRATURE_SCHEME_MAP(BASIS_DEFAULT_QUADRATURE_SCHEME)%PTR%NUMBER_OF_GAUSS
+              MAX_NGP=MAX(MAX_NGP,NGP)
             ENDDO !element_idx
-            CALL MPI_REDUCE(MPI_IN_PLACE,MAX_NGP,1,MPI_INTEGER,MPI_MAX,COMPUTATIONAL_ENVIRONMENT%MY_COMPUTATIONAL_NODE_NUMBER, &
-              & COMPUTATIONAL_ENVIRONMENT%MPI_COMM,MPI_IERROR)
-            CALL MPI_ERROR_CHECK("MPI_REDUCE",MPI_IERROR,ERR,ERROR,*999)             
+            CALL MPI_ALLREDUCE(MPI_IN_PLACE,MAX_NGP,1,MPI_INTEGER,MPI_MAX,MPI_COMM_WORLD,MPI_IERROR)
+            CALL MPI_ERROR_CHECK("MPI_ALLREDUCE",MPI_IERROR,ERR,ERROR,*999)             
             NUMBER_OF_GAUSS_POINT_DOFS=NUMBER_OF_GAUSS_POINT_DOFS+DOMAIN_TOPOLOGY%ELEMENTS%TOTAL_NUMBER_OF_ELEMENTS*MAX_NGP
             NUMBER_OF_LOCAL_VARIABLE_DOFS=NUMBER_OF_LOCAL_VARIABLE_DOFS+DOMAIN_TOPOLOGY%ELEMENTS%NUMBER_OF_ELEMENTS*MAX_NGP
             TOTAL_NUMBER_OF_VARIABLE_DOFS=TOTAL_NUMBER_OF_VARIABLE_DOFS+DOMAIN_TOPOLOGY%ELEMENTS%TOTAL_NUMBER_OF_ELEMENTS*MAX_NGP
@@ -8565,7 +8564,7 @@ CONTAINS
                       & ERR,ERROR,*999)
                     ALLOCATE(FIELD_VARIABLE_DOFS_MAPPING%GLOBAL_TO_LOCAL_MAP(variable_global_ny)%LOCAL_TYPE(NUMBER_OF_DOMAINS), &
                       & STAT=ERR)
-                    IF(ERR/=0) CALL FLAG_ERROR("Could not allocate field variable dofs global to local map domain number.", &
+                    IF(ERR/=0) CALL FLAG_ERROR("Could not allocate field variable dofs global to local map local type.", &
                       & ERR,ERROR,*999)
                     !A constant dof is mapped to all domains.
                     FIELD_VARIABLE_DOFS_MAPPING%GLOBAL_TO_LOCAL_MAP(variable_global_ny)%NUMBER_OF_DOMAINS=NUMBER_OF_DOMAINS
@@ -8593,7 +8592,6 @@ CONTAINS
               CASE(FIELD_ELEMENT_BASED_INTERPOLATION)
                 DOMAIN=>FIELD_COMPONENT%DOMAIN
                 DOMAIN_TOPOLOGY=>DOMAIN%TOPOLOGY
-                DECOMPOSITION=>DOMAIN%DECOMPOSITION
                 ELEMENTS_MAPPING=>DOMAIN%MAPPINGS%ELEMENTS
                 IF(domain_type_idx==1) THEN
                   !Allocate parameter to dof map for this field variable component
@@ -8621,7 +8619,7 @@ CONTAINS
                         & ERR,ERROR,*999)
                       ALLOCATE(FIELD_VARIABLE_DOFS_MAPPING%GLOBAL_TO_LOCAL_MAP(variable_global_ny)%LOCAL_TYPE(NUMBER_OF_DOMAINS), &
                         & STAT=ERR)
-                      IF(ERR/=0) CALL FLAG_ERROR("Could not allocate field variable dofs global to local map domain number.", &
+                      IF(ERR/=0) CALL FLAG_ERROR("Could not allocate field variable dofs global to local map local type.", &
                         & ERR,ERROR,*999)
                       FIELD_VARIABLE_DOFS_MAPPING%GLOBAL_TO_LOCAL_MAP(variable_global_ny)%NUMBER_OF_DOMAINS=NUMBER_OF_DOMAINS
                       DO domain_idx=1,NUMBER_OF_DOMAINS
@@ -8640,14 +8638,14 @@ CONTAINS
                   !Adjust the local and ghost offsets
                   IF(component_idx>1) &
                     & VARIABLE_GHOST_DOFS_OFFSETS=VARIABLE_GHOST_DOFS_OFFSETS+ELEMENTS_MAPPING%NUMBER_OF_DOMAIN_LOCAL
-                  VARIABLE_LOCAL_DOFS_OFFSETS=VARIABLE_LOCAL_DOFS_OFFSETS+&
+                  VARIABLE_LOCAL_DOFS_OFFSETS=VARIABLE_LOCAL_DOFS_OFFSETS+ &
                     & ELEMENTS_MAPPING%NUMBER_OF_DOMAIN_LOCAL+ELEMENTS_MAPPING%NUMBER_OF_DOMAIN_GHOST
                 ELSE
                   !Handle global dofs domain mapping. For the second pass adjust the local dof numbers to ensure that the ghost
                   !dofs are at the end of the local dofs.
                   !Adjust the ghost offsets
                   IF(component_idx>1) &
-                    VARIABLE_GHOST_DOFS_OFFSETS=VARIABLE_GHOST_DOFS_OFFSETS-ELEMENTS_MAPPING%NUMBER_OF_DOMAIN_LOCAL
+                    & VARIABLE_GHOST_DOFS_OFFSETS=VARIABLE_GHOST_DOFS_OFFSETS-ELEMENTS_MAPPING%NUMBER_OF_DOMAIN_LOCAL
                   DO ny=1,ELEMENTS_MAPPING%NUMBER_OF_GLOBAL
                     !Adjust variable mapping local numbers
                     IF(ASSOCIATED(FIELD_VARIABLE_DOFS_MAPPING)) THEN
@@ -8732,7 +8730,7 @@ CONTAINS
                         & ERR,ERROR,*999)
                       ALLOCATE(FIELD_VARIABLE_DOFS_MAPPING%GLOBAL_TO_LOCAL_MAP(variable_global_ny)%LOCAL_TYPE(NUMBER_OF_DOMAINS), &
                         & STAT=ERR)
-                      IF(ERR/=0) CALL FLAG_ERROR("Could not allocate field variable dofs global to local map domain number.", &
+                      IF(ERR/=0) CALL FLAG_ERROR("Could not allocate field variable dofs global to local map local type.", &
                         & ERR,ERROR,*999)
                       FIELD_VARIABLE_DOFS_MAPPING%GLOBAL_TO_LOCAL_MAP(variable_global_ny)%NUMBER_OF_DOMAINS=NUMBER_OF_DOMAINS
                       DO domain_idx=1,NUMBER_OF_DOMAINS
@@ -8810,17 +8808,16 @@ CONTAINS
                 DOMAIN=>FIELD_COMPONENT%DOMAIN
                 ELEMENTS_MAPPING=>DOMAIN%MAPPINGS%ELEMENTS
                 DOMAIN_TOPOLOGY=>DOMAIN%TOPOLOGY
-                DECOMPOSITION=>DOMAIN%DECOMPOSITION
-                IF(domain_type_idx==1) THEN ! domain_type_idx==1 -> non ghosts
+                IF(domain_type_idx==1) THEN ! domain_type_idx==1 --> non ghosts
                   !Allocate parameter to dof map for this field variable component
                   DOFS_MAPPING=>DOMAIN%MAPPINGS%ELEMENTS
                   ! GAUSS_POINT_PARAM2DOF_MAP%GAUSS_POINTS(ng,element_idx). The field variable dof number of ng'th Gauss point in the element_idx'th element based parameter for this field variable component. 
                   ALLOCATE(FIELD_COMPONENT%PARAM_TO_DOF_MAP%GAUSS_POINT_PARAM2DOF_MAP%GAUSS_POINTS(&
                    & MAX_NGP,DOMAIN_TOPOLOGY%ELEMENTS%TOTAL_NUMBER_OF_ELEMENTS),STAT=ERR)
-                  IF(ERR/=0) CALL FLAG_ERROR("Could not allocate field component parameter to dof element map.",ERR,ERROR,*999)
+                  IF(ERR/=0) CALL FLAG_ERROR("Could not allocate field component parameter to dof Gauss point map.",ERR,ERROR,*999)
                   ! this might be wasteful in worst case, but should generally be ok
-                  FIELD_COMPONENT%PARAM_TO_DOF_MAP%GAUSS_POINT_PARAM2DOF_MAP%NUMBER_OF_GAUSS_POINT_PARAMETERS = &
-                  &  MAX_NGP * DOMAIN_TOPOLOGY%ELEMENTS%TOTAL_NUMBER_OF_ELEMENTS
+                  FIELD_COMPONENT%PARAM_TO_DOF_MAP%GAUSS_POINT_PARAM2DOF_MAP%NUMBER_OF_GAUSS_POINT_PARAMETERS= &
+                  &  DOMAIN_TOPOLOGY%ELEMENTS%TOTAL_NUMBER_OF_ELEMENTS*MAX_NGP
                   !Handle global dofs domain mapping
                   DO ny=1,ELEMENTS_MAPPING%NUMBER_OF_GLOBAL
                    DO gp=1,MAX_NGP !
@@ -8862,10 +8859,10 @@ CONTAINS
                   stop_idx=ELEMENTS_MAPPING%NUMBER_OF_LOCAL
                   !Adjust the local and ghost offsets
                   IF(component_idx>1) &
-                    & VARIABLE_GHOST_DOFS_OFFSETS=VARIABLE_GHOST_DOFS_OFFSETS + ELEMENTS_MAPPING%NUMBER_OF_DOMAIN_LOCAL * MAX_NGP
-                  VARIABLE_LOCAL_DOFS_OFFSETS=VARIABLE_LOCAL_DOFS_OFFSETS+&
-                    & (ELEMENTS_MAPPING%NUMBER_OF_DOMAIN_LOCAL+ELEMENTS_MAPPING%NUMBER_OF_DOMAIN_GHOST) * MAX_NGP
-                ELSE ! domain_type_idx == 2 -> ghosts
+                    & VARIABLE_GHOST_DOFS_OFFSETS=VARIABLE_GHOST_DOFS_OFFSETS+ELEMENTS_MAPPING%NUMBER_OF_DOMAIN_LOCAL*MAX_NGP
+                  VARIABLE_LOCAL_DOFS_OFFSETS=VARIABLE_LOCAL_DOFS_OFFSETS+ &
+                    & (ELEMENTS_MAPPING%NUMBER_OF_DOMAIN_LOCAL+ELEMENTS_MAPPING%NUMBER_OF_DOMAIN_GHOST)*MAX_NGP
+                ELSE !domain_type_idx==2 --> ghosts
                   !Handle global dofs domain mapping. For the second pass adjust the local dof numbers to ensure that the ghost
                   !dofs are at the end of the local dofs.
                   !Adjust the ghost offsets
@@ -8893,13 +8890,13 @@ CONTAINS
                     ENDIF
                    ENDDO ! gp
                   ENDDO !ny (global)
-                  start_idx=ELEMENTS_MAPPING%NUMBER_OF_LOCAL
+                  start_idx=ELEMENTS_MAPPING%NUMBER_OF_LOCAL+1
                   stop_idx=ELEMENTS_MAPPING%TOTAL_NUMBER_OF_LOCAL
                   !Adjust the local offsets
-                  VARIABLE_LOCAL_DOFS_OFFSETS=VARIABLE_LOCAL_DOFS_OFFSETS - ELEMENTS_MAPPING%NUMBER_OF_DOMAIN_GHOST * MAX_NGP
+                  VARIABLE_LOCAL_DOFS_OFFSETS=VARIABLE_LOCAL_DOFS_OFFSETS-ELEMENTS_MAPPING%NUMBER_OF_DOMAIN_GHOST*MAX_NGP
                 ENDIF ! 2 passes for normal, ghost 
                 !Adjust the global offset
-                VARIABLE_GLOBAL_DOFS_OFFSET=VARIABLE_GLOBAL_DOFS_OFFSET + ELEMENTS_MAPPING%NUMBER_OF_GLOBAL * MAX_NGP
+                VARIABLE_GLOBAL_DOFS_OFFSET=VARIABLE_GLOBAL_DOFS_OFFSET+ELEMENTS_MAPPING%NUMBER_OF_GLOBAL*MAX_NGP
                 !Handle local dofs domain mapping
                 DO element_idx=start_idx,stop_idx
                  DO gp=1,MAX_NGP !
@@ -9053,7 +9050,7 @@ CONTAINS
                     & ERR,ERROR,*999)
                   ALLOCATE(FIELD_VARIABLE_DOFS_MAPPING%GLOBAL_TO_LOCAL_MAP(variable_global_ny)%LOCAL_TYPE(NUMBER_OF_DOMAINS), &
                     & STAT=ERR)
-                  IF(ERR/=0) CALL FLAG_ERROR("Could not allocate field variable dofs global to local map domain number.", &
+                  IF(ERR/=0) CALL FLAG_ERROR("Could not allocate field variable dofs global to local map local type.", &
                     & ERR,ERROR,*999)
                   !A constant dof is mapped to all domains.
                   FIELD_VARIABLE_DOFS_MAPPING%GLOBAL_TO_LOCAL_MAP(variable_global_ny)%NUMBER_OF_DOMAINS=NUMBER_OF_DOMAINS
@@ -9113,7 +9110,7 @@ CONTAINS
                       & ERR,ERROR,*999)
                     ALLOCATE(FIELD_VARIABLE_DOFS_MAPPING%GLOBAL_TO_LOCAL_MAP(variable_global_ny)%LOCAL_TYPE(NUMBER_OF_DOMAINS), &
                       & STAT=ERR)
-                    IF(ERR/=0) CALL FLAG_ERROR("Could not allocate field variable dofs global to local map domain number.", &
+                    IF(ERR/=0) CALL FLAG_ERROR("Could not allocate field variable dofs global to local map local type.", &
                       & ERR,ERROR,*999)
                     FIELD_VARIABLE_DOFS_MAPPING%GLOBAL_TO_LOCAL_MAP(variable_global_ny)%NUMBER_OF_DOMAINS=NUMBER_OF_DOMAINS
                     DO domain_idx=1,NUMBER_OF_DOMAINS
@@ -9179,7 +9176,7 @@ CONTAINS
                   IF(ERR/=0) CALL FLAG_ERROR("Could not allocate field component parameter to dof node map (derivatives).", &
                     & ERR,ERROR,*999)
                   FIELD_COMPONENT%PARAM_TO_DOF_MAP%NODE_PARAM2DOF_MAP%NODES(node_idx)%NUMBER_OF_DERIVATIVES = & 
-                    & DOMAIN_TOPOLOGY%NODES%TOTAL_NUMBER_OF_NODES
+                    & DOMAIN_TOPOLOGY%NODES%NODES(node_idx)%NUMBER_OF_DERIVATIVES
                   DO derivative_idx=1,DOMAIN_TOPOLOGY%NODES%NODES(node_idx)%NUMBER_OF_DERIVATIVES
                     ALLOCATE(FIELD_COMPONENT%PARAM_TO_DOF_MAP%NODE_PARAM2DOF_MAP%NODES(node_idx)%DERIVATIVES(derivative_idx)% &
                       & VERSIONS(DOMAIN_TOPOLOGY%NODES%NODES(node_idx)%DERIVATIVES(derivative_idx)%NUMBER_OF_VERSIONS),STAT=ERR)
@@ -9217,7 +9214,7 @@ CONTAINS
                       & ERR,ERROR,*999)
                     ALLOCATE(FIELD_VARIABLE_DOFS_MAPPING%GLOBAL_TO_LOCAL_MAP(variable_global_ny)%LOCAL_TYPE(NUMBER_OF_DOMAINS), &
                       & STAT=ERR)
-                    IF(ERR/=0) CALL FLAG_ERROR("Could not allocate field variable dofs global to local map domain number.", &
+                    IF(ERR/=0) CALL FLAG_ERROR("Could not allocate field variable dofs global to local map local type.", &
                       & ERR,ERROR,*999)
                     FIELD_VARIABLE_DOFS_MAPPING%GLOBAL_TO_LOCAL_MAP(variable_global_ny)%NUMBER_OF_DOMAINS=NUMBER_OF_DOMAINS
                     DO domain_idx=1,NUMBER_OF_DOMAINS
@@ -9285,7 +9282,7 @@ CONTAINS
                   & ELEMENTS%TOTAL_NUMBER_OF_ELEMENTS),STAT=ERR)
                 IF(ERR/=0) CALL FLAG_ERROR("Could not allocate field component parameter to dof gauss point map (gauss points).", &
                   & ERR,ERROR,*999)
-                FIELD_COMPONENT%PARAM_TO_DOF_MAP%GAUSS_POINT_PARAM2DOF_MAP%NUMBER_OF_GAUSS_POINT_PARAMETERS = &
+                FIELD_COMPONENT%PARAM_TO_DOF_MAP%GAUSS_POINT_PARAM2DOF_MAP%NUMBER_OF_GAUSS_POINT_PARAMETERS= &
                   & MAX_NGP*DOMAIN_TOPOLOGY%ELEMENTS%TOTAL_NUMBER_OF_ELEMENTS
               ENDDO
               !Handle global dofs domain mapping
@@ -9315,7 +9312,7 @@ CONTAINS
                         & ERR,ERROR,*999)
                       ALLOCATE(FIELD_VARIABLE_DOFS_MAPPING%GLOBAL_TO_LOCAL_MAP(variable_global_ny)%LOCAL_TYPE(NUMBER_OF_DOMAINS), &
                         & STAT=ERR)
-                      IF(ERR/=0) CALL FLAG_ERROR("Could not allocate field variable dofs global to local map domain number.", &
+                      IF(ERR/=0) CALL FLAG_ERROR("Could not allocate field variable dofs global to local map local type.", &
                         & ERR,ERROR,*999)
                       FIELD_VARIABLE_DOFS_MAPPING%GLOBAL_TO_LOCAL_MAP(variable_global_ny)%NUMBER_OF_DOMAINS=NUMBER_OF_DOMAINS
                       DO domain_idx=1,NUMBER_OF_DOMAINS
@@ -17200,7 +17197,6 @@ CONTAINS
 
   !>Returns from the given parameter set a double precision value for the specified element of a field variable component. \see OPENCMISS::CMISSFieldParameterSetGetElement
   SUBROUTINE FIELD_PARAMETER_SET_GET_ELEMENT_DP(FIELD,VARIABLE_TYPE,FIELD_SET_TYPE,USER_ELEMENT_NUMBER,COMPONENT_NUMBER, &
-
     & VALUE,ERR,ERROR,*)
 
     !Argument variables
