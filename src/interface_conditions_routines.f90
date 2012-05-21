@@ -2414,6 +2414,83 @@ CONTAINS
                     ENDDO !mh
                   ENDIF
                 ENDDO !ng
+                !Scale factor adjustment
+                !\todo check if scale factor adjustments are already made elsewhere eg when calculating the interface matrix contribution to the residual for non-linear problems
+                !\todo update looping of variables/components for non-zero matrix elements as done above 
+                IF(INTERFACE_CONDITION%METHOD==INTERFACE_CONDITION_PENALTY_METHOD .AND. &
+                  & interface_matrix_idx==INTERFACE_EQUATIONS%INTERFACE_MATRICES%NUMBER_OF_INTERFACE_MATRICES) THEN
+                  !Scale factor adjustment for the Lagrange Variable (columns)
+                  IF(INTERFACE_DEPENDENT_FIELD%SCALINGS%SCALING_TYPE/=FIELD_NO_SCALING) THEN
+                    CALL FIELD_INTERPOLATION_PARAMETERS_SCALE_FACTORS_ELEM_GET(ELEMENT_NUMBER, &
+                      & INTERFACE_INTERPOLATION%DEPENDENT_INTERPOLATION(1)%INTERPOLATION_PARAMETERS(LAGRANGE_VARIABLE_TYPE)%PTR, &
+                      & ERR,ERROR,*999)
+                    mhs=0
+                    !Use Lagrange variable number of components here since we are only dealing with Lagrange variable scale factors 
+                    !\todo Currently Lagrange field variable component numbers must match each coupled dependent field variable component numbers. Generalise ordering
+                    DO mh=1,LAGRANGE_VARIABLE%NUMBER_OF_COMPONENTS
+                      !Loop over element Lagrange variable rows
+                      DO ms=1,INTERFACE_DEPENDENT_BASIS%NUMBER_OF_ELEMENT_PARAMETERS
+                        mhs=mhs+1
+                        INTERFACE_ELEMENT_MATRIX%MATRIX(mhs,mhs)=INTERFACE_ELEMENT_MATRIX%MATRIX(mhs,mhs) * &
+                          & INTERFACE_INTERPOLATION%DEPENDENT_INTERPOLATION(1)% &
+                          & INTERPOLATION_PARAMETERS(LAGRANGE_VARIABLE_TYPE)%PTR%SCALE_FACTORS(ms,mh)**2
+                      ENDDO !ms
+                    ENDDO !mh
+                  ENDIF
+                ELSE
+                  !Scale factor adjustment for the Lagrange Variable (columns)
+                  IF(INTERFACE_DEPENDENT_FIELD%SCALINGS%SCALING_TYPE/=FIELD_NO_SCALING) THEN
+                    CALL FIELD_INTERPOLATION_PARAMETERS_SCALE_FACTORS_ELEM_GET(ELEMENT_NUMBER, &
+                      & INTERFACE_INTERPOLATION%DEPENDENT_INTERPOLATION(1)%INTERPOLATION_PARAMETERS(LAGRANGE_VARIABLE_TYPE)%PTR, &
+                      & ERR,ERROR,*999)
+                    mhs=0
+                    !Use Lagrange variable number of components here since we are only dealing with Lagrange variable scale factors 
+                    !\todo Currently Lagrange field variable component numbers must match each coupled dependent field variable component numbers. Generalise ordering
+                    DO mh=1,LAGRANGE_VARIABLE%NUMBER_OF_COMPONENTS
+                      mhc=INTERFACE_MATRIX_VARIABLE%COMPONENTS(mh)%MESH_COMPONENT_NUMBER
+                      COUPLED_MESH_BASIS=>INTERFACE_MATRIX_DEPENDENT_FIELD%DECOMPOSITION%DOMAIN(mhc)%PTR%TOPOLOGY% & 
+                        & ELEMENTS%ELEMENTS(coupledMeshElementNumber)%BASIS
+                      !Loop over element rows
+                      DO ms=1,COUPLED_MESH_BASIS%NUMBER_OF_ELEMENT_PARAMETERS
+                        mhs=mhs+1
+                        nhs=0
+                        !Loop over element columns
+                        DO nh=1,LAGRANGE_VARIABLE%NUMBER_OF_COMPONENTS
+                          DO ns=1,INTERFACE_DEPENDENT_BASIS%NUMBER_OF_ELEMENT_PARAMETERS
+                            nhs=nhs+1
+                            INTERFACE_ELEMENT_MATRIX%MATRIX(mhs,nhs)=INTERFACE_ELEMENT_MATRIX%MATRIX(mhs,nhs) * &
+                            & INTERFACE_INTERPOLATION%DEPENDENT_INTERPOLATION(1)% &
+                            & INTERPOLATION_PARAMETERS(LAGRANGE_VARIABLE_TYPE)%PTR%SCALE_FACTORS(ns,nh)
+                          ENDDO !ns
+                        ENDDO !nh
+                      ENDDO !ms
+                    ENDDO !mh
+                  ENDIF
+                  !Scale factor adjustment for the row dependent variable
+                  IF(INTERFACE_MATRIX_DEPENDENT_FIELD%SCALINGS%SCALING_TYPE/=FIELD_NO_SCALING) THEN
+                    CALL FIELD_INTERPOLATION_PARAMETERS_SCALE_FACTORS_ELEM_GET(coupledMeshElementNumber, &
+                      & INTERFACE_EQUATIONS%INTERPOLATION%VARIABLE_INTERPOLATION(interface_matrix_idx)% &
+                      & DEPENDENT_INTERPOLATION(1)%INTERPOLATION_PARAMETERS(INTERFACE_MATRIX_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)
+                    mhs=0
+                    DO mh=1,INTERFACE_MATRIX_VARIABLE%NUMBER_OF_COMPONENTS
+                      !Loop over element rows
+                      DO ms=1,COUPLED_MESH_BASIS%NUMBER_OF_ELEMENT_PARAMETERS
+                        mhs=mhs+1
+                        nhs=0
+                        !Loop over element columns
+                        DO nh=1,LAGRANGE_VARIABLE%NUMBER_OF_COMPONENTS
+                          DO ns=1,INTERFACE_DEPENDENT_BASIS%NUMBER_OF_ELEMENT_PARAMETERS
+                            nhs=nhs+1
+                            INTERFACE_ELEMENT_MATRIX%MATRIX(mhs,nhs)=INTERFACE_ELEMENT_MATRIX%MATRIX(mhs,nhs)* &
+                            & INTERFACE_EQUATIONS%INTERPOLATION%VARIABLE_INTERPOLATION(interface_matrix_idx)% &
+                            & DEPENDENT_INTERPOLATION(1)%INTERPOLATION_PARAMETERS(INTERFACE_MATRIX_VARIABLE_TYPE)%PTR% &
+                            & SCALE_FACTORS(ms,mh)
+                          ENDDO !ns
+                        ENDDO !nh
+                      ENDDO !ms
+                    ENDDO !mh
+                  ENDIF
+                ENDIF
               CASE(INTERFACE_CONDITION_FIELD_NODE_CONTINUITY_OPERATOR)
                 ! Loop over number of Lagrange variable components as not all components in the dependent field variable may be coupled
                 !\todo Currently Lagrange field variable component numbers must match each coupled dependent field variable component numbers. Generalise ordering
@@ -2498,6 +2575,83 @@ CONTAINS
                     END SELECT
                   END SELECT
                 ENDDO !mh
+                !Scale factor adjustment
+                !\todo check if scale factor adjustments are already made elsewhere eg when calculating the interface matrix contribution to the residual for non-linear problems
+                !\todo update looping of variables/components for non-zero matrix elements as done above 
+                IF(INTERFACE_CONDITION%METHOD==INTERFACE_CONDITION_PENALTY_METHOD .AND. &
+                  & interface_matrix_idx==INTERFACE_EQUATIONS%INTERFACE_MATRICES%NUMBER_OF_INTERFACE_MATRICES) THEN
+                  !Scale factor adjustment for the Lagrange Variable (columns)
+                  IF(INTERFACE_DEPENDENT_FIELD%SCALINGS%SCALING_TYPE/=FIELD_NO_SCALING) THEN
+                    CALL FIELD_INTERPOLATION_PARAMETERS_SCALE_FACTORS_ELEM_GET(ELEMENT_NUMBER, &
+                      & INTERFACE_INTERPOLATION%DEPENDENT_INTERPOLATION(1)%INTERPOLATION_PARAMETERS(LAGRANGE_VARIABLE_TYPE)%PTR, &
+                      & ERR,ERROR,*999)
+                    mhs=0
+                    !Use Lagrange variable number of components here since we are only dealing with Lagrange variable scale factors 
+                    !\todo Currently Lagrange field variable component numbers must match each coupled dependent field variable component numbers. Generalise ordering
+                    DO mh=1,LAGRANGE_VARIABLE%NUMBER_OF_COMPONENTS
+                      !Loop over element Lagrange variable rows
+                      DO ms=1,INTERFACE_DEPENDENT_BASIS%NUMBER_OF_ELEMENT_PARAMETERS
+                        mhs=mhs+1
+                        INTERFACE_ELEMENT_MATRIX%MATRIX(mhs,mhs)=INTERFACE_ELEMENT_MATRIX%MATRIX(mhs,mhs) * &
+                          & INTERFACE_INTERPOLATION%DEPENDENT_INTERPOLATION(1)% &
+                          & INTERPOLATION_PARAMETERS(LAGRANGE_VARIABLE_TYPE)%PTR%SCALE_FACTORS(ms,mh)**2
+                      ENDDO !ms
+                    ENDDO !mh
+                  ENDIF
+                ELSE
+                  !Scale factor adjustment for the Lagrange Variable (columns)
+                  IF(INTERFACE_DEPENDENT_FIELD%SCALINGS%SCALING_TYPE/=FIELD_NO_SCALING) THEN
+                    CALL FIELD_INTERPOLATION_PARAMETERS_SCALE_FACTORS_ELEM_GET(ELEMENT_NUMBER, &
+                      & INTERFACE_INTERPOLATION%DEPENDENT_INTERPOLATION(1)%INTERPOLATION_PARAMETERS(LAGRANGE_VARIABLE_TYPE)%PTR, &
+                      & ERR,ERROR,*999)
+                    mhs=0
+                    !Use Lagrange variable number of components here since we are only dealing with Lagrange variable scale factors 
+                    !\todo Currently Lagrange field variable component numbers must match each coupled dependent field variable component numbers. Generalise ordering
+                    DO mh=1,LAGRANGE_VARIABLE%NUMBER_OF_COMPONENTS
+                      mhc=INTERFACE_MATRIX_VARIABLE%COMPONENTS(mh)%MESH_COMPONENT_NUMBER
+                      COUPLED_MESH_BASIS=>INTERFACE_MATRIX_DEPENDENT_FIELD%DECOMPOSITION%DOMAIN(mhc)%PTR%TOPOLOGY% & 
+                        & ELEMENTS%ELEMENTS(coupledMeshElementNumber)%BASIS
+                      !Loop over element rows
+                      DO ms=1,COUPLED_MESH_BASIS%NUMBER_OF_ELEMENT_PARAMETERS
+                        mhs=mhs+1
+                        nhs=0
+                        !Loop over element columns
+                        DO nh=1,LAGRANGE_VARIABLE%NUMBER_OF_COMPONENTS
+                          DO ns=1,INTERFACE_DEPENDENT_BASIS%NUMBER_OF_ELEMENT_PARAMETERS
+                            nhs=nhs+1
+                            INTERFACE_ELEMENT_MATRIX%MATRIX(mhs,nhs)=INTERFACE_ELEMENT_MATRIX%MATRIX(mhs,nhs) * &
+                            & INTERFACE_INTERPOLATION%DEPENDENT_INTERPOLATION(1)% &
+                            & INTERPOLATION_PARAMETERS(LAGRANGE_VARIABLE_TYPE)%PTR%SCALE_FACTORS(ns,nh)
+                          ENDDO !ns
+                        ENDDO !nh
+                      ENDDO !ms
+                    ENDDO !mh
+                  ENDIF
+                  !Scale factor adjustment for the row dependent variable
+                  IF(INTERFACE_MATRIX_DEPENDENT_FIELD%SCALINGS%SCALING_TYPE/=FIELD_NO_SCALING) THEN
+                    CALL FIELD_INTERPOLATION_PARAMETERS_SCALE_FACTORS_ELEM_GET(coupledMeshElementNumber, &
+                      & INTERFACE_EQUATIONS%INTERPOLATION%VARIABLE_INTERPOLATION(interface_matrix_idx)% &
+                      & DEPENDENT_INTERPOLATION(1)%INTERPOLATION_PARAMETERS(INTERFACE_MATRIX_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)
+                    mhs=0
+                    DO mh=1,INTERFACE_MATRIX_VARIABLE%NUMBER_OF_COMPONENTS
+                      !Loop over element rows
+                      DO ms=1,COUPLED_MESH_BASIS%NUMBER_OF_ELEMENT_PARAMETERS
+                        mhs=mhs+1
+                        nhs=0
+                        !Loop over element columns
+                        DO nh=1,LAGRANGE_VARIABLE%NUMBER_OF_COMPONENTS
+                          DO ns=1,INTERFACE_DEPENDENT_BASIS%NUMBER_OF_ELEMENT_PARAMETERS
+                            nhs=nhs+1
+                            INTERFACE_ELEMENT_MATRIX%MATRIX(mhs,nhs)=INTERFACE_ELEMENT_MATRIX%MATRIX(mhs,nhs)* &
+                            & INTERFACE_EQUATIONS%INTERPOLATION%VARIABLE_INTERPOLATION(interface_matrix_idx)% &
+                            & DEPENDENT_INTERPOLATION(1)%INTERPOLATION_PARAMETERS(INTERFACE_MATRIX_VARIABLE_TYPE)%PTR% &
+                            & SCALE_FACTORS(ms,mh)
+                          ENDDO !ns
+                        ENDDO !nh
+                      ENDDO !ms
+                    ENDDO !mh
+                  ENDIF
+                ENDIF
                         
 !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++          
               !Contact Mechanics starts here.                          
@@ -2625,8 +2779,16 @@ CONTAINS
                       !IF (penetration>0.0_DP) THEN !Only add the contribution of the Gauss point if it's a penetration
                       DO rowParameterIdx=1,COUPLED_MESH_BASIS%NUMBER_OF_ELEMENT_PARAMETERS 
                         rowIdx=rowParameterIdx+COUPLED_MESH_BASIS%NUMBER_OF_ELEMENT_PARAMETERS*(rowComponentIdx-1)
-                        PGMSI=BASIS_EVALUATE_XI(COUPLED_MESH_BASIS,rowParameterIdx,NO_PART_DERIV,XI,ERR,ERROR)* &
-                          & NORMAL(rowComponentIdx)
+                        
+                        IF (interface_matrix_idx==1) THEN
+                          PGMSI=BASIS_EVALUATE_XI(COUPLED_MESH_BASIS,rowParameterIdx,NO_PART_DERIV,XI,ERR,ERROR)* &
+                          & 1!NORMAL(rowComponentIdx)
+                        ELSE
+                          PGMSI=BASIS_EVALUATE_XI(COUPLED_MESH_BASIS,rowParameterIdx,NO_PART_DERIV,XI,ERR,ERROR)* &
+                          & -1!NORMAL(rowComponentIdx)
+                        ENDIF
+                        !PGMSI=BASIS_EVALUATE_XI(COUPLED_MESH_BASIS,rowParameterIdx,NO_PART_DERIV,XI,ERR,ERROR)* &
+                        !  & 1!NORMAL(rowComponentIdx)
                         colComponentIdx=rowComponentIdx !Since x and y are not coupled.
                         DO colParameterIdx=1,INTERFACE_DEPENDENT_BASIS%NUMBER_OF_ELEMENT_PARAMETERS
                           colIdx=colParameterIdx+INTERFACE_DEPENDENT_BASIS%NUMBER_OF_ELEMENT_PARAMETERS*(colComponentIdx-1)
@@ -2651,10 +2813,10 @@ CONTAINS
                         colComponentIdx=rowComponentIdx !X and Y are decoupled
                         DO colParameterIdx=1,INTERFACE_DEPENDENT_BASIS%NUMBER_OF_ELEMENT_PARAMETERS
                           colIdx=colParameterIdx+INTERFACE_DEPENDENT_BASIS%NUMBER_OF_ELEMENT_PARAMETERS*(colComponentIdx-1)
-                          INTERFACE_ELEMENT_MATRIX%MATRIX(rowIdx,colIdx)=INTERFACE_ELEMENT_MATRIX%MATRIX(rowIdx, &
-                            & colIdx)*INTERFACE_EQUATIONS%INTERPOLATION%VARIABLE_INTERPOLATION(interface_matrix_idx)% &
-                            & DEPENDENT_INTERPOLATION(1)%INTERPOLATION_PARAMETERS(INTERFACE_MATRIX_VARIABLE_TYPE)% &
-                            & PTR%SCALE_FACTORS(rowParameterIdx,rowComponentIdx)           
+                          !INTERFACE_ELEMENT_MATRIX%MATRIX(rowIdx,colIdx)=INTERFACE_ELEMENT_MATRIX%MATRIX(rowIdx, &
+                          !  & colIdx)*INTERFACE_EQUATIONS%INTERPOLATION%VARIABLE_INTERPOLATION(interface_matrix_idx)% &
+                          !  & DEPENDENT_INTERPOLATION(1)%INTERPOLATION_PARAMETERS(INTERFACE_MATRIX_VARIABLE_TYPE)% &
+                          !  & PTR%SCALE_FACTORS(rowParameterIdx,rowComponentIdx)           
                         ENDDO !colParameterIdx
                       ENDDO !rowParameterIdx 
                     ENDDO !rowComponentIdx
@@ -2671,9 +2833,9 @@ CONTAINS
                         colComponentIdx=rowComponentIdx !X and Y are decoupled
                         DO colParameterIdx=1,INTERFACE_DEPENDENT_BASIS%NUMBER_OF_ELEMENT_PARAMETERS
                           colIdx=colParameterIdx+INTERFACE_DEPENDENT_BASIS%NUMBER_OF_ELEMENT_PARAMETERS*(colComponentIdx-1)
-                          INTERFACE_ELEMENT_MATRIX%MATRIX(rowIdx,colIdx)=INTERFACE_ELEMENT_MATRIX%MATRIX(rowIdx, &
-                            & colIdx)*INTERFACE_INTERPOLATION%DEPENDENT_INTERPOLATION(1)%INTERPOLATION_PARAMETERS(1)% &
-                            & PTR%SCALE_FACTORS(colParameterIdx,colComponentIdx)              
+                          !INTERFACE_ELEMENT_MATRIX%MATRIX(rowIdx,colIdx)=INTERFACE_ELEMENT_MATRIX%MATRIX(rowIdx, &
+                          !  & colIdx)*INTERFACE_INTERPOLATION%DEPENDENT_INTERPOLATION(1)%INTERPOLATION_PARAMETERS(1)% &
+                          !  & PTR%SCALE_FACTORS(colParameterIdx,colComponentIdx)              
                         ENDDO !colParameterIdx
                       ENDDO !rowParameterIdx 
                     ENDDO !rowComponentIdx
