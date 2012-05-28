@@ -1465,6 +1465,11 @@ CONTAINS
                   END SELECT
                 ENDDO !equations_set_idx
                 !Note that the linear interface matrices are not required to be updated since these matrices do not change
+                !Make sure the interface conditions are up to date
+                DO interface_condition_idx=1,SOLVER_MAPPING%NUMBER_OF_INTERFACE_CONDITIONS
+                  INTERFACE_CONDITION=>SOLVER_MAPPING%INTERFACE_CONDITIONS(interface_condition_idx)%PTR
+                  CALL INTERFACE_CONDITION_RESIDUAL_EVALUATE(INTERFACE_CONDITION,ERR,ERROR,*999)
+                ENDDO
                 !Assemble the solver matrices
                 CALL SOLVER_MATRICES_STATIC_ASSEMBLE(SOLVER,SOLVER_MATRICES_RHS_RESIDUAL_ONLY,ERR,ERROR,*999)
               END IF

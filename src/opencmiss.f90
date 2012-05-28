@@ -1655,6 +1655,11 @@ MODULE OPENCMISS
     MODULE PROCEDURE CMISSDataPoints_ProjectionXiGetObj
   END INTERFACE !CMISSDataPoints_ProjectionXiGet
 
+  !>update the data projection objection 
+  INTERFACE CMISSDataPoints_ProjectionsUpdate
+    MODULE PROCEDURE CMISSDataPoints_ProjectionsUpdateObj0
+    MODULE PROCEDURE CMISSDataPoints_ProjectionsUpdateObj1
+  END INTERFACE !CMISSDataPoints_ProjectionsUpdate
 
   !>Returns the user number for a data point identified by a given global number.
   INTERFACE CMISSDataPoints_UserNumberGet
@@ -1667,6 +1672,12 @@ MODULE OPENCMISS
     MODULE PROCEDURE CMISSDataPoints_UserNumberSetNumber
     MODULE PROCEDURE CMISSDataPoints_UserNumberSetObj
   END INTERFACE !CMISSDataPoints_UserNumberSet
+  
+  !>Evaluate the data points position based on exsiting xi positions and the input field.
+  INTERFACE CMISSDataPoints_ValuesEvaluate
+    !MODULE PROCEDURE CMISSDataPoints_ValuesEvaluateNumber
+    MODULE PROCEDURE CMISSDataPoints_ValuesEvaluateObj
+  END INTERFACE !CMISSDataPoints_ValuesEvaluate
 
   !>Returns the values for a data point identified by a given global number. \todo should this be a user number?
   INTERFACE CMISSDataPoints_ValuesGet
@@ -1700,7 +1711,7 @@ MODULE OPENCMISS
 
   PUBLIC CMISSDataPoints_LabelGet,CMISSDataPoints_LabelSet
 
-  PUBLIC CMISSDataPoints_ProjectionDistanceGet,CMISSDataPoints_ProjectionElementNumberGet
+  PUBLIC CMISSDataPoints_ProjectionDistanceGet,CMISSDataPoints_ProjectionElementNumberGet,CMISSDataPoints_ProjectionsUpdate
 
   PUBLIC CMISSDataPoints_ProjectionElementFaceNumberGet,CMISSDataPoints_ProjectionElementLineNumberGet
 
@@ -1708,7 +1719,7 @@ MODULE OPENCMISS
 
   PUBLIC CMISSDataPoints_UserNumberGet,CMISSDataPoints_UserNumberSet
 
-  PUBLIC CMISSDataPoints_ValuesGet,CMISSDataPoints_ValuesSet
+  PUBLIC CMISSDataPoints_ValuesGet,CMISSDataPoints_ValuesSet,CMISSDataPoints_ValuesEvaluate
 
   PUBLIC CMISSDataPoints_WeightsGet,CMISSDataPoints_WeightsSet
 
@@ -18323,6 +18334,72 @@ CONTAINS
     RETURN
 
   END SUBROUTINE CMISSDataPoints_ProjectionXiGetObj
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Returns the projection xi for a data point in a set of data points identified by an object.
+  SUBROUTINE CMISSDataPoints_ProjectionsUpdateObj0(dataPoints,dataProjection,projectionNumber,err)
+
+    !Argument variables
+    TYPE(CMISSDataPointsType), INTENT(IN) :: dataPoints !<The data points to get the data point user number for.
+    TYPE(CMISSDataProjectionType), INTENT(IN) :: dataProjection !The data projections
+    INTEGER(INTG), INTENT(IN) :: projectionNumber !<The projection numbers of the projection
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code.
+    !Local variables
+    INTEGER(INTG) :: projection_idx
+    TYPE(VARYING_STRING) :: LOCAL_ERROR
+    
+    CALL ENTERS("CMISSDataPoints_ProjectionsUpdateObj0",err,error,*999)
+
+    CALL CMISSDataPoints_ProjectionsUpdateObj1(dataPoints,[dataProjection],[projectionNumber],err)
+
+    CALL EXITS("CMISSDataPoints_ProjectionsUpdateObj0")
+    RETURN
+999 CALL ERRORS("CMISSDataPoints_ProjectionsUpdateObj0",err,error)
+    CALL EXITS("CMISSDataPoints_ProjectionsUpdateObj0")
+    CALL CMISS_HANDLE_ERROR(err,error)
+    RETURN
+
+  END SUBROUTINE CMISSDataPoints_ProjectionsUpdateObj0
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Returns the projection xi for a data point in a set of data points identified by an object.
+  SUBROUTINE CMISSDataPoints_ProjectionsUpdateObj1(dataPoints,dataProjections,projectionNumbers,err)
+
+    !Argument variables
+    TYPE(CMISSDataPointsType), INTENT(IN) :: dataPoints !<The data points to get the data point user number for.
+    TYPE(CMISSDataProjectionType), INTENT(IN) :: dataProjections(:) !The data projections
+    INTEGER(INTG), INTENT(IN) :: projectionNumbers(:) !<The projection numbers of the projection
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code.
+    !Local variables
+    INTEGER(INTG) :: projection_idx
+    TYPE(VARYING_STRING) :: LOCAL_ERROR
+    
+    CALL ENTERS("CMISSDataPoints_ProjectionsUpdateObj1",err,error,*999)
+
+    DO projection_idx=1,SIZE(dataProjections,1)
+      IF(ASSOCIATED(dataProjections(projection_idx)%DATA_PROJECTION)) THEN
+        dataPoints%DATA_POINTS%DATA_PROJECTIONS(projectionNumbers(projection_idx))%PTR=>dataProjections(projection_idx)% &
+          & DATA_PROJECTION
+      ELSE
+        LOCAL_ERROR="The projection for index "//TRIM(NUMBER_TO_VSTRING(projection_idx,"*",err,error))//" is not associated."
+        CALL FLAG_ERROR(LOCAL_ERROR,err,error,*999)
+      END IF
+    END DO
+
+    CALL EXITS("CMISSDataPoints_ProjectionsUpdateObj1")
+    RETURN
+999 CALL ERRORS("CMISSDataPoints_ProjectionsUpdateObj1",err,error)
+    CALL EXITS("CMISSDataPoints_ProjectionsUpdateObj1")
+    CALL CMISS_HANDLE_ERROR(err,error)
+    RETURN
+
+  END SUBROUTINE CMISSDataPoints_ProjectionsUpdateObj1
 
   !
   !================================================================================================================================
@@ -18457,6 +18534,33 @@ CONTAINS
     RETURN
 
   END SUBROUTINE CMISSDataPoints_UserNumberSetObj
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Evaluate the data 
+  SUBROUTINE CMISSDataPoints_ValuesEvaluateObj(dataPoints,dataProjection,field,err)
+
+    !Argument variables
+    TYPE(CMISSDataPointsType), INTENT(INOUT) :: dataPoints !<The data points to get the data point user number for.
+    TYPE(CMISSDataProjectionType), INTENT(IN) :: dataProjection !<The data projection to get tolerance for.
+    TYPE(CMISSFieldType), INTENT(IN) :: field !<The field to evaluate data points positions for.
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code.
+    !Local variables
+
+    CALL ENTERS("CMISSDataPoints_ValuesEvaluateObj",err,error,*999)
+
+    CALL DATA_POINTS_VALUES_FIELD_EVALUATE(dataPoints%DATA_POINTS,dataProjection%DATA_PROJECTION,field%FIELD,err,error,*999)
+
+    CALL EXITS("CMISSDataPoints_ValuesEvaluateObj")
+    RETURN
+999 CALL ERRORS("CMISSDataPoints_ValuesEvaluateObj",err,error)
+    CALL EXITS("CMISSDataPoints_ValuesEvaluateObj")
+    CALL CMISS_HANDLE_ERROR(err,error)
+    RETURN
+
+  END SUBROUTINE CMISSDataPoints_ValuesEvaluateObj
 
   !
   !================================================================================================================================

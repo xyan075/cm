@@ -83,6 +83,8 @@ MODULE INTERFACE_ROUTINES
   PUBLIC INTERFACE_CREATE_START, INTERFACE_CREATE_FINISH
   
   PUBLIC INTERFACE_SELF_CONTACT_SET
+  
+  PUBLIC INTERFACE_COORDINATE_SYSTEM_SET,INTERFACE_COORDINATE_SYSTEM_GET
 
   PUBLIC INTERFACE_DESTROY, INTERFACE_MESH_CONNECTIVITY_DESTROY
   
@@ -109,8 +111,6 @@ MODULE INTERFACE_ROUTINES
   PUBLIC INTERFACE_POINTS_CONNECTIVITY_POINT_XI_CONTACT_SET
   
   PUBLIC INTERFACE_POINTS_CONNECTIVITY_PROJECTION_RESULTS_SET
-  
-  PUBLIC INTERFACE_COORDINATE_SYSTEM_SET,INTERFACE_COORDINATE_SYSTEM_GET
   
 CONTAINS
 
@@ -372,6 +372,84 @@ CONTAINS
     CALL EXITS("INTERFACE_SELF_CONTACT_SET")
     RETURN 1
   END SUBROUTINE INTERFACE_SELF_CONTACT_SET
+  
+  !
+  !================================================================================================================================
+  !
+  !>Returns the coordinate system of an interface. \see OPENCMISS::CMISSInterface_CoordinateSystemGet
+  SUBROUTINE INTERFACE_COORDINATE_SYSTEM_GET(INTERFACE,COORDINATE_SYSTEM,ERR,ERROR,*)
+
+    !Argument variables
+    TYPE(INTERFACE_TYPE), POINTER :: INTERFACE !<A pointer to the interface to get the coordinate system for
+    TYPE(COORDINATE_SYSTEM_TYPE), POINTER :: COORDINATE_SYSTEM !<On exit, the coordinate system for the specified interface. Must not be associated on entry.
+    INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
+    !Local Variables
+    
+    CALL ENTERS("INTERFACE_COORDINATE_SYSTEM_GET",ERR,ERROR,*999)
+
+    IF(ASSOCIATED(INTERFACE)) THEN
+      IF(INTERFACE%INTERFACE_FINISHED) THEN
+        IF(ASSOCIATED(COORDINATE_SYSTEM)) THEN
+          CALL FLAG_ERROR("Coordinate system is already associated.",ERR,ERROR,*999)
+        ELSE
+          COORDINATE_SYSTEM=>INTERFACE%COORDINATE_SYSTEM
+        ENDIF
+      ELSE
+        CALL FLAG_ERROR("Interface has not been finished.",ERR,ERROR,*999)
+      ENDIF
+    ELSE
+      CALL FLAG_ERROR("Interface is not associated.",ERR,ERROR,*999)
+    ENDIF
+    
+    CALL EXITS("INTERFACE_COORDINATE_SYSTEM_GET")
+    RETURN
+999 CALL ERRORS("INTERFACE_COORDINATE_SYSTEM_GET",ERR,ERROR)
+    CALL EXITS("INTERFACE_COORDINATE_SYSTEM_GET")
+    RETURN 1
+  END SUBROUTINE INTERFACE_COORDINATE_SYSTEM_GET
+  
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Sets the coordinate system of an interface.  \see OPENCMISS::CMISSInterface_CoordinateSystemSet
+  SUBROUTINE INTERFACE_COORDINATE_SYSTEM_SET(INTERFACE,COORDINATE_SYSTEM,ERR,ERROR,*)
+
+    !Argument variables
+    TYPE(INTERFACE_TYPE), POINTER :: INTERFACE !<A pointer to the interface to set the coordinate system for
+    TYPE(COORDINATE_SYSTEM_TYPE), POINTER :: COORDINATE_SYSTEM !<The coordinate system to set
+    INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
+    !Local Variables
+
+    CALL ENTERS("INTERFACE_COORDINATE_SYSTEM_SET",ERR,ERROR,*999)
+
+    IF(ASSOCIATED(INTERFACE)) THEN
+      IF(INTERFACE%INTERFACE_FINISHED) THEN
+        CALL FLAG_ERROR("Interface has been finished.",ERR,ERROR,*999)
+      ELSE
+        IF(ASSOCIATED(COORDINATE_SYSTEM)) THEN
+          IF(COORDINATE_SYSTEM%COORDINATE_SYSTEM_FINISHED) THEN
+            INTERFACE%COORDINATE_SYSTEM=>COORDINATE_SYSTEM
+          ELSE
+            CALL FLAG_ERROR("Coordinate system has not been finished.",ERR,ERROR,*999)
+          ENDIF
+        ELSE
+          CALL FLAG_ERROR("Coordinate system is not associated.",ERR,ERROR,*999)
+        ENDIF
+      ENDIF
+    ELSE
+      CALL FLAG_ERROR("Interface is not associated.",ERR,ERROR,*999)
+    ENDIF
+    
+    CALL EXITS("INTERFACE_COORDINATE_SYSTEM_SET")
+    RETURN
+999 CALL ERRORS("INTERFACE_COORDINATE_SYSTEM_SET",ERR,ERROR)
+    CALL EXITS("INTERFACE_COORDINATE_SYSTEM_SET")
+    RETURN 1
+  END SUBROUTINE INTERFACE_COORDINATE_SYSTEM_SET
 
   !
   !================================================================================================================================
@@ -1606,7 +1684,6 @@ CONTAINS
             ENDDO !(DIFFERENT_ELEMENT) 
             XI_DIFF=POINTS_CON%POINTS_CONNECTIVITY(point_idx,COUPLED_MESHID)%XI(xi_dir,1)- &
               & POINTS_CON%POINTS_CONNECTIVITY(mod_reference_point_idx,COUPLED_MESHID)%XI(xi_dir,1)
-              
             IF(XI_DIFF==0.0_DP) THEN !Data points have same xi location (current xi direction)
               !Check if the absolute value is zero 
               IF(POINTS_CON%POINTS_CONNECTIVITY(point_idx,COUPLED_MESHID)%XI(xi_dir,1) &
@@ -1633,7 +1710,7 @@ CONTAINS
             CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
           END SELECT
         CASE(3)
-          DO xi_dir=1,SIZE(POINTS_CON%POINTS_CONNECTIVITY(point_idx,COUPLED_MESHID)%XI,1)
+          DO xi_dir=1,SIZE(POINTS_CON%POINTS_CONNECTIVITY(point_idx,COUPLED_MESHID)%XI,1)-1
             IF(point_idx==POINTS_CON%NUMBER_OF_DATA_POINTS) THEN
               XI_DIFF=POINTS_CON%POINTS_CONNECTIVITY(point_idx,COUPLED_MESHID)%XI(xi_dir,1)- &
                 & POINTS_CON%POINTS_CONNECTIVITY(point_idx-1,COUPLED_MESHID)%XI(xi_dir,1)
@@ -1733,7 +1810,7 @@ CONTAINS
                     CALL FLAG_ERROR("Coupled mesh element number doesn't match that set to the interface.",ERR,ERROR,*999)
                   ELSE
                     POINTS_CON%POINTS_CONNECTIVITY(POINTS_IDX,COUPLED_MESHID)%COUPLED_MESH_CONTACT_NUMBER=LOCAL_CONTACT
-                    IF (SIZE(XI,1)==POINTS_CON%INTERFACE%MESH_CONNECTIVITY%BASIS%NUMBER_OF_XI) THEN
+                    IF (SIZE(XI,1)/=SIZE(POINTS_CON%POINTS_CONNECTIVITY(POINTS_IDX,COUPLED_MESHID)%XI,1)) THEN
                       SELECT CASE(SIZE(XI,1))
                       CASE(1)
                         SELECT CASE(LOCAL_CONTACT)
@@ -1803,6 +1880,47 @@ CONTAINS
                       END SELECT
                     ELSE
                       POINTS_CON%POINTS_CONNECTIVITY(POINTS_IDX,COUPLED_MESHID)%XI(:,COMP_NO)=XI(:)
+                      SELECT CASE(SIZE(XI,1))
+                      CASE(2)
+                        SELECT CASE(LOCAL_CONTACT)
+                        CASE(1)
+                          POINTS_CON%POINTS_CONNECTIVITY(POINTS_IDX,COUPLED_MESHID)%COUPLED_MESH_CONTACT_XI_NORMAL=-2
+                        CASE(2)
+                          POINTS_CON%POINTS_CONNECTIVITY(POINTS_IDX,COUPLED_MESHID)%COUPLED_MESH_CONTACT_XI_NORMAL=2
+                        CASE(3)
+                          POINTS_CON%POINTS_CONNECTIVITY(POINTS_IDX,COUPLED_MESHID)%COUPLED_MESH_CONTACT_XI_NORMAL=-1
+                        CASE(4)
+                          POINTS_CON%POINTS_CONNECTIVITY(POINTS_IDX,COUPLED_MESHID)%COUPLED_MESH_CONTACT_XI_NORMAL=1
+                        CASE DEFAULT 
+                          LOCAL_ERROR="The local contact number for coupled mesh "//TRIM(NUMBER_TO_VSTRING(COUPLED_MESHID, &
+                            & "*",ERR,ERROR))//" is invalid for element number "//TRIM(NUMBER_TO_VSTRING(COUPLED_ELEM, &
+                            & "*",ERR,ERROR))//"."
+                          CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
+                        END SELECT
+                      CASE(3)
+                        SELECT CASE(LOCAL_CONTACT)
+                        CASE(1)
+                          POINTS_CON%POINTS_CONNECTIVITY(POINTS_IDX,COUPLED_MESHID)%COUPLED_MESH_CONTACT_XI_NORMAL=1
+                        CASE(2)
+                          POINTS_CON%POINTS_CONNECTIVITY(POINTS_IDX,COUPLED_MESHID)%COUPLED_MESH_CONTACT_XI_NORMAL=-1
+                        CASE(3)
+                          POINTS_CON%POINTS_CONNECTIVITY(POINTS_IDX,COUPLED_MESHID)%COUPLED_MESH_CONTACT_XI_NORMAL=2
+                        CASE(4)
+                          POINTS_CON%POINTS_CONNECTIVITY(POINTS_IDX,COUPLED_MESHID)%COUPLED_MESH_CONTACT_XI_NORMAL=-2
+                        CASE(5)
+                          POINTS_CON%POINTS_CONNECTIVITY(POINTS_IDX,COUPLED_MESHID)%COUPLED_MESH_CONTACT_XI_NORMAL=3
+                        CASE(6)
+                          POINTS_CON%POINTS_CONNECTIVITY(POINTS_IDX,COUPLED_MESHID)%COUPLED_MESH_CONTACT_XI_NORMAL=-3
+                        CASE DEFAULT 
+                          LOCAL_ERROR="The local contact number for coupled mesh "// &
+                              & TRIM(NUMBER_TO_VSTRING(COUPLED_MESHID,"*",ERR,ERROR))//" is invalid for element number "// &
+                              & TRIM(NUMBER_TO_VSTRING(COUPLED_ELEM,"*",ERR,ERROR))//"."
+                          CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999) 
+                        END SELECT
+                      CASE DEFAULT 
+                        LOCAL_ERROR="interface dimension should be < 3"
+                        CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
+                      END SELECT
                     ENDIF
                   ENDIF !end of core code   
                 ENDIF    
@@ -1859,12 +1977,19 @@ CONTAINS
             DO data_projection_idx=1,DATA_POINTS%NUMBER_OF_DATA_PROJECTIONS-1 !The last data projection was on the interface mesh for setting up lagrange field
               IF(DATA_POINTS%DATA_PROJECTIONS(data_projection_idx)%PTR%DATA_PROJECTION_PROJECTED) THEN
                 DO data_point_idx=1,DATA_POINTS%NUMBER_OF_DATA_POINTS
-                  !DATA_PROJECTION_RESULT=>DATA_POINTS%DATA_PROJECTIONS(data_projection_idx)%DATA_PROJECTION_RESULTS(data_point_idx)
-                  !CALL INTERFACE_POINTS_CONNECTIVITY_ELEMENT_NUMBER_SET(POINTS_CON,data_point_idx,data_projection_idx, &
-                  !  & DATA_PROJECTION_RESULT%ELEMENT_NUMBER,ERR,ERROR,*999)
-                  !CALL INTERFACE_POINTS_CONNECTIVITY_POINT_XI_CONTACT_SET(POINTS_CON,data_point_idx,data_projection_idx, &
-                  !  & DATA_PROJECTION_RESULT%ELEMENT_NUMBER,DATA_PROJECTION_RESULT%ELEMENT_LINE_NUMBER,COMP_NO, &
-                  !  & DATA_PROJECTION_RESULT%XI,ERR,ERROR,*999)
+                  DATA_PROJECTION_RESULT=>DATA_POINTS%DATA_PROJECTIONS(data_projection_idx)%PTR% &
+                    & DATA_PROJECTION_RESULTS(data_point_idx)
+                  CALL INTERFACE_POINTS_CONNECTIVITY_ELEMENT_NUMBER_SET(POINTS_CON,data_point_idx,data_projection_idx, &
+                    & DATA_PROJECTION_RESULT%ELEMENT_NUMBER,ERR,ERROR,*999)
+                  IF(DATA_PROJECTION_RESULT%ELEMENT_LINE_NUMBER/=0) THEN
+                    CALL INTERFACE_POINTS_CONNECTIVITY_POINT_XI_CONTACT_SET(POINTS_CON,data_point_idx,data_projection_idx, &
+                      & DATA_PROJECTION_RESULT%ELEMENT_NUMBER,DATA_PROJECTION_RESULT%ELEMENT_LINE_NUMBER,COMP_NO, &
+                      & DATA_PROJECTION_RESULT%XI,ERR,ERROR,*999)
+                  ELSEIF(DATA_PROJECTION_RESULT%ELEMENT_FACE_NUMBER/=0) THEN
+                    CALL INTERFACE_POINTS_CONNECTIVITY_POINT_XI_CONTACT_SET(POINTS_CON,data_point_idx,data_projection_idx, &
+                      & DATA_PROJECTION_RESULT%ELEMENT_NUMBER,DATA_PROJECTION_RESULT%ELEMENT_FACE_NUMBER,COMP_NO, &
+                      & DATA_PROJECTION_RESULT%XI,ERR,ERROR,*999)
+                  ENDIF
                 ENDDO !data_point_idx      
               ELSE
                 LOCAL_ERROR="Data Projection  "//TRIM(NUMBER_TO_VSTRING(data_projection_idx,"*",ERR,ERROR))//" is not projected."        
@@ -1943,86 +2068,6 @@ CONTAINS
     RETURN 1
   END SUBROUTINE INTERFACE_USER_NUMBER_FIND
   
-  !
-  !================================================================================================================================
-  !
-
-  !>Returns the coordinate system of region. \see OPENCMISS::CMISSRegionCoordinateSystemGet
-  SUBROUTINE INTERFACE_COORDINATE_SYSTEM_GET(INTERFACE,COORDINATE_SYSTEM,ERR,ERROR,*)
-
-    !Argument variables
-    TYPE(INTERFACE_TYPE), POINTER :: INTERFACE !<A pointer to the region to get the coordinate system for
-    TYPE(COORDINATE_SYSTEM_TYPE), POINTER :: COORDINATE_SYSTEM !<On exit, the coordinate system for the specified region. Must not be associated on entry.
-    INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
-    TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
-    !Local Variables
-    
-    CALL ENTERS("INTERFACE_COORDINATE_SYSTEM_GET",ERR,ERROR,*999)
-
-    IF(ASSOCIATED(INTERFACE)) THEN
-      IF(INTERFACE%INTERFACE_FINISHED) THEN
-        IF(ASSOCIATED(COORDINATE_SYSTEM)) THEN
-          CALL FLAG_ERROR("Coordinate system is already associated.",ERR,ERROR,*999)
-        ELSE
-          COORDINATE_SYSTEM=>INTERFACE%COORDINATE_SYSTEM
-        ENDIF
-      ELSE
-        CALL FLAG_ERROR("Interface has not been finished.",ERR,ERROR,*999)
-      ENDIF
-    ELSE
-      CALL FLAG_ERROR("Interface is not associated.",ERR,ERROR,*999)
-    ENDIF
-    
-    CALL EXITS("INTERFACE_COORDINATE_SYSTEM_GET")
-    RETURN
-999 CALL ERRORS("INTERFACE_COORDINATE_SYSTEM_GET",ERR,ERROR)
-    CALL EXITS("INTERFACE_COORDINATE_SYSTEM_GET")
-    RETURN 1
-  END SUBROUTINE INTERFACE_COORDINATE_SYSTEM_GET
-  
-  
-  !
-  !================================================================================================================================
-  !
-
-  !>Sets the coordinate system of an interface.  \see OPENCMISS::CMISSInterfaceCoordinateSystemSet
-  SUBROUTINE INTERFACE_COORDINATE_SYSTEM_SET(INTERFACE,COORDINATE_SYSTEM,ERR,ERROR,*)
-
-    !Argument variables
-    TYPE(INTERFACE_TYPE), POINTER :: INTERFACE !<A pointer to the interface to set the coordinate system for
-    TYPE(COORDINATE_SYSTEM_TYPE), POINTER :: COORDINATE_SYSTEM !<The coordinate system to set
-    INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
-    TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
-    !Local Variables
-
-    CALL ENTERS("V",ERR,ERROR,*999)
-
-    IF(ASSOCIATED(INTERFACE)) THEN
-      IF(INTERFACE%INTERFACE_FINISHED) THEN
-        CALL FLAG_ERROR("Interface has been finished.",ERR,ERROR,*999)
-      ELSE
-        IF(ASSOCIATED(COORDINATE_SYSTEM)) THEN
-          IF(COORDINATE_SYSTEM%COORDINATE_SYSTEM_FINISHED) THEN
-            INTERFACE%COORDINATE_SYSTEM=>COORDINATE_SYSTEM
-          ELSE
-            CALL FLAG_ERROR("Coordinate system has not been finished.",ERR,ERROR,*999)
-          ENDIF
-        ELSE
-          CALL FLAG_ERROR("Coordinate system is not associated.",ERR,ERROR,*999)
-        ENDIF
-      ENDIF
-    ELSE
-      CALL FLAG_ERROR("Interface is not associated.",ERR,ERROR,*999)
-    ENDIF
-    
-    CALL EXITS("INTERFACE_COORDINATE_SYSTEM_SET")
-    RETURN
-999 CALL ERRORS("INTERFACE_COORDINATE_SYSTEM_SET",ERR,ERROR)
-    CALL EXITS("INTERFACE_COORDINATE_SYSTEM_SET")
-    RETURN 1
-  END SUBROUTINE INTERFACE_COORDINATE_SYSTEM_SET
-  
-
   !
   !================================================================================================================================
   !

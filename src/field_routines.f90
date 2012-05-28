@@ -2582,12 +2582,14 @@ CONTAINS
     INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
     TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
     !Local Variables
-    INTEGER(INTG) :: element_idx,derivative_idx,version_idx,field_dof,node_idx,partial_deriv_idx,gauss_point_idx,MAX_NGP
+    INTEGER(INTG) :: element_idx,derivative_idx,version_idx,field_dof,node_idx,partial_deriv_idx,gauss_point_idx,MAX_NGP, &
+      & data_point_idx
     REAL(DP), POINTER :: FIELD_PARAMETERS(:)
     TYPE(DOMAIN_TYPE), POINTER :: COMPONENT_DOMAIN
     TYPE(DOMAIN_TOPOLOGY_TYPE), POINTER :: DOMAIN_TOPOLOGY
     TYPE(DOMAIN_ELEMENTS_TYPE), POINTER :: DOMAIN_ELEMENTS
     TYPE(DOMAIN_NODES_TYPE), POINTER :: DOMAIN_NODES
+    TYPE(DOMAIN_DATA_POINTS_TYPE), POINTER :: DOMAIN_DATA_POINTS
     TYPE(FIELD_PARAMETER_SET_TYPE), POINTER :: FIELD_PARAMETER_SET
     TYPE(FIELD_VARIABLE_TYPE), POINTER :: FIELD_VARIABLE
     TYPE(VARYING_STRING) :: LOCAL_ERROR
@@ -2721,6 +2723,27 @@ CONTAINS
                       ELSE
                         CALL FLAG_ERROR("Domain is not associated.",ERR,ERROR,*999)
                       ENDIF
+                    CASE(FIELD_DATA_POINT_BASED_INTERPOLATION)
+                      COMPONENT_DOMAIN=>FIELD_VARIABLE%COMPONENTS(COMPONENT_NUMBER)%DOMAIN
+                      IF(ASSOCIATED(COMPONENT_DOMAIN)) THEN
+                        DOMAIN_TOPOLOGY=>COMPONENT_DOMAIN%TOPOLOGY
+                        IF(ASSOCIATED(DOMAIN_TOPOLOGY)) THEN
+                          DOMAIN_DATA_POINTS=>DOMAIN_TOPOLOGY%DATA_POINTS
+                          IF(ASSOCIATED(DOMAIN_DATA_POINTS)) THEN
+                            DO data_point_idx=1,DOMAIN_DATA_POINTS%TOTAL_NUMBER_OF_DATA_POINTS
+                              field_dof=FIELD_VARIABLE%COMPONENTS(COMPONENT_NUMBER)%PARAM_TO_DOF_MAP% &
+                                & DATA_POINT_PARAM2DOF_MAP%DATA_POINTS(data_point_idx)
+                              FIELD_PARAMETERS(field_dof)=VALUE
+                            ENDDO !data_point_idx
+                          ELSE
+                             CALL FLAG_ERROR("Domain topology data points is not associated.",ERR,ERROR,*999)
+                          ENDIF
+                        ELSE
+                          CALL FLAG_ERROR("Domain topology is not associated.",ERR,ERROR,*999)
+                        ENDIF !ASSOCIATED(DOMAIN_TOPOLOGY)
+                      ELSE
+                        CALL FLAG_ERROR("Domain is not associated.",ERR,ERROR,*999)
+                      ENDIF !ASSOCIATED(COMPONENT_DOMAIN)
                     CASE DEFAULT
                       LOCAL_ERROR="The interpolation type of "//TRIM(NUMBER_TO_VSTRING(FIELD_VARIABLE% &
                         & COMPONENTS(COMPONENT_NUMBER)%INTERPOLATION_TYPE,"*",ERR,ERROR))// &
@@ -22941,7 +22964,7 @@ CONTAINS
                         nu1=PART_DERIV_S1
                         ni2=3
                         nu2=PART_DERIV_S3
-                      ELSE IF(partial_derivative_idx==PART_DERIV_S1_S2) THEN
+                      ELSE IF(partial_derivative_idx==PART_DERIV_S2_S3) THEN
                         ni1=2
                         nu1=PART_DERIV_S2
                         ni2=3
