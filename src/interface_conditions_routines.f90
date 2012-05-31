@@ -47,6 +47,8 @@ MODULE INTERFACE_CONDITIONS_ROUTINES
   USE BASE_ROUTINES
   USE BASIS_ROUTINES
   USE COMP_ENVIRONMENT
+  USE DATA_POINT_ROUTINES
+  USE DATA_PROJECTION_ROUTINES
   USE FIELD_ROUTINES
   USE INPUT_OUTPUT
   USE INTERFACE_CONDITIONS_CONSTANTS
@@ -83,6 +85,8 @@ MODULE INTERFACE_CONDITIONS_ROUTINES
   PUBLIC INTERFACE_CONDITION_METHOD_GET,INTERFACE_CONDITION_METHOD_SET
 
   PUBLIC INTERFACE_CONDITION_OPERATOR_GET,INTERFACE_CONDITION_OPERATOR_SET
+  
+  PUBLIC INTERFACE_CONDITION_TRANSLATION_INCREMENT_APPLY
 
   PUBLIC INTERFACE_CONDITION_USER_NUMBER_FIND
 
@@ -113,6 +117,9 @@ CONTAINS
         IF(INTERFACE_EQUATIONS%INTERFACE_EQUATIONS_FINISHED) THEN
           SELECT CASE(INTERFACE_CONDITION%METHOD)
           CASE(INTERFACE_CONDITION_LAGRANGE_MULTIPLIERS_METHOD,INTERFACE_CONDITION_PENALTY_METHOD)
+            IF(INTERFACE_CONDITION%OPERATOR==INTERFACE_CONDITION_FRICTIONLESS_CONTACT_OPERATOR) THEN
+              CALL INTERFACE_CONDITION_DATA_REPROJECTION(INTERFACE_CONDITION,ERR,ERROR,*999)
+            ENDIF
             CALL INTERFACE_CONDITION_ASSEMBLE_FEM(INTERFACE_CONDITION,ERR,ERROR,*999)
           CASE(INTERFACE_CONDITION_AUGMENTED_LAGRANGE_METHOD)
             CALL FLAG_ERROR("Not implemented.",ERR,ERROR,*999)
@@ -571,6 +578,102 @@ CONTAINS
     CALL EXITS("INTERFACE_CONDITION_CREATE_START")
     RETURN 1   
   END SUBROUTINE INTERFACE_CONDITION_CREATE_START
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Assembles the equations for an interface condition.
+  SUBROUTINE INTERFACE_CONDITION_DATA_REPROJECTION(INTERFACE_CONDITION,ERR,ERROR,*)
+
+    !Argument variables
+    TYPE(INTERFACE_CONDITION_TYPE), POINTER :: INTERFACE_CONDITION !<A pointer to the interface condition to assemble the equations for.
+    INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
+    !Local Variables
+    TYPE(INTERFACE_EQUATIONS_TYPE), POINTER :: INTERFACE_EQUATIONS
+    TYPE(INTERFACE_POINTS_CONNECTIVITY_TYPE), POINTER :: POINTS_CONNECTIVITY
+    TYPE(DATA_POINTS_TYPE), POINTER :: DATA_POINTS
+    TYPE(DATA_PROJECTION_TYPE), POINTER :: DATA_PROJECTION !<Data projection to store the xi locations and element number for the data points
+    TYPE(FIELD_TYPE), POINTER :: DEPENDENT_FIELD_1,DEPENDENT_FIELD_PROJECTION!< Dependent field to interpolate
+    TYPE(DATA_PROJECTION_RESULT_TYPE), POINTER :: DATA_PROJECTION_RESULT
+    INTEGER(INTG) :: data_point_idx,coupled_mesh_idx,MESH_COMPONENT_NUMBER
+    TYPE(VARYING_STRING) :: LOCAL_ERROR
+    
+ 
+    CALL ENTERS("INTERFACE_CONDITION_DATA_REPROJECTION",ERR,ERROR,*999)
+
+    IF(ASSOCIATED(INTERFACE_CONDITION)) THEN
+      POINTS_CONNECTIVITY=>INTERFACE_CONDITION%INTERFACE%POINTS_CONNECTIVITY
+      IF(ASSOCIATED(POINTS_CONNECTIVITY)) THEN
+        DATA_POINTS=>INTERFACE_CONDITION%INTERFACE%DATA_POINTS
+        !TODO: Default first region data projection to be unchanged throughout the simulation, i.e. data embedded in the first region mesh
+        DEPENDENT_FIELD_1=>INTERFACE_CONDITION%DEPENDENT%EQUATIONS_SETS(1)%PTR%DEPENDENT%DEPENDENT_FIELD
+        !Evaluate the data points positions according to the xi locations of first mesh and its dependent field.
+        CALL DATA_POINTS_VALUES_POINTS_CONNECTIVITY_FIELD_EVALUATE(DATA_POINTS,POINTS_CONNECTIVITY,1,DEPENDENT_FIELD_1, &
+          & ERR,ERROR,*999)
+        !Get the mesh component number for this field
+        !MESH_COMPONENT_NUMBER=DEPENDENT_FIELD_1%DECOMPOSITION%MESH_COMPONENT_NUMBER
+        MESH_COMPONENT_NUMBER=1
+        DO coupled_mesh_idx=2,INTERFACE_CONDITION%INTERFACE%NUMBER_OF_COUPLED_MESHES
+          DATA_PROJECTION=>DATA_POINTS%DATA_PROJECTIONS(coupled_mesh_idx)%PTR
+          DEPENDENT_FIELD_PROJECTION=>INTERFACE_CONDITION%DEPENDENT%EQUATIONS_SETS(coupled_mesh_idx)%PTR%DEPENDENT%DEPENDENT_FIELD
+          !Projection the data points (with know spatial positions) on the dependent field of the second (or more) mesh
+          CALL DATA_PROJECTION_DATA_POINTS_PROJECTION_EVALUATE(DATA_PROJECTION,DEPENDENT_FIELD_PROJECTION,err,error,*999)
+          !Loop through data points and record the new element number and xi location of the data points in the second mesh
+          DO data_point_idx=1,POINTS_CONNECTIVITY%NUMBER_OF_DATA_POINTS
+            DATA_PROJECTION_RESULT=>DATA_PROJECTION%DATA_PROJECTION_RESULTS(data_point_idx)
+            POINTS_CONNECTIVITY%POINTS_CONNECTIVITY(data_point_idx,coupled_mesh_idx)%COUPLED_MESH_ELEMENT_NUMBER= &
+              & DATA_PROJECTION_RESULT%ELEMENT_NUMBER
+            IF(DATA_PROJECTION_RESULT%ELEMENT_LINE_NUMBER/=0) THEN
+              POINTS_CONNECTIVITY%POINTS_CONNECTIVITY(data_point_idx,coupled_mesh_idx)%COUPLED_MESH_CONTACT_NUMBER= &
+                & DATA_PROJECTION_RESULT%ELEMENT_LINE_NUMBER
+              SELECT CASE(ABS(POINTS_CONNECTIVITY%POINTS_CONNECTIVITY(data_point_idx,coupled_mesh_idx)% &
+                & COUPLED_MESH_CONTACT_XI_NORMAL))
+              CASE(1)
+                POINTS_CONNECTIVITY%POINTS_CONNECTIVITY(data_point_idx,coupled_mesh_idx)%XI(2,MESH_COMPONENT_NUMBER)= &
+                  & DATA_PROJECTION_RESULT%XI(1)
+              CASE(2)
+                POINTS_CONNECTIVITY%POINTS_CONNECTIVITY(data_point_idx,coupled_mesh_idx)%XI(1,MESH_COMPONENT_NUMBER)= &
+                  & DATA_PROJECTION_RESULT%XI(1)
+              END SELECT
+            ELSEIF(DATA_PROJECTION_RESULT%ELEMENT_FACE_NUMBER/=0) THEN
+              POINTS_CONNECTIVITY%POINTS_CONNECTIVITY(data_point_idx,coupled_mesh_idx)%COUPLED_MESH_CONTACT_NUMBER= &
+                & DATA_PROJECTION_RESULT%ELEMENT_FACE_NUMBER
+              SELECT CASE(ABS(POINTS_CONNECTIVITY%POINTS_CONNECTIVITY(data_point_idx,coupled_mesh_idx)% &
+                & COUPLED_MESH_CONTACT_XI_NORMAL))
+              CASE(1)
+                POINTS_CONNECTIVITY%POINTS_CONNECTIVITY(data_point_idx,coupled_mesh_idx)%XI(2,MESH_COMPONENT_NUMBER)= &
+                  & DATA_PROJECTION_RESULT%XI(1)
+                POINTS_CONNECTIVITY%POINTS_CONNECTIVITY(data_point_idx,coupled_mesh_idx)%XI(3,MESH_COMPONENT_NUMBER)= &
+                  & DATA_PROJECTION_RESULT%XI(2)
+              CASE(2)
+                POINTS_CONNECTIVITY%POINTS_CONNECTIVITY(data_point_idx,coupled_mesh_idx)%XI(1,MESH_COMPONENT_NUMBER)= &
+                  & DATA_PROJECTION_RESULT%XI(1)
+                POINTS_CONNECTIVITY%POINTS_CONNECTIVITY(data_point_idx,coupled_mesh_idx)%XI(3,MESH_COMPONENT_NUMBER)= &
+                  & DATA_PROJECTION_RESULT%XI(2)
+              CASE(3)
+                POINTS_CONNECTIVITY%POINTS_CONNECTIVITY(data_point_idx,coupled_mesh_idx)%XI(1,MESH_COMPONENT_NUMBER)= &
+                  & DATA_PROJECTION_RESULT%XI(1)
+                POINTS_CONNECTIVITY%POINTS_CONNECTIVITY(data_point_idx,coupled_mesh_idx)%XI(2,MESH_COMPONENT_NUMBER)= &
+                  & DATA_PROJECTION_RESULT%XI(2)
+              END SELECT
+            ENDIF
+          ENDDO !data_point_idx      
+        ENDDO
+      ELSE
+        CALL FLAG_ERROR("Interface condition points connectivity is not associated.",ERR,ERROR,*999)
+      ENDIF
+    ELSE
+      CALL FLAG_ERROR("Interface condition is not associated.",ERR,ERROR,*999)
+    ENDIF
+       
+    CALL EXITS("INTERFACE_CONDITION_DATA_REPROJECTION")
+    RETURN
+999 CALL ERRORS("INTERFACE_CONDITION_DATA_REPROJECTION",ERR,ERROR)
+    CALL EXITS("INTERFACE_CONDITION_DATA_REPROJECTION")
+    RETURN 1
+  END SUBROUTINE INTERFACE_CONDITION_DATA_REPROJECTION
   
   !
   !================================================================================================================================
@@ -2792,15 +2895,15 @@ CONTAINS
                         DO rowParameterIdx=1,COUPLED_MESH_BASIS%NUMBER_OF_ELEMENT_PARAMETERS 
                           rowIdx=rowParameterIdx+COUPLED_MESH_BASIS%NUMBER_OF_ELEMENT_PARAMETERS*(rowComponentIdx-1)
                           
-                          IF (interface_matrix_idx==1) THEN
-                            PGMSI=BASIS_EVALUATE_XI(COUPLED_MESH_BASIS,rowParameterIdx,NO_PART_DERIV,XI,ERR,ERROR)* &
-                            & 1!NORMAL(rowComponentIdx)
-                          ELSE
-                            PGMSI=BASIS_EVALUATE_XI(COUPLED_MESH_BASIS,rowParameterIdx,NO_PART_DERIV,XI,ERR,ERROR)* &
-                            & -1!NORMAL(rowComponentIdx)
-                          ENDIF
-                          !PGMSI=BASIS_EVALUATE_XI(COUPLED_MESH_BASIS,rowParameterIdx,NO_PART_DERIV,XI,ERR,ERROR)* &
-                          !  & 1!NORMAL(rowComponentIdx)
+!                          IF (interface_matrix_idx==1) THEN
+!                            PGMSI=BASIS_EVALUATE_XI(COUPLED_MESH_BASIS,rowParameterIdx,NO_PART_DERIV,XI,ERR,ERROR)* &
+!                            & 1!NORMAL(rowComponentIdx)
+!                          ELSE
+!                            PGMSI=BASIS_EVALUATE_XI(COUPLED_MESH_BASIS,rowParameterIdx,NO_PART_DERIV,XI,ERR,ERROR)* &
+!                            & -1!NORMAL(rowComponentIdx)
+!                          ENDIF
+                          PGMSI=BASIS_EVALUATE_XI(COUPLED_MESH_BASIS,rowParameterIdx,NO_PART_DERIV,XI,ERR,ERROR)* &
+                            & NORMAL(rowComponentIdx)
                           colComponentIdx=rowComponentIdx !Since x and y are not coupled.
                           DO colParameterIdx=1,INTERFACE_DEPENDENT_BASIS%NUMBER_OF_ELEMENT_PARAMETERS
                             colIdx=colParameterIdx+INTERFACE_DEPENDENT_BASIS%NUMBER_OF_ELEMENT_PARAMETERS*(colComponentIdx-1)
@@ -3243,6 +3346,112 @@ CONTAINS
     RETURN
     
   END FUNCTION INTERFACE_TO_COUPLED_MESH_GAUSSPOINT_TRANSFORM
+  
+  !
+  !================================================================================================================================
+  !
+
+  !> Apply translation to the interface associated dependent fields, only for frictionless contact, to introduce penetration
+  SUBROUTINE INTERFACE_CONDITION_TRANSLATION_INCREMENT_APPLY(INTERFACE_CONDITION,ITERATION_NUMBER, &
+      & MAXIMUM_NUMBER_OF_ITERATIONS,ERR,ERROR,*)
+
+    !Argument variables
+    TYPE(INTERFACE_CONDITION_TYPE), POINTER :: INTERFACE_CONDITION 
+    INTEGER(INTG), INTENT(IN) :: ITERATION_NUMBER
+    INTEGER(INTG), INTENT(IN) :: MAXIMUM_NUMBER_OF_ITERATIONS
+    INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
+    !Local Variables
+    INTEGER(INTG) :: dependent_variable_idx,node_idx,comp_idx
+    INTEGER(INTG) :: VERSION_NUMBER,DERIVATIVE_NUMBER,MESH_COMPONENT_NUMBER
+    TYPE(FIELD_TYPE), POINTER :: FIELD !<A pointer to the dependent field to translate
+    TYPE(VARYING_STRING) :: LOCAL_ERROR
+
+    CALL ENTERS("INTERFACE_CONDITION_TRANSLATION_INCREMENT_APPLY",ERR,ERROR,*999)
+
+    VERSION_NUMBER=1;
+    DERIVATIVE_NUMBER=1;
+    IF(ASSOCIATED(INTERFACE_CONDITION)) THEN
+    DO dependent_variable_idx=1,INTERFACE_CONDITION%DEPENDENT%NUMBER_OF_DEPENDENT_VARIABLES
+      !Get the field from the interface dependent field variables
+      FIELD=>INTERFACE_CONDITION%DEPENDENT%FIELD_VARIABLES(dependent_variable_idx)%PTR%FIELD
+      !Get the mesh component number for this field
+      MESH_COMPONENT_NUMBER=FIELD%DECOMPOSITION%MESH_COMPONENT_NUMBER
+      DO comp_idx=1,INTERFACE_CONDITION%INTERFACE%COORDINATE_SYSTEM%NUMBER_OF_DIMENSIONS
+        !Loop through the nodes in the mesh
+        DO node_idx=1,INTERFACE_CONDITION%INTERFACE%COUPLED_MESHES(dependent_variable_idx)%PTR% &
+            & TOPOLOGY(MESH_COMPONENT_NUMBER)%PTR%NODES%NUMBER_OF_NODES
+          ! Add corresponding translation to the nodal coordinates
+          CALL FIELD_PARAMETER_SET_ADD_NODE(FIELD,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE,VERSION_NUMBER, &
+            & DERIVATIVE_NUMBER,node_idx,comp_idx,INTERFACE_CONDITION%TRANSLATIONS(comp_idx,ITERATION_NUMBER, &
+            & dependent_variable_idx),ERR,ERROR,*999)
+          CALL FIELD_PARAMETER_SET_ADD_NODE(FIELD,FIELD_U_VARIABLE_TYPE,FIELD_BOUNDARY_CONDITIONS_SET_TYPE,VERSION_NUMBER, &
+            & DERIVATIVE_NUMBER,node_idx,comp_idx,INTERFACE_CONDITION%TRANSLATIONS(comp_idx,ITERATION_NUMBER, &
+            & dependent_variable_idx),ERR,ERROR,*999)
+        ENDDO
+      ENDDO
+    ENDDO
+      
+    ELSE
+      CALL FLAG_ERROR("Interface condition is not associated.",ERR,ERROR,*999)
+    ENDIF
+    
+    CALL EXITS("INTERFACE_CONDITION_TRANSLATION_INCREMENT_APPLY")
+    RETURN
+999 CALL ERRORS("INTERFACE_CONDITION_TRANSLATION_INCREMENT_APPLY",ERR,ERROR)
+    CALL EXITS("INTERFACE_CONDITION_TRANSLATION_INCREMENT_APPLY")
+    RETURN 1
+  END SUBROUTINE INTERFACE_CONDITION_TRANSLATION_INCREMENT_APPLY
+  
+  !
+  !================================================================================================================================
+  !
+
+  !> Set translation to the interface associated dependent fields at a specific load increment, only for frictionless contact, to introduce penetration
+  SUBROUTINE INTERFACE_CONDITION_TRANSLATION_INCREMENT_SET(INTERFACE_CONDITION,ITERATION_NUMBER, &
+      & DEPENDENT_FIELD_NUMBER,TRANSLATION,ERR,ERROR,*)
+
+    !Argument variables
+    TYPE(INTERFACE_CONDITION_TYPE), POINTER :: INTERFACE_CONDITION 
+    INTEGER(INTG), INTENT(IN) :: ITERATION_NUMBER
+    INTEGER(INTG), INTENT(IN) :: DEPENDENT_FIELD_NUMBER
+    REAL(DP), INTENT(IN) :: TRANSLATION(:)
+    INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
+    !Local Variables
+    INTEGER(INTG) :: dependent_variable_idx,node_idx,comp_idx
+    INTEGER(INTG) :: VERSION_NUMBER,DERIVATIVE_NUMBER,MESH_COMPONENT_NUMBER
+    TYPE(FIELD_TYPE), POINTER :: FIELD !<A pointer to the dependent field to translate
+    TYPE(VARYING_STRING) :: LOCAL_ERROR
+
+    CALL ENTERS("INTERFACE_CONDITION_TRANSLATION_INCREMENT_SET",ERR,ERROR,*999)
+
+    IF(ASSOCIATED(INTERFACE_CONDITION)) THEN
+      IF(ITERATION_NUMBER<=SIZE(INTERFACE_CONDITION%TRANSLATIONS,2)) THEN
+        IF(DEPENDENT_FIELD_NUMBER<=SIZE(INTERFACE_CONDITION%TRANSLATIONS,3)) THEN
+          IF(SIZE(TRANSLATION,1)==SIZE(INTERFACE_CONDITION%TRANSLATIONS,1)) THEN
+            INTERFACE_CONDITION%TRANSLATIONS(:,ITERATION_NUMBER,DEPENDENT_FIELD_NUMBER)=TRANSLATION
+          ELSE
+            CALL FLAG_ERROR("Number of spatial components in translation does not match with the that for the field.", &
+              & ERR,ERROR,*999)
+          ENDIF
+        ELSE
+          CALL FLAG_ERROR("Coupled mesh/ dependent field number is incorrect.",ERR,ERROR,*999)
+        ENDIF
+      ELSE
+        CALL FLAG_ERROR("Load increment number is incorrect.",ERR,ERROR,*999)
+      ENDIF
+      
+    ELSE
+      CALL FLAG_ERROR("Interface condition is not associated.",ERR,ERROR,*999)
+    ENDIF
+    
+    CALL EXITS("INTERFACE_CONDITION_TRANSLATION_INCREMENT_SET")
+    RETURN
+999 CALL ERRORS("INTERFACE_CONDITION_TRANSLATION_INCREMENT_SET",ERR,ERROR)
+    CALL EXITS("INTERFACE_CONDITION_TRANSLATION_INCREMENT_SET")
+    RETURN 1
+  END SUBROUTINE INTERFACE_CONDITION_TRANSLATION_INCREMENT_SET
 
   !
   !================================================================================================================================

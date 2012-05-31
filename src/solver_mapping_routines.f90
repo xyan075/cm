@@ -5044,6 +5044,7 @@ CONTAINS
     TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
     !Local Variables
     INTEGER(INTG) :: equations_matrix_idx,equations_set_idx,interface_condition_idx,interface_matrix_idx,LIST_ITEM(2)
+    INTEGER(INTG) :: NO_COMPONENTS,NO_LOAD_INCREMENTS,NO_COUPLED_MESHES,i,j,k
     INTEGER(INTG) :: number_of_interface_matrices
     LOGICAL :: EQUATIONS_SET_FOUND,VARIABLE_FOUND
     TYPE(EQUATIONS_SET_TYPE), POINTER :: EQUATIONS_SET
@@ -5076,6 +5077,26 @@ CONTAINS
                     CASE(INTERFACE_CONDITION_LAGRANGE_MULTIPLIERS_METHOD,INTERFACE_CONDITION_PENALTY_METHOD)
                       INTERFACE_DEPENDENT=>INTERFACE_CONDITION%DEPENDENT
                       IF(ASSOCIATED(INTERFACE_DEPENDENT)) THEN
+                        !Initialise translation matrix if it's frictionless contact
+                        SELECT CASE(INTERFACE_CONDITION%OPERATOR)
+                        CASE(INTERFACE_CONDITION_FRICTIONLESS_CONTACT_OPERATOR)
+                          IF(SOLVER_MAPPING%SOLVER_EQUATIONS%SOLVER%SOLVERS%CONTROL_LOOP%LOOP_TYPE== &
+                            & PROBLEM_CONTROL_LOAD_INCREMENT_LOOP_TYPE) THEN
+                            NO_COMPONENTS=INTERFACE_CONDITION%INTERFACE%COORDINATE_SYSTEM%NUMBER_OF_DIMENSIONS
+                            NO_LOAD_INCREMENTS=SOLVER_MAPPING%SOLVER_EQUATIONS%SOLVER%SOLVERS%CONTROL_LOOP% &
+                              & LOAD_INCREMENT_LOOP%MAXIMUM_NUMBER_OF_ITERATIONS
+                            NO_COUPLED_MESHES=INTERFACE_DEPENDENT%NUMBER_OF_DEPENDENT_VARIABLES !number of meshes= number of dependent variables
+                            ALLOCATE(INTERFACE_CONDITION%TRANSLATIONS(NO_COMPONENTS,NO_LOAD_INCREMENTS, &
+                              & NO_COUPLED_MESHES),STAT=ERR)
+                            DO i=1,NO_COMPONENTS
+                              DO j=1,NO_LOAD_INCREMENTS
+                                DO k=1,NO_COUPLED_MESHES
+                                  INTERFACE_CONDITION%TRANSLATIONS(i,j,k)=0.0_DP
+                                ENDDO
+                              ENDDO
+                            ENDDO
+                          ENDIF
+                        END SELECT
                         SELECT CASE(INTERFACE_CONDITION%METHOD)
                         CASE(INTERFACE_CONDITION_LAGRANGE_MULTIPLIERS_METHOD)
                           number_of_interface_matrices=INTERFACE_MAPPING%NUMBER_OF_INTERFACE_MATRICES
