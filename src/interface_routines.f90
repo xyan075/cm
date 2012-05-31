@@ -625,8 +625,8 @@ CONTAINS
       NULLIFY(INTERFACE%GENERATED_MESHES)
       NULLIFY(INTERFACE%FIELDS)
       NULLIFY(INTERFACE%INTERFACE_CONDITIONS)
-      NULLIFY(INTERFACE%DATA_POINTS)
       NULLIFY(INTERFACE%COORDINATE_SYSTEM)
+      NULLIFY(INTERFACE%DATA_POINTS)
       CALL MESHES_INITIALISE(INTERFACE,ERR,ERROR,*999)
       CALL GENERATED_MESHES_INITIALISE(INTERFACE,ERR,ERROR,*999)
       CALL FIELDS_INITIALISE(INTERFACE,ERR,ERROR,*999)
@@ -1948,18 +1948,19 @@ CONTAINS
   !================================================================================================================================
   !
   
-    !>Finalises the meshes connectivity and deallocates all memory
-  SUBROUTINE INTERFACE_POINTS_CONNECTIVITY_PROJECTION_RESULTS_SET(POINTS_CON,DATA_POINTS,ERR,ERROR,*)
+    !>Set interface points connectivity
+  SUBROUTINE INTERFACE_POINTS_CONNECTIVITY_PROJECTION_RESULTS_SET(POINTS_CON,DATA_PROJECTION,COUPLED_MESH_IDX,ERR,ERROR,*)
 
     !Argument variables
     TYPE(INTERFACE_POINTS_CONNECTIVITY_TYPE), POINTER :: POINTS_CON !<A pointer to interface points connectivity to set the element number of elements for.
-    TYPE(DATA_POINTS_TYPE), POINTER :: DATA_POINTS !<A pointer to the data points that contains projection results
+    TYPE(DATA_PROJECTION_TYPE), POINTER :: DATA_PROJECTION !<A pointer to the data projection that contains projection results
+    INTEGER(INTG), INTENT(IN) :: COUPLED_MESH_IDX
     INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
     TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
     
     !Local Variables
     TYPE(DATA_PROJECTION_RESULT_TYPE), POINTER :: DATA_PROJECTION_RESULT
-    INTEGER(INTG) :: COMP_NO=1 !\TODO:mesh component number is now hard-coded to be one, need to be 
+    INTEGER(INTG) :: COMP_NO=1 !\TODO:mesh component number is now hard-coded to be one, need to be updated
     INTEGER(INTG) :: data_projection_idx,data_point_idx
     LOGICAL:: POINTS_CON_FINISHED
     TYPE(VARYING_STRING) :: LOCAL_ERROR
@@ -1969,40 +1970,29 @@ CONTAINS
     ! Preliminary error checks to verify user input information
     IF(ASSOCIATED(POINTS_CON)) THEN
       IF (ALLOCATED(POINTS_CON%POINTS_CONNECTIVITY)) THEN
-        IF(ASSOCIATED(DATA_POINTS)) THEN
-          IF(POINTS_CON%NUMBER_INT_DOM==DATA_POINTS%NUMBER_OF_DATA_PROJECTIONS-1) THEN !The last data projection was on the interface mesh for setting up lagrange field
-            IF(POINTS_CON%POINTS_CONNECTIVITY_FINISHED) THEN
-              POINTS_CON%POINTS_CONNECTIVITY_FINISHED=.FALSE.
-              POINTS_CON_FINISHED=.TRUE.
-            ENDIF
-            DO data_projection_idx=1,DATA_POINTS%NUMBER_OF_DATA_PROJECTIONS-1 !The last data projection was on the interface mesh for setting up lagrange field
-              IF(DATA_POINTS%DATA_PROJECTIONS(data_projection_idx)%PTR%DATA_PROJECTION_PROJECTED) THEN
-                DO data_point_idx=1,DATA_POINTS%NUMBER_OF_DATA_POINTS
-                  DATA_PROJECTION_RESULT=>DATA_POINTS%DATA_PROJECTIONS(data_projection_idx)%PTR% &
-                    & DATA_PROJECTION_RESULTS(data_point_idx)
-                  CALL INTERFACE_POINTS_CONNECTIVITY_ELEMENT_NUMBER_SET(POINTS_CON,data_point_idx,data_projection_idx, &
-                    & DATA_PROJECTION_RESULT%ELEMENT_NUMBER,ERR,ERROR,*999)
-                  IF(DATA_PROJECTION_RESULT%ELEMENT_LINE_NUMBER/=0) THEN
-                    CALL INTERFACE_POINTS_CONNECTIVITY_POINT_XI_CONTACT_SET(POINTS_CON,data_point_idx,data_projection_idx, &
-                      & DATA_PROJECTION_RESULT%ELEMENT_NUMBER,DATA_PROJECTION_RESULT%ELEMENT_LINE_NUMBER,COMP_NO, &
-                      & DATA_PROJECTION_RESULT%XI,ERR,ERROR,*999)
-                  ELSEIF(DATA_PROJECTION_RESULT%ELEMENT_FACE_NUMBER/=0) THEN
-                    CALL INTERFACE_POINTS_CONNECTIVITY_POINT_XI_CONTACT_SET(POINTS_CON,data_point_idx,data_projection_idx, &
-                      & DATA_PROJECTION_RESULT%ELEMENT_NUMBER,DATA_PROJECTION_RESULT%ELEMENT_FACE_NUMBER,COMP_NO, &
-                      & DATA_PROJECTION_RESULT%XI,ERR,ERROR,*999)
-                  ENDIF
-                ENDDO !data_point_idx      
-              ELSE
-                LOCAL_ERROR="Data Projection  "//TRIM(NUMBER_TO_VSTRING(data_projection_idx,"*",ERR,ERROR))//" is not projected."        
-                CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
-              ENDIF      
-            ENDDO !data_projection_idx                       
-            IF(POINTS_CON_FINISHED) POINTS_CON%POINTS_CONNECTIVITY_FINISHED=.TRUE.
+        IF(ASSOCIATED(DATA_PROJECTION)) THEN
+          POINTS_CON%POINTS_CONNECTIVITY_FINISHED=.FALSE.
+          IF(DATA_PROJECTION%DATA_PROJECTION_PROJECTED) THEN
+            DO data_point_idx=1,POINTS_CON%NUMBER_OF_DATA_POINTS
+              DATA_PROJECTION_RESULT=>DATA_PROJECTION%DATA_PROJECTION_RESULTS(data_point_idx)
+              CALL INTERFACE_POINTS_CONNECTIVITY_ELEMENT_NUMBER_SET(POINTS_CON,data_point_idx,COUPLED_MESH_IDX, &
+                & DATA_PROJECTION_RESULT%ELEMENT_NUMBER,ERR,ERROR,*999)
+              IF(DATA_PROJECTION_RESULT%ELEMENT_LINE_NUMBER/=0) THEN
+                CALL INTERFACE_POINTS_CONNECTIVITY_POINT_XI_CONTACT_SET(POINTS_CON,data_point_idx,COUPLED_MESH_IDX, &
+                  & DATA_PROJECTION_RESULT%ELEMENT_NUMBER,DATA_PROJECTION_RESULT%ELEMENT_LINE_NUMBER,COMP_NO, &
+                  & DATA_PROJECTION_RESULT%XI,ERR,ERROR,*999)
+              ELSEIF(DATA_PROJECTION_RESULT%ELEMENT_FACE_NUMBER/=0) THEN
+                CALL INTERFACE_POINTS_CONNECTIVITY_POINT_XI_CONTACT_SET(POINTS_CON,data_point_idx,COUPLED_MESH_IDX, &
+                  & DATA_PROJECTION_RESULT%ELEMENT_NUMBER,DATA_PROJECTION_RESULT%ELEMENT_FACE_NUMBER,COMP_NO, &
+                  & DATA_PROJECTION_RESULT%XI,ERR,ERROR,*999)
+              ENDIF
+            ENDDO !data_point_idx      
           ELSE
-            CALL FLAG_ERROR("Number of coupled mesh does not match number of data projections.",ERR,ERROR,*999)
-          ENDIF
+            LOCAL_ERROR="Data Projection  "//TRIM(NUMBER_TO_VSTRING(data_projection_idx,"*",ERR,ERROR))//" is not projected."        
+            CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
+          ENDIF                           
         ELSE
-          CALL FLAG_ERROR("Data points is not associated.",ERR,ERROR,*999)
+          CALL FLAG_ERROR("Data projection is not associated.",ERR,ERROR,*999)
         ENDIF        
       ELSE
         CALL FLAG_ERROR("Interface points connectivity array not allocated.",ERR,ERROR,*999)

@@ -198,8 +198,8 @@ CONTAINS
                   VARIABLE_DOMAIN_MAPPING=>FIELD_VARIABLE%DOMAIN_MAPPING
                   IF(ASSOCIATED(VARIABLE_DOMAIN_MAPPING)) THEN
                     SEND_COUNT=VARIABLE_DOMAIN_MAPPING%NUMBER_OF_GLOBAL
-!!This operation is a little expensive as we are doing an unnecessary sum across all the ranks in order to combin
-!!the data from each rank into all ranks. We will see how this goes for now.
+                    !\todo This operation is a little expensive as we are doing an unnecessary sum across all the ranks in order to combin
+                    !\todo the data from each rank into all ranks. We will see how this goes for now.
                     CALL MPI_ALLREDUCE(MPI_IN_PLACE,BOUNDARY_CONDITION_VARIABLE%DOF_TYPES, &
                       & SEND_COUNT,MPI_INTEGER,MPI_SUM,COMPUTATIONAL_ENVIRONMENT%MPI_COMM,MPI_IERROR)
                     CALL MPI_ERROR_CHECK("MPI_ALLREDUCE",MPI_IERROR,ERR,ERROR,*999)
@@ -299,10 +299,10 @@ CONTAINS
                                   LINEAR_MATRICES=>EQUATIONS_MATRICES%LINEAR_MATRICES
                                   IF(ASSOCIATED(LINEAR_MATRICES)) THEN
                                     !Iterate through equations matrices
-                                    DO equations_matrix_idx=1,LINEAR_MATRICES%NUMBER_OF_LINEAR_MATRICES
-                                      EQUATION_MATRIX=>LINEAR_MATRICES%MATRICES(equations_matrix_idx)%PTR
+                                    DO equ_matrix_idx=1,LINEAR_MATRICES%NUMBER_OF_LINEAR_MATRICES
+                                      EQUATION_MATRIX=>LINEAR_MATRICES%MATRICES(equ_matrix_idx)%PTR
+                                      CALL DISTRIBUTED_MATRIX_STORAGE_TYPE_GET(EQUATION_MATRIX%MATRIX,STORAGE_TYPE,ERR,ERROR,*999)
                                       IF(ASSOCIATED(EQUATION_MATRIX)) THEN
-                                        CALL DISTRIBUTED_MATRIX_STORAGE_TYPE_GET(EQUATION_MATRIX%MATRIX,STORAGE_TYPE,ERR,ERROR,*999)
                                         SELECT CASE(STORAGE_TYPE)
                                         CASE(DISTRIBUTED_MATRIX_BLOCK_STORAGE_TYPE)
                                           !Do nothing
@@ -323,12 +323,12 @@ CONTAINS
                                           NUMBER_OF_ROWS=EQUATIONS_MATRICES%TOTAL_NUMBER_OF_ROWS
                                           !Initialise sparsity indices arrays
                                           CALL BOUNDARY_CONDITIONS_SPARSITY_INDICES_INITIALISE(BOUNDARY_CONDITIONS_DIRICHLET% &
-                                            & LINEAR_SPARSITY_INDICES(equations_set_idx,equations_matrix_idx)%PTR, &
+                                            & LINEAR_SPARSITY_INDICES(equations_set_idx,equ_matrix_idx)%PTR, &
                                             & BOUNDARY_CONDITION_VARIABLE%NUMBER_OF_DIRICHLET_CONDITIONS,ERR,ERROR,*999)
                                           !Find dirichlet columns and store the non zero indices (with respect to the 1D storage array)
                                           NULLIFY(SPARSITY_INDICES)
                                           SPARSITY_INDICES=>BOUNDARY_CONDITIONS_DIRICHLET%LINEAR_SPARSITY_INDICES( &
-                                              & equations_set_idx,equations_matrix_idx)%PTR
+                                            & equations_set_idx,equ_matrix_idx)%PTR
                                           IF(ASSOCIATED(SPARSITY_INDICES)) THEN
                                             !Setup list for storing dirichlet non zero indices
                                             NULLIFY(SPARSE_INDICES)
@@ -378,10 +378,10 @@ CONTAINS
                                   DYNAMIC_MATRICES=>EQUATIONS_MATRICES%DYNAMIC_MATRICES
                                   IF(ASSOCIATED(DYNAMIC_MATRICES)) THEN
                                     !Iterate through equations matrices
-                                    DO equations_matrix_idx=1,DYNAMIC_MATRICES%NUMBER_OF_DYNAMIC_MATRICES
-                                      EQUATION_MATRIX=>DYNAMIC_MATRICES%MATRICES(equations_matrix_idx)%PTR
+                                    DO equ_matrix_idx=1,DYNAMIC_MATRICES%NUMBER_OF_DYNAMIC_MATRICES
+                                      EQUATION_MATRIX=>DYNAMIC_MATRICES%MATRICES(equ_matrix_idx)%PTR
+                                      CALL DISTRIBUTED_MATRIX_STORAGE_TYPE_GET(EQUATION_MATRIX%MATRIX,STORAGE_TYPE,ERR,ERROR,*999)
                                       IF(ASSOCIATED(EQUATION_MATRIX)) THEN
-                                        CALL DISTRIBUTED_MATRIX_STORAGE_TYPE_GET(EQUATION_MATRIX%MATRIX,STORAGE_TYPE,ERR,ERROR,*999)
                                         SELECT CASE(STORAGE_TYPE)
                                         CASE(DISTRIBUTED_MATRIX_BLOCK_STORAGE_TYPE)
                                           !Do nothing
@@ -402,12 +402,12 @@ CONTAINS
                                           NUMBER_OF_ROWS=EQUATIONS_MATRICES%TOTAL_NUMBER_OF_ROWS
                                           !Intialise sparsity indices arrays
                                           CALL BOUNDARY_CONDITIONS_SPARSITY_INDICES_INITIALISE(BOUNDARY_CONDITIONS_DIRICHLET% &
-                                            & DYNAMIC_SPARSITY_INDICES(equations_set_idx,equations_matrix_idx)%PTR, &
+                                            & DYNAMIC_SPARSITY_INDICES(equations_set_idx,equ_matrix_idx)%PTR, &
                                             & BOUNDARY_CONDITION_VARIABLE%NUMBER_OF_DIRICHLET_CONDITIONS,ERR,ERROR,*999)
                                           !Find dirichlet columns and store the non zero indices (with respect to the 1D storage array)
                                           NULLIFY(SPARSITY_INDICES)
                                           SPARSITY_INDICES=>BOUNDARY_CONDITIONS_DIRICHLET%DYNAMIC_SPARSITY_INDICES( &
-                                              & equations_set_idx,equations_matrix_idx)%PTR
+                                              & equations_set_idx,equ_matrix_idx)%PTR
                                           IF(ASSOCIATED(SPARSITY_INDICES)) THEN
                                             ! Setup list for storing dirichlet non zero indices
                                             NULLIFY(SPARSE_INDICES)
@@ -770,7 +770,7 @@ CONTAINS
     TYPE(EQUATIONS_MAPPING_DYNAMIC_TYPE), POINTER :: DYNAMIC_MAPPING
     TYPE(EQUATIONS_MAPPING_LINEAR_TYPE), POINTER :: LINEAR_MAPPING
     TYPE(EQUATIONS_MAPPING_NONLINEAR_TYPE), POINTER :: NONLINEAR_MAPPING
-    TYPE(EQUATIONS_MAPPING_RHS_TYPE), POINTER :: EQUATIONS_RHS_MAPPING
+    TYPE(EQUATIONS_MAPPING_RHS_TYPE), POINTER :: RHS_MAPPING
     TYPE(INTERFACE_CONDITION_TYPE), POINTER :: INTERFACE_CONDITION
     TYPE(INTERFACE_EQUATIONS_TYPE), POINTER :: INTERFACE_EQUATIONS
     TYPE(INTERFACE_MAPPING_TYPE), POINTER :: INTERFACE_MAPPING
@@ -815,10 +815,10 @@ CONTAINS
                           ELSE
                             CALL FLAG_ERROR("Equations mapping linear mapping is not associated.",ERR,ERROR,*999)
                           ENDIF
-                          EQUATIONS_RHS_MAPPING=>EQUATIONS_MAPPING%RHS_MAPPING
-                          IF(ASSOCIATED(EQUATIONS_RHS_MAPPING)) THEN
+                          RHS_MAPPING=>EQUATIONS_MAPPING%RHS_MAPPING
+                          IF(ASSOCIATED(RHS_MAPPING)) THEN
                             CALL BOUNDARY_CONDITIONS_VARIABLE_INITIALISE(SOLVER_EQUATIONS%BOUNDARY_CONDITIONS, &
-                                & EQUATIONS_RHS_MAPPING%RHS_VARIABLE,ERR,ERROR,*999)
+                                & RHS_MAPPING%RHS_VARIABLE,ERR,ERROR,*999)
                           ENDIF
                         CASE(EQUATIONS_NONLINEAR)
                           NONLINEAR_MAPPING=>EQUATIONS_MAPPING%NONLINEAR_MAPPING
@@ -830,10 +830,10 @@ CONTAINS
                           ELSE
                             CALL FLAG_ERROR("Equations mapping nonlinear mapping is not associated.",ERR,ERROR,*999)
                           ENDIF
-                          EQUATIONS_RHS_MAPPING=>EQUATIONS_MAPPING%RHS_MAPPING
-                          IF(ASSOCIATED(EQUATIONS_RHS_MAPPING)) THEN
+                          RHS_MAPPING=>EQUATIONS_MAPPING%RHS_MAPPING
+                          IF(ASSOCIATED(RHS_MAPPING)) THEN
                             CALL BOUNDARY_CONDITIONS_VARIABLE_INITIALISE(SOLVER_EQUATIONS%BOUNDARY_CONDITIONS, &
-                                & EQUATIONS_RHS_MAPPING%RHS_VARIABLE,ERR,ERROR,*999)
+                                & RHS_MAPPING%RHS_VARIABLE,ERR,ERROR,*999)
                           ELSE
                             CALL FLAG_ERROR("Equations mapping RHS mapping is not associated.",ERR,ERROR,*999)
                           ENDIF
@@ -852,10 +852,10 @@ CONTAINS
                           ELSE
                             CALL FLAG_ERROR("Equations mapping dynamic mapping is not associated.",ERR,ERROR,*999)
                           ENDIF
-                          EQUATIONS_RHS_MAPPING=>EQUATIONS_MAPPING%RHS_MAPPING
-                          IF(ASSOCIATED(EQUATIONS_RHS_MAPPING)) THEN
+                          RHS_MAPPING=>EQUATIONS_MAPPING%RHS_MAPPING
+                          IF(ASSOCIATED(RHS_MAPPING)) THEN
                             CALL BOUNDARY_CONDITIONS_VARIABLE_INITIALISE(SOLVER_EQUATIONS%BOUNDARY_CONDITIONS, &
-                                & EQUATIONS_RHS_MAPPING%RHS_VARIABLE,ERR,ERROR,*999)
+                                & RHS_MAPPING%RHS_VARIABLE,ERR,ERROR,*999)
                           ELSE
                             CALL FLAG_ERROR("Equations mapping RHS mapping is not associated.",ERR,ERROR,*999)
                           ENDIF
@@ -867,10 +867,10 @@ CONTAINS
                           ELSE
                             CALL FLAG_ERROR("Equations mapping dynamic mapping is not associated.",ERR,ERROR,*999)
                           ENDIF
-                          EQUATIONS_RHS_MAPPING=>EQUATIONS_MAPPING%RHS_MAPPING
-                          IF(ASSOCIATED(EQUATIONS_RHS_MAPPING)) THEN
+                          RHS_MAPPING=>EQUATIONS_MAPPING%RHS_MAPPING
+                          IF(ASSOCIATED(RHS_MAPPING)) THEN
                             CALL BOUNDARY_CONDITIONS_VARIABLE_INITIALISE(SOLVER_EQUATIONS%BOUNDARY_CONDITIONS, &
-                                & EQUATIONS_RHS_MAPPING%RHS_VARIABLE,ERR,ERROR,*999)
+                                & RHS_MAPPING%RHS_VARIABLE,ERR,ERROR,*999)
                           ELSE
                             CALL FLAG_ERROR("Equations mapping RHS mapping is not associated.",ERR,ERROR,*999)
                           ENDIF
@@ -3866,15 +3866,15 @@ CONTAINS
     INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
     TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
     !Local Variables
-    INTEGER(INTG) :: equ_set_idx, equations_matrix_idx
+    INTEGER(INTG) :: equ_set_idx, equ_matrix_idx
     TYPE(BOUNDARY_CONDITIONS_SPARSITY_INDICES_TYPE), POINTER :: SPARSITY_INDICES
     
     CALL ENTERS("BOUNDARY_CONDITIONS_SPARSITY_INDICES_ARRAY_FINALISE",ERR,ERROR,*999)
     
     IF (ALLOCATED(SPARSITY_INDICES_ARRAY)) THEN
       DO equ_set_idx=1,SIZE(SPARSITY_INDICES_ARRAY,1)
-        DO equations_matrix_idx=1,SIZE(SPARSITY_INDICES_ARRAY,2)
-          SPARSITY_INDICES=>SPARSITY_INDICES_ARRAY(equ_set_idx,equations_matrix_idx)%PTR
+        DO equ_matrix_idx=1,SIZE(SPARSITY_INDICES_ARRAY,2)
+          SPARSITY_INDICES=>SPARSITY_INDICES_ARRAY(equ_set_idx,equ_matrix_idx)%PTR
           IF(ASSOCIATED(SPARSITY_INDICES)) THEN
             IF(ALLOCATED(SPARSITY_INDICES%SPARSE_ROW_INDICES)) THEN
               DEALLOCATE(SPARSITY_INDICES%SPARSE_ROW_INDICES)

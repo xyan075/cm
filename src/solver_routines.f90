@@ -11923,10 +11923,6 @@ CONTAINS
                                 IF(ASSOCIATED(INTERFACE_RHS_MAPPING)) THEN
                                   INTERFACE_MATRICES=>INTERFACE_EQUATIONS%INTERFACE_MATRICES
                                   IF(ASSOCIATED(INTERFACE_MATRICES)) THEN
-                                    RHS_VARIABLE_TYPE=INTERFACE_RHS_MAPPING%RHS_VARIABLE_TYPE
-                                    NULLIFY(RHS_PARAMETERS)
-                                    CALL FIELD_PARAMETER_SET_DATA_GET(LAGRANGE_FIELD,RHS_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE, &
-                                      & RHS_PARAMETERS,ERR,ERROR,*999)
                                     INTERFACE_RHS_VECTOR=>INTERFACE_MATRICES%RHS_VECTOR
                                     IF(ASSOCIATED(INTERFACE_RHS_VECTOR)) THEN
                                       !Worry about BCs on the Lagrange variables later.
@@ -15338,6 +15334,7 @@ CONTAINS
                           IF(ASSOCIATED(DEPENDENT_VARIABLE)) THEN
                             variable_type=DEPENDENT_VARIABLE%VARIABLE_TYPE
                             DEPENDENT_FIELD=>DEPENDENT_VARIABLE%FIELD
+                            NULLIFY(VARIABLE_DATA)
                             CALL FIELD_PARAMETER_SET_DATA_GET(DEPENDENT_FIELD,variable_type,FIELD_VALUES_SET_TYPE,VARIABLE_DATA, &
                               & ERR,ERROR,*999)
                             DO variable_dof_idx=1,DEPENDENT_VARIABLE%NUMBER_OF_DOFS
@@ -15369,6 +15366,7 @@ CONTAINS
                         IF(ASSOCIATED(DEPENDENT_VARIABLE)) THEN
                           variable_type=LAGRANGE_VARIABLE%VARIABLE_TYPE
                           LAGRANGE_FIELD=>LAGRANGE_VARIABLE%FIELD
+                          NULLIFY(VARIABLE_DATA)
                           CALL FIELD_PARAMETER_SET_DATA_GET(LAGRANGE_FIELD,variable_type,FIELD_VALUES_SET_TYPE,VARIABLE_DATA, &
                             & ERR,ERROR,*999)
                           DO variable_dof_idx=1,LAGRANGE_VARIABLE%NUMBER_OF_DOFS
