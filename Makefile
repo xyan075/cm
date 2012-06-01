@@ -1138,6 +1138,7 @@ $(OBJECT_DIR)/interface_conditions_constants.o	:	$(SOURCE_DIR)/interface_conditi
 $(OBJECT_DIR)/interface_conditions_routines.o	:	$(SOURCE_DIR)/interface_conditions_routines.f90 \
 	$(OBJECT_DIR)/base_routines.o \
 	$(OBJECT_DIR)/basis_routines.o \
+	$(OBJECT_DIR)/boundary_condition_routines.o \
 	$(OBJECT_DIR)/data_point_routines.o \
 	$(OBJECT_DIR)/data_projection_routines.o \
 	$(OBJECT_DIR)/field_routines.o \

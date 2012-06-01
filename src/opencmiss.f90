@@ -1768,6 +1768,12 @@ MODULE OPENCMISS
     MODULE PROCEDURE CMISSDataProjection_NumberOfClosestElementsSetNumber
     MODULE PROCEDURE CMISSDataProjection_NumberOfClosestElementsSetObj
   END INTERFACE !CMISSDataProjection_NumberOfClosestElementsSet
+  
+  !>Sets/changes the projection type for a data projection.
+  INTERFACE CMISSDataProjection_ProjectionElementsSet
+    MODULE PROCEDURE CMISSDataProjection_ProjectionElementsSetNumber
+    MODULE PROCEDURE CMISSDataProjection_ProjectionElementsSetObj
+  END INTERFACE !CMISSDataProjection_ProjectionElementsSet
 
   !>Returns the projection type for a data projection.
   INTERFACE CMISSDataProjection_ProjectionTypeGet
@@ -1872,13 +1878,14 @@ MODULE OPENCMISS
   PUBLIC CMISSDataProjection_MaximumNumberOfIterationsGet,CMISSDataProjection_MaximumNumberOfIterationsSet
 
   PUBLIC CMISSDataProjection_NumberOfClosestElementsGet,CMISSDataProjection_NumberOfClosestElementsSet
+  
+  PUBLIC CMISSDataProjection_ProjectionElementsSet
 
   PUBLIC CMISSDataProjection_ProjectionTypeGet,CMISSDataProjection_ProjectionTypeSet
 
   PUBLIC CMISSDataProjection_RelativeToleranceGet,CMISSDataProjection_RelativeToleranceSet
 
   PUBLIC CMISSDataProjection_StartingXiGet,CMISSDataProjection_StartingXiSet
-  
 
   PUBLIC CMISSDataProjection_XiSet,CMISSDataProjection_ElementSet
 
@@ -19710,6 +19717,82 @@ CONTAINS
     RETURN
 
   END SUBROUTINE CMISSDataProjection_NumberOfClosestElementsSetObj
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Sets/changes the projection type of data projection identified by a region user number.
+  SUBROUTINE CMISSDataProjection_ProjectionElementsSetNumber(dataProjectionUserNumber,regionUserNumber, &
+      & projectionElementNumbers,projectionFaceNumbers,err)
+
+    !Argument variables
+    INTEGER(INTG), INTENT(IN) :: dataProjectionUserNumber !<The data projection user number of the data projection to get starting xi for.
+    INTEGER(INTG), INTENT(IN) :: regionUserNumber !<The region use number of data projection to set projection type for.
+    INTEGER(INTG), INTENT(IN) :: projectionElementNumbers(:) !< The global candidate element number for the projection
+    INTEGER(INTG), INTENT(IN) :: projectionFaceNumbers(:) !<The element candidate face
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code.
+    !Local variables
+    TYPE(REGION_TYPE), POINTER :: REGION
+    TYPE(DATA_POINTS_TYPE), POINTER :: DATA_POINTS
+    TYPE(DATA_PROJECTION_TYPE), POINTER :: DATA_PROJECTION
+    TYPE(VARYING_STRING) :: LOCAL_ERROR
+    INTEGER(INTG) :: GLOBAL_NUMBER !<The data projection global number.
+
+    CALL ENTERS("CMISSDataProjection_ProjectionElementsSetNumber",err,error,*999)
+
+    NULLIFY(REGION)
+    NULLIFY(DATA_POINTS)
+    NULLIFY(DATA_PROJECTION)
+    CALL REGION_USER_NUMBER_FIND(regionUserNumber,REGION,err,error,*999)
+    IF(ASSOCIATED(REGION)) THEN
+      CALL REGION_DATA_POINTS_GET(REGION,DATA_POINTS,err,error,*999)
+      CALL DATA_POINTS_DATA_PROJECTION_GLOBAL_NUMBER_GET(DATA_POINTS,DataProjectionUserNumber,GLOBAL_NUMBER,err,ERROR,*999)
+      CALL DATA_POINTS_DATA_PROJECTION_GET(DATA_POINTS,GLOBAL_NUMBER,DATA_PROJECTION,err,ERROR,*999)
+      CALL DATA_PROJECTION_PROJECTION_ELEMENTS_SET(DATA_PROJECTION,projectionElementNumbers,projectionFaceNumbers,err,error,*999)
+    ELSE
+      LOCAL_ERROR="A region with an user number of "//TRIM(NUMBER_TO_VSTRING(regionUserNumber,"*",err,error))// &
+        & " does not exist."
+      CALL FLAG_ERROR(LOCAL_ERROR,err,error,*999)
+    END IF
+
+    CALL EXITS("CMISSDataProjection_ProjectionElementsSetNumber")
+    RETURN
+999 CALL ERRORS("CMISSDataProjection_ProjectionElementsSetNumber",err,error)
+    CALL EXITS("CMISSDataProjection_ProjectionElementsSetNumber")
+    CALL CMISS_HANDLE_ERROR(err,error)
+    RETURN
+
+  END SUBROUTINE CMISSDataProjection_ProjectionElementsSetNumber
+
+  !
+  !================================================================================================================================
+  !
+
+  !>Sets/changes the projection type of data projection identified an object.
+  SUBROUTINE CMISSDataProjection_ProjectionElementsSetObj(dataProjection,projectionElementNumbers, &
+      & projectionFaceNumbers,err)
+
+    !Argument variables
+    TYPE(CMISSDataProjectionType), INTENT(INOUT) :: dataProjection !<The data projection to set projection type for.
+    INTEGER(INTG), INTENT(IN) :: projectionElementNumbers(:) !< The global candidate element number for the projection
+    INTEGER(INTG), INTENT(IN) :: projectionFaceNumbers(:) !<The element candidate face
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code.
+    !Local variables
+
+    CALL ENTERS("CMISSDataProjection_ProjectionElementsSetObj",err,error,*999)
+
+    CALL DATA_PROJECTION_PROJECTION_ELEMENTS_SET(dataProjection%DATA_PROJECTION,projectionElementNumbers,projectionFaceNumbers, &
+      & err,error,*999)
+
+    CALL EXITS("CMISSDataProjection_ProjectionElementsSetObj")
+    RETURN
+999 CALL ERRORS("CMISSDataProjection_ProjectionElementsSetObj",err,error)
+    CALL EXITS("CMISSDataProjection_ProjectionElementsSetObj")
+    CALL CMISS_HANDLE_ERROR(err,error)
+    RETURN
+
+  END SUBROUTINE CMISSDataProjection_ProjectionElementsSetObj
 
   !
   !================================================================================================================================

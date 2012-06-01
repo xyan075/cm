@@ -301,6 +301,8 @@ MODULE TYPES
     REAL(DP) :: RELATIVE_TOLERANCE !<The relative tolerance of the iteration update
     LOGICAL :: DATA_PROJECTION_PROJECTED !<Is .TRUE. if the data projection have been projected, .FALSE. if not.
     TYPE(DATA_PROJECTION_RESULT_TYPE), ALLOCATABLE :: DATA_PROJECTION_RESULTS(:)
+    INTEGER(INTG), ALLOCATABLE :: CANDIDATE_ELEMENT_NUMBERS(:) !Global candidate element numbers 
+    INTEGER(INTG), ALLOCATABLE :: CANDIDATE_FACE_NUMBERS(:) !Element candidate face/line numbers
   END TYPE DATA_PROJECTION_TYPE
   
   !>A buffer type to allow for an array of pointers to a MESH_TOPOLOGY_TYPE.

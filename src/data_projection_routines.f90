@@ -108,6 +108,8 @@ MODULE DATA_PROJECTION_ROUTINES
   
   PUBLIC DATA_PROJECTION_NUMBER_OF_CLOSEST_ELEMENTS_GET,DATA_PROJECTION_NUMBER_OF_CLOSEST_ELEMENTS_SET
   
+  PUBLIC DATA_PROJECTION_PROJECTION_ELEMENTS_SET
+  
   PUBLIC DATA_PROJECTION_PROJECTION_TYPE_GET,DATA_PROJECTION_PROJECTION_TYPE_SET
   
   PUBLIC DATA_PROJECTION_RELATIVE_TOLERANCE_GET,DATA_PROJECTION_RELATIVE_TOLERANCE_SET
@@ -852,60 +854,74 @@ CONTAINS
               NUMBER_OF_FACES=DOMAIN%TOPOLOGY%FACES%NUMBER_OF_FACES
               NUMBER_OF_LINES=DOMAIN%TOPOLOGY%LINES%NUMBER_OF_LINES        
               NUMBER_OF_CANDIDATES=0
-              SELECT CASE(DATA_PROJECTION%PROJECTION_TYPE)
-                CASE (DATA_PROJECTION_BOUNDARY_LINES_PROJECTION_TYPE)  !identify all non-ghost boundary lines
-                  ALLOCATE(CANDIDATE_ELEMENTS(NUMBER_OF_LINES),STAT=ERR)
-                  IF(ERR/=0) CALL FLAG_ERROR("Could not allocate candidate elements.",ERR,ERROR,*999)
-                  ALLOCATE(CANDIDATE_FACES(NUMBER_OF_LINES),STAT=ERR)
-                  IF(ERR/=0) CALL FLAG_ERROR("Could not allocate candidate lines.",ERR,ERROR,*999)
-                  DO ne=DOMAIN%MAPPINGS%ELEMENTS%INTERNAL_START,DOMAIN%MAPPINGS%ELEMENTS%BOUNDARY_FINISH
-                    IF(DECOMPOSITION%TOPOLOGY%ELEMENTS%ELEMENTS(ne)%BOUNDARY_ELEMENT) THEN
-                      DO nse=1,SIZE(DECOMPOSITION%TOPOLOGY%ELEMENTS%ELEMENTS(ne)%ELEMENT_LINES,1)
-                        temp_number=DECOMPOSITION%TOPOLOGY%ELEMENTS%ELEMENTS(ne)%ELEMENT_LINES(nse)
-                        IF(DECOMPOSITION%TOPOLOGY%LINES%LINES(temp_number)%BOUNDARY_LINE) THEN
-                          NUMBER_OF_CANDIDATES=NUMBER_OF_CANDIDATES+1
-                          CANDIDATE_FACES(NUMBER_OF_CANDIDATES)=nse
-                          CANDIDATE_ELEMENTS(NUMBER_OF_CANDIDATES)=ne
-                        ENDIF !boundary line
-                      ENDDO !nse
-                    ENDIF !boundary element
-                  ENDDO !ne
-                CASE (DATA_PROJECTION_BOUNDARY_FACES_PROJECTION_TYPE) !identify all non-ghost boundary faces
-                  IF(DECOMPOSITION%MESH%NUMBER_OF_DIMENSIONS>=2) THEN
-                    ALLOCATE(CANDIDATE_ELEMENTS(NUMBER_OF_FACES),STAT=ERR)
+              IF(ALLOCATED(DATA_PROJECTION%CANDIDATE_ELEMENT_NUMBERS) .AND. ALLOCATED(DATA_PROJECTION%CANDIDATE_FACE_NUMBERS)) THEN
+                NUMBER_OF_CANDIDATES=SIZE(DATA_PROJECTION%CANDIDATE_ELEMENT_NUMBERS,1)
+                SELECT CASE(DATA_PROJECTION%PROJECTION_TYPE)
+                !identify all non-ghost boundary lines OR all non-ghost boundary faces
+                CASE (DATA_PROJECTION_BOUNDARY_LINES_PROJECTION_TYPE,DATA_PROJECTION_BOUNDARY_FACES_PROJECTION_TYPE)  !identify all non-ghost boundary lines
+                  CANDIDATE_FACES=DATA_PROJECTION%CANDIDATE_FACE_NUMBERS
+                  CANDIDATE_ELEMENTS=DATA_PROJECTION%CANDIDATE_ELEMENT_NUMBERS
+                CASE (DATA_PROJECTION_ALL_ELEMENTS_PROJECTION_TYPE) !identify all non-ghost elements
+                  CANDIDATE_ELEMENTS=DATA_PROJECTION%CANDIDATE_ELEMENT_NUMBERS
+                CASE DEFAULT
+                  CALL FLAG_ERROR("No match for data projection type found",ERR,ERROR,*999)
+                END SELECT !DATA_PROJECTION%PROJECTION_TYPE
+              ELSE
+                SELECT CASE(DATA_PROJECTION%PROJECTION_TYPE)
+                  CASE (DATA_PROJECTION_BOUNDARY_LINES_PROJECTION_TYPE)  !identify all non-ghost boundary lines
+                    ALLOCATE(CANDIDATE_ELEMENTS(NUMBER_OF_LINES),STAT=ERR)
                     IF(ERR/=0) CALL FLAG_ERROR("Could not allocate candidate elements.",ERR,ERROR,*999)
-                    ALLOCATE(CANDIDATE_FACES(NUMBER_OF_FACES),STAT=ERR)
-                    IF(ERR/=0) CALL FLAG_ERROR("Could not allocate candidate faces.",ERR,ERROR,*999)
+                    ALLOCATE(CANDIDATE_FACES(NUMBER_OF_LINES),STAT=ERR)
+                    IF(ERR/=0) CALL FLAG_ERROR("Could not allocate candidate lines.",ERR,ERROR,*999)
                     DO ne=DOMAIN%MAPPINGS%ELEMENTS%INTERNAL_START,DOMAIN%MAPPINGS%ELEMENTS%BOUNDARY_FINISH
                       IF(DECOMPOSITION%TOPOLOGY%ELEMENTS%ELEMENTS(ne)%BOUNDARY_ELEMENT) THEN
-                        DO nse=1,SIZE(DECOMPOSITION%TOPOLOGY%ELEMENTS%ELEMENTS(ne)%ELEMENT_FACES,1)
-                          temp_number=DECOMPOSITION%TOPOLOGY%ELEMENTS%ELEMENTS(ne)%ELEMENT_FACES(nse)
-                          IF(DECOMPOSITION%TOPOLOGY%FACES%FACES(temp_number)%BOUNDARY_FACE) THEN
+                        DO nse=1,SIZE(DECOMPOSITION%TOPOLOGY%ELEMENTS%ELEMENTS(ne)%ELEMENT_LINES,1)
+                          temp_number=DECOMPOSITION%TOPOLOGY%ELEMENTS%ELEMENTS(ne)%ELEMENT_LINES(nse)
+                          IF(DECOMPOSITION%TOPOLOGY%LINES%LINES(temp_number)%BOUNDARY_LINE) THEN
                             NUMBER_OF_CANDIDATES=NUMBER_OF_CANDIDATES+1
                             CANDIDATE_FACES(NUMBER_OF_CANDIDATES)=nse
                             CANDIDATE_ELEMENTS(NUMBER_OF_CANDIDATES)=ne
-                          ENDIF !boundary face
+                          ENDIF !boundary line
                         ENDDO !nse
                       ENDIF !boundary element
                     ENDDO !ne
-                  ELSE
-                    CALL FLAG_ERROR("Decomposition mesh number of dimensions has to be 2 or greater.",ERR,ERROR,*999)        
-                  ENDIF
-                CASE (DATA_PROJECTION_ALL_ELEMENTS_PROJECTION_TYPE) !identify all non-ghost elements
-                  IF(DATA_PROJECTION%NUMBER_OF_XI==DECOMPOSITION%MESH%NUMBER_OF_DIMENSIONS) THEN
-                    ALLOCATE(CANDIDATE_ELEMENTS(NUMBER_OF_ELEMENTS),STAT=ERR)
-                    IF(ERR/=0) CALL FLAG_ERROR("Could not allocate candidate elements.",ERR,ERROR,*999)
-                    DO ne=DOMAIN%MAPPINGS%ELEMENTS%INTERNAL_START,DOMAIN%MAPPINGS%ELEMENTS%BOUNDARY_FINISH
-                      NUMBER_OF_CANDIDATES=NUMBER_OF_CANDIDATES+1
-                      CANDIDATE_ELEMENTS(NUMBER_OF_CANDIDATES)=ne
-                    ENDDO
-                  ELSE
-                    CALL FLAG_ERROR("Data projection number of xi has to equal to decomposition mesh number of dimensions",ERR, &
-                      & ERROR,*999)
-                  ENDIF
-                CASE DEFAULT
-                  CALL FLAG_ERROR("No match for data projection type found",ERR,ERROR,*999)
-              END SELECT !DATA_PROJECTION%PROJECTION_TYPE
+                  CASE (DATA_PROJECTION_BOUNDARY_FACES_PROJECTION_TYPE) !identify all non-ghost boundary faces
+                    IF(DECOMPOSITION%MESH%NUMBER_OF_DIMENSIONS>=2) THEN
+                      ALLOCATE(CANDIDATE_ELEMENTS(NUMBER_OF_FACES),STAT=ERR)
+                      IF(ERR/=0) CALL FLAG_ERROR("Could not allocate candidate elements.",ERR,ERROR,*999)
+                      ALLOCATE(CANDIDATE_FACES(NUMBER_OF_FACES),STAT=ERR)
+                      IF(ERR/=0) CALL FLAG_ERROR("Could not allocate candidate faces.",ERR,ERROR,*999)
+                      DO ne=DOMAIN%MAPPINGS%ELEMENTS%INTERNAL_START,DOMAIN%MAPPINGS%ELEMENTS%BOUNDARY_FINISH
+                        IF(DECOMPOSITION%TOPOLOGY%ELEMENTS%ELEMENTS(ne)%BOUNDARY_ELEMENT) THEN
+                          DO nse=1,SIZE(DECOMPOSITION%TOPOLOGY%ELEMENTS%ELEMENTS(ne)%ELEMENT_FACES,1)
+                            temp_number=DECOMPOSITION%TOPOLOGY%ELEMENTS%ELEMENTS(ne)%ELEMENT_FACES(nse)
+                            IF(DECOMPOSITION%TOPOLOGY%FACES%FACES(temp_number)%BOUNDARY_FACE) THEN
+                              NUMBER_OF_CANDIDATES=NUMBER_OF_CANDIDATES+1
+                              CANDIDATE_FACES(NUMBER_OF_CANDIDATES)=nse
+                              CANDIDATE_ELEMENTS(NUMBER_OF_CANDIDATES)=ne
+                            ENDIF !boundary face
+                          ENDDO !nse
+                        ENDIF !boundary element
+                      ENDDO !ne
+                    ELSE
+                      CALL FLAG_ERROR("Decomposition mesh number of dimensions has to be 2 or greater.",ERR,ERROR,*999)        
+                    ENDIF
+                  CASE (DATA_PROJECTION_ALL_ELEMENTS_PROJECTION_TYPE) !identify all non-ghost elements
+                    IF(DATA_PROJECTION%NUMBER_OF_XI==DECOMPOSITION%MESH%NUMBER_OF_DIMENSIONS) THEN
+                      ALLOCATE(CANDIDATE_ELEMENTS(NUMBER_OF_ELEMENTS),STAT=ERR)
+                      IF(ERR/=0) CALL FLAG_ERROR("Could not allocate candidate elements.",ERR,ERROR,*999)
+                      DO ne=DOMAIN%MAPPINGS%ELEMENTS%INTERNAL_START,DOMAIN%MAPPINGS%ELEMENTS%BOUNDARY_FINISH
+                        NUMBER_OF_CANDIDATES=NUMBER_OF_CANDIDATES+1
+                        CANDIDATE_ELEMENTS(NUMBER_OF_CANDIDATES)=ne
+                      ENDDO
+                    ELSE
+                      CALL FLAG_ERROR("Data projection number of xi has to equal to decomposition mesh number of dimensions",ERR, &
+                        & ERROR,*999)
+                    ENDIF
+                  CASE DEFAULT
+                    CALL FLAG_ERROR("No match for data projection type found",ERR,ERROR,*999)
+                END SELECT !DATA_PROJECTION%PROJECTION_TYPE
+              ENDIF
               !#####################################################################################################################
               !find the clostest elements/faces/lines for each point in the current computational node base on starting xi
               !the clostest elements/faces/lines are required to shrink down on the list of possible projection candiates
@@ -2476,6 +2492,47 @@ CONTAINS
     RETURN 1
 
   END SUBROUTINE DATA_PROJECTION_NUMBER_OF_CLOSEST_ELEMENTS_SET
+  
+  !
+  !================================================================================================================================
+  !
+  
+  !>Sets the projection type for a data projection.
+  SUBROUTINE DATA_PROJECTION_PROJECTION_ELEMENTS_SET(DATA_PROJECTION,ELEMENT_NUMBERS,FACE_NUMBERS,ERR,ERROR,*)
+
+    !Argument variables
+    TYPE(DATA_PROJECTION_TYPE), POINTER :: DATA_PROJECTION !<A pointer to the data projection to set the projection type for
+    INTEGER(INTG), INTENT(IN) :: ELEMENT_NUMBERS(:) !<the projection candidate global element numbers
+    INTEGER(INTG), INTENT(IN) :: FACE_NUMBERS(:) !<the projection candidate element face numbers
+    INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
+    !Local Variables
+    INTEGER(INTG) :: element_idx
+    
+    CALL ENTERS("DATA_PROJECTION_PROJECTION_ELEMENTS_SET",ERR,ERROR,*999)
+
+    IF(ASSOCIATED(DATA_PROJECTION)) THEN
+      IF(SIZE(ELEMENT_NUMBERS,1)==SIZE(FACE_NUMBERS,1)) THEN
+        ALLOCATE(DATA_PROJECTION%CANDIDATE_ELEMENT_NUMBERS(SIZE(ELEMENT_NUMBERS,1)),STAT=ERR)
+        ALLOCATE(DATA_PROJECTION%CANDIDATE_FACE_NUMBERS(SIZE(FACE_NUMBERS,1)),STAT=ERR)
+        DO element_idx=1,SIZE(ELEMENT_NUMBERS,1)
+          DATA_PROJECTION%CANDIDATE_ELEMENT_NUMBERS(element_idx)=ELEMENT_NUMBERS(element_idx)
+          DATA_PROJECTION%CANDIDATE_FACE_NUMBERS(element_idx)=FACE_NUMBERS(element_idx)
+        ENDDO
+      ELSE
+        CALL FLAG_ERROR("Input element numbers and face numbers sizes do not match.",ERR,ERROR,*999)
+      ENDIF
+    ELSE
+      CALL FLAG_ERROR("Data projection is not associated.",ERR,ERROR,*999)
+    ENDIF
+    
+    CALL EXITS("DATA_PROJECTION_PROJECTION_ELEMENTS_SET")
+    RETURN
+999 CALL ERRORS("DATA_PROJECTION_PROJECTION_ELEMENTS_SET",ERR,ERROR)    
+    CALL EXITS("DATA_PROJECTION_PROJECTION_ELEMENTS_SET")
+    RETURN 1
+
+  END SUBROUTINE DATA_PROJECTION_PROJECTION_ELEMENTS_SET
   
   !
   !================================================================================================================================
