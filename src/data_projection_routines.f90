@@ -108,6 +108,8 @@ MODULE DATA_PROJECTION_ROUTINES
   
   PUBLIC DATA_PROJECTION_NUMBER_OF_CLOSEST_ELEMENTS_GET,DATA_PROJECTION_NUMBER_OF_CLOSEST_ELEMENTS_SET
   
+  PUBLIC DATA_PROJECTION_ORTHOGONAL_PROJECTION_SET
+  
   PUBLIC DATA_PROJECTION_PROJECTION_ELEMENTS_SET
   
   PUBLIC DATA_PROJECTION_PROJECTION_TYPE_GET,DATA_PROJECTION_PROJECTION_TYPE_SET
@@ -1789,6 +1791,7 @@ CONTAINS
     
     
     INTEGER(INTG) :: ne,ni,ni2(2),nb,nifix,nifix2(2),itr1,itr2,nbfix
+    LOGICAL :: ORTHOGONAL_PROJECTION !Dummy variable- orthogonal projection flag
     
     CALL ENTERS("DATA_PROJECTION_NEWTON_ELEMENTS_EVALUATE_3",ERR,ERROR,*999)
               
@@ -1803,6 +1806,7 @@ CONTAINS
         ABSOLUTE_TOLERANCE=DATA_PROJECTION%ABSOLUTE_TOLERANCE
         MAXIMUM_DELTA=DATA_PROJECTION%MAXIMUM_ITERATION_UPDATE
         MINIMUM_DELTA=0.025_DP*MAXIMUM_DELTA !need to set a minimum, in case if it gets too small      
+        ORTHOGONAL_PROJECTION=DATA_PROJECTION%ORTHOGONAL_PROJECTION
         DO ne=1,SIZE(CANDIDATE_ELEMENTS,1) !project on each candidate elements
           ELEMENT_NUMBER=CANDIDATE_ELEMENTS(ne)
           EXIT_TAG=DATA_PROJECTION_EXIT_TAG_NO_ELEMENT
@@ -1890,6 +1894,10 @@ CONTAINS
               NBOUND=0
               DO ni=1,3
                 IF((BOUND(ni)/=0).AND.(BOUND(ni)>0.EQV.XI_UPDATE(ni)>0.0_DP)) THEN !projection go out of element bound
+                  IF(ORTHOGONAL_PROJECTION) THEN !If we only want orthogonal projection
+                    EXIT_TAG=DATA_PROJECTION_EXIT_TAG_BOUNDS !Exit without further search 
+                    EXIT main_loop 
+                  ENDIF 
                   NBOUND=NBOUND+1
                   FREE=.FALSE.
                   IF(NBOUND<=2) THEN
@@ -2507,6 +2515,40 @@ CONTAINS
     RETURN 1
 
   END SUBROUTINE DATA_PROJECTION_NUMBER_OF_CLOSEST_ELEMENTS_SET
+  
+  !
+  !================================================================================================================================
+  !
+  
+  !>Sets the number of closest elements for a data projection.
+  SUBROUTINE DATA_PROJECTION_ORTHOGONAL_PROJECTION_SET(DATA_PROJECTION,ORTHOGONAL_PROJECTION_FLAG,ERR,ERROR,*)
+
+    !Argument variables
+    TYPE(DATA_PROJECTION_TYPE), POINTER :: DATA_PROJECTION !<A pointer to the data projection to set the number of closest elements for
+    LOGICAL, INTENT(IN) :: ORTHOGONAL_PROJECTION_FLAG !<A flag to set orthogonal projection to be true (default is false)
+    INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
+    !Local Variables
+    
+    CALL ENTERS("DATA_PROJECTION_ORTHOGONAL_PROJECTION_SET",ERR,ERROR,*999)
+
+    IF(ASSOCIATED(DATA_PROJECTION)) THEN
+      IF(DATA_PROJECTION%DATA_PROJECTION_FINISHED) THEN
+        CALL FLAG_ERROR("Data projection have been finished.",ERR,ERROR,*999)
+      ELSE
+        DATA_PROJECTION%ORTHOGONAL_PROJECTION=ORTHOGONAL_PROJECTION_FLAG
+      ENDIF
+    ELSE
+      CALL FLAG_ERROR("Data projection is not associated.",ERR,ERROR,*999)
+    ENDIF
+    
+    CALL EXITS("DATA_PROJECTION_ORTHOGONAL_PROJECTION_SET")
+    RETURN
+999 CALL ERRORS("DATA_PROJECTION_ORTHOGONAL_PROJECTION_SET",ERR,ERROR)    
+    CALL EXITS("DATA_PROJECTION_ORTHOGONAL_PROJECTION_SET")
+    RETURN 1
+
+  END SUBROUTINE DATA_PROJECTION_ORTHOGONAL_PROJECTION_SET
   
   !
   !================================================================================================================================
