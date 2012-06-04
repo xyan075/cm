@@ -1488,6 +1488,9 @@ CONTAINS
                 DELTA=DMAX1(MINIMUM_DELTA,0.25_DP*DELTA)
               ELSE
                 PREDICTED_REDUCTION=XI_UPDATE(1)*(FUNCTION_GRADIENT+0.5_DP*FUNCTION_HESSIAN*XI_UPDATE(1))
+                IF(PREDICTED_REDUCTION==0.0_DP) THEN  ! if the predicted reduction is zero, then any new function value that is smaller than the previous value is an acceptable solution step
+                  EXIT
+                ENDIF    
                 PREDICTION_ACCURACY=(FUNCTION_VALUE_NEW-FUNCTION_VALUE)/PREDICTED_REDUCTION
                 IF(PREDICTION_ACCURACY<0.01_DP) THEN !bad model: reduce region size
                   IF(DELTA<=MINIMUM_DELTA) THEN !something went wrong, MINIMUM_DELTA too large? not likely to happen if MINIMUM_DELTA is small
@@ -1700,6 +1703,9 @@ CONTAINS
                 PREDICTED_REDUCTION=DOT_PRODUCT(FUNCTION_GRADIENT,XI_UPDATE)+ &
                   & 0.5_DP*(XI_UPDATE(1)*(XI_UPDATE(1)*FUNCTION_HESSIAN(1,1)+2.0_DP*XI_UPDATE(2)*FUNCTION_HESSIAN(1,2))+ &
                   & XI_UPDATE(2)**2*FUNCTION_HESSIAN(2,2))
+                IF(PREDICTED_REDUCTION==0.0_DP) THEN ! if the predicted reduction is zero, then any new function value that is smaller than the previous value is an acceptable solution step
+                  EXIT
+                ENDIF    
                 PREDICTION_ACCURACY=(FUNCTION_VALUE_NEW-FUNCTION_VALUE)/PREDICTED_REDUCTION
                 IF(PREDICTION_ACCURACY<0.01_DP) THEN !bad model: reduce region size
                   IF(DELTA<=MINIMUM_DELTA) THEN !something went wrong, MINIMUM_DELTA too large? not likely to happen if MINIMUM_DELTA is small
@@ -1994,6 +2000,9 @@ CONTAINS
                   & 0.5_DP*(XI_UPDATE(1)*(XI_UPDATE(1)*FUNCTION_HESSIAN(1,1)+2.0_DP*XI_UPDATE(2)*FUNCTION_HESSIAN(1,2)+ &
                   & 2.0_DP*XI_UPDATE(3)*FUNCTION_HESSIAN(1,3))+XI_UPDATE(2)*(XI_UPDATE(2)*FUNCTION_HESSIAN(2,2)+ &
                   & 2.0_DP*XI_UPDATE(3)*FUNCTION_HESSIAN(2,3))+XI_UPDATE(2)**2*FUNCTION_HESSIAN(2,2))
+                IF(PREDICTED_REDUCTION==0.0_DP) THEN ! if the predicted reduction is zero, then any new function value that is smaller than the previous value is an acceptable solution step
+                  EXIT
+                ENDIF    
                 PREDICTION_ACCURACY=(FUNCTION_VALUE_NEW-FUNCTION_VALUE)/PREDICTED_REDUCTION
                 IF(PREDICTION_ACCURACY<0.01_DP) THEN !bad model: reduce region size
                   IF(DELTA<=MINIMUM_DELTA) THEN !something went wrong, MINIMUM_DELTA too large? not likely to happen if MINIMUM_DELTA is small
@@ -2213,6 +2222,9 @@ CONTAINS
                 PREDICTED_REDUCTION=DOT_PRODUCT(FUNCTION_GRADIENT,XI_UPDATE)+ &
                   & 0.5_DP*(XI_UPDATE(1)*(XI_UPDATE(1)*FUNCTION_HESSIAN(1,1)+2.0_DP*XI_UPDATE(2)*FUNCTION_HESSIAN(1,2))+ &
                   & XI_UPDATE(2)**2*FUNCTION_HESSIAN(2,2))
+                IF(PREDICTED_REDUCTION==0.0_DP) THEN ! if the predicted reduction is zero, then any new function value that is smaller than the previous value is an acceptable solution step
+                  EXIT
+                ENDIF                
                 PREDICTION_ACCURACY=(FUNCTION_VALUE_NEW-FUNCTION_VALUE)/PREDICTED_REDUCTION
                 IF(PREDICTION_ACCURACY<0.01_DP) THEN !bad model: reduce region size
                   IF(DELTA<=MINIMUM_DELTA) THEN !something went wrong, MINIMUM_DELTA too large? not likely to happen if MINIMUM_DELTA is small
@@ -2374,6 +2386,9 @@ CONTAINS
                 DELTA=DMAX1(MINIMUM_DELTA,0.25_DP*DELTA)
               ELSE
                 PREDICTED_REDUCTION=XI_UPDATE(1)*(FUNCTION_GRADIENT+0.5_DP*FUNCTION_HESSIAN*XI_UPDATE(1))
+                IF(PREDICTED_REDUCTION==0.0_DP) THEN ! if the predicted reduction is zero, then any new function value that is smaller than the previous value is an acceptable solution step
+                  EXIT
+                ENDIF    
                 PREDICTION_ACCURACY=(FUNCTION_VALUE_NEW-FUNCTION_VALUE)/PREDICTED_REDUCTION
                 IF(PREDICTION_ACCURACY<0.01_DP) THEN !bad model: reduce region size
                   IF(DELTA<=MINIMUM_DELTA) THEN !something went wrong, MINIMUM_DELTA too large? not likely to happen if MINIMUM_DELTA is small
