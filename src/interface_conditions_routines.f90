@@ -119,6 +119,7 @@ CONTAINS
           SELECT CASE(INTERFACE_CONDITION%METHOD)
           CASE(INTERFACE_CONDITION_LAGRANGE_MULTIPLIERS_METHOD,INTERFACE_CONDITION_PENALTY_METHOD)
             IF(INTERFACE_CONDITION%OPERATOR==INTERFACE_CONDITION_FRICTIONLESS_CONTACT_OPERATOR) THEN
+            !if point connectivity
               CALL INTERFACE_CONDITION_DATA_REPROJECTION(INTERFACE_CONDITION,ERR,ERROR,*999)
             ENDIF
             CALL INTERFACE_CONDITION_ASSEMBLE_FEM(INTERFACE_CONDITION,ERR,ERROR,*999)
@@ -2892,7 +2893,7 @@ CONTAINS
                       ELSE
                         penetration=-gap(rowComponentIdx)*NORMAL(rowComponentIdx) 
                       ENDIF
-                      IF (penetration>0.0_DP) THEN !Only add the contribution of the Gauss point if it's a penetration
+                      !IF (penetration>0.0_DP) THEN !Only add the contribution of the Gauss point if it's a penetration
                         DO rowParameterIdx=1,COUPLED_MESH_BASIS%NUMBER_OF_ELEMENT_PARAMETERS 
                           rowIdx=rowParameterIdx+COUPLED_MESH_BASIS%NUMBER_OF_ELEMENT_PARAMETERS*(rowComponentIdx-1)
                           
@@ -2913,7 +2914,7 @@ CONTAINS
                               & PGNSI*PGMSI*RWG!*INTERPOLATED_POINT_METRICS%JACOBIAN
                           ENDDO !colParameterIdx
                       ENDDO !rowParameterIdx  
-                      ENDIF
+                     ! ENDIF
                     ENDDO !rowComponentIdx       
                   ENDDO !gaussPointIdx
                   
@@ -2981,7 +2982,7 @@ CONTAINS
                 !Points connectivity
                 CASE(FIELD_DATA_POINT_BASED_INTERPOLATION) !Points connecitivity
                   IF(INTERFACE_CONDITION%METHOD==INTERFACE_CONDITION_PENALTY_METHOD .AND. &
-                      & interface_matrix_idx==INTERFACE_EQUATIONS%INTERFACE_MATRICES%NUMBER_OF_INTERFACE_MATRICES) THEN
+                      & interface_matrix_idx==INTERFACE_EQUATIONS%INTERFACE_MATRICES%NUMBER_OF_INTERFACE_MATRICES) THEN !Penalty matrix
                     DO dataPointIdx=1,DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(ELEMENT_NUMBER)%NUMBER_OF_PROJECTED_DATA
                       DO colComponentIdx=1,LAGRANGE_VARIABLE%NUMBER_OF_COMPONENTS
                         colIdx=dataPointIdx+DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(ELEMENT_NUMBER)% &
@@ -2990,7 +2991,7 @@ CONTAINS
                           & weightS(colComponentIdx)
                         dofValue=INTERFACE_PENALTY_FIELD%VARIABLES(1)%PARAMETER_SETS%PARAMETER_SETS(1)%PTR%PARAMETERS%CMISS% &
                           & DATA_DP(colIdx)
-                        INTERFACE_ELEMENT_MATRIX%MATRIX(colIdx,colIdx)=-(1.0_DP/dofValue)*weight
+                        INTERFACE_ELEMENT_MATRIX%MATRIX(colIdx,colIdx)=-(1.0_DP/dofValue)!*weight!*weight
                       ENDDO
                     ENDDO
                   ELSE
@@ -3021,11 +3022,14 @@ CONTAINS
                           REVERSE_NORMAL=.FALSE.
                         ELSE
                           REVERSE_NORMAL=.TRUE. 
-                        ENDIF                  
+                        ENDIF                                          
+                          
                         DO rowComponentIdx=1,coupledMeshNumberOfGeometricComponents
                           rowMeshComponentNumber=INTERFACE_MATRIX_VARIABLE%COMPONENTS(rowComponentIdx)%MESH_COMPONENT_NUMBER  
                           coupledMeshNumberOfXi=COUPLED_MESH_GEOMETRIC_FIELD%DECOMPOSITION%DOMAIN(rowMeshComponentNumber)% &
-                            & PTR%TOPOLOGY%ELEMENTS%ELEMENTS(coupledMeshElementNumber)%BASIS%NUMBER_OF_XI    
+                            & PTR%TOPOLOGY%ELEMENTS%ELEMENTS(coupledMeshElementNumber)%BASIS%NUMBER_OF_XI 
+                          XI(1:coupledMeshNumberOfXi)=POINTS_CONNECTIVITY%POINTS_CONNECTIVITY(dataPointNumber, &
+                            & interface_matrix_idx)%XI(1:coupledMeshNumberOfXi,rowMeshComponentNumber)   
                           SELECT CASE(coupledMeshNumberOfXi)
                           CASE(2)
                             !Global number of the line in contact
@@ -3035,7 +3039,9 @@ CONTAINS
                             !Compute interpolation parameters for the line for the couple mesh field
                             CALL FIELD_INTERPOLATION_PARAMETERS_LINE_GET(FIELD_VALUES_SET_TYPE,globalContactNumber, &
                               & INTERFACE_EQUATIONS%INTERPOLATION%VARIABLE_INTERPOLATION(interface_matrix_idx)% &
-                              & GEOMETRIC_INTERPOLATION(1)%INTERPOLATION_PARAMETERS(FIELD_U_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)!Needed for computing metrics
+                              & DEPENDENT_INTERPOLATION(1)%INTERPOLATION_PARAMETERS(FIELD_U_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)!Needed for computing metrics
+                            !Compute the other xi direction of the line normal, i.e. xi position input for calculating interpolated point
+                            XI_POSITION(1)=XI(OTHER_XI_DIRECTIONS2(ABS(localContactXiNormal)))
                           CASE(3)
                             !Global number of the line in contact
                             globalContactNumber=POINTS_CONNECTIVITY%INTERFACE%COUPLED_MESHES(interface_matrix_idx)%PTR% &
@@ -3044,25 +3050,10 @@ CONTAINS
                             !Compute interpolation parameters for the face for the couple mesh field
                             CALL FIELD_INTERPOLATION_PARAMETERS_FACE_GET(FIELD_VALUES_SET_TYPE,globalContactNumber, &
                               & INTERFACE_EQUATIONS%INTERPOLATION%VARIABLE_INTERPOLATION(interface_matrix_idx)% &
-                              & GEOMETRIC_INTERPOLATION(1)%INTERPOLATION_PARAMETERS(FIELD_U_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)
-                          CASE DEFAULT
-                              CALL FLAG_ERROR("Xi dimension of coupled mesh should be <= 3 and >=0.",ERR,ERROR,*999)
-                          END SELECT                                          
-                          XI(1:coupledMeshNumberOfXi)=POINTS_CONNECTIVITY%POINTS_CONNECTIVITY(dataPointNumber, &
-                            & interface_matrix_idx)%XI(1:coupledMeshNumberOfXi,rowMeshComponentNumber)
-                          SELECT CASE(coupledMeshNumberOfXi)
-                          CASE(2)
-                            !Compute the other xi direction of the line normal, i.e. xi position input for calculating interpolated point
-                            XI_POSITION(1)=XI(OTHER_XI_DIRECTIONS2(ABS(localContactXiNormal)))
-                            !Compute interpolation parameters for the line for the couple mesh field
-                            !Needs the global contact line/face number.
-                            CALL FIELD_INTERPOLATION_PARAMETERS_LINE_GET(FIELD_VALUES_SET_TYPE,globalContactNumber, &
-                              & INTERFACE_EQUATIONS%INTERPOLATION%VARIABLE_INTERPOLATION(interface_matrix_idx)% &
-                              & GEOMETRIC_INTERPOLATION(1)%INTERPOLATION_PARAMETERS(FIELD_U_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)!Needed for computing metrics
-                          CASE(3)
+                              & DEPENDENT_INTERPOLATION(1)%INTERPOLATION_PARAMETERS(FIELD_U_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)
                             SELECT CASE(ABS(localContactXiNormal))
                             CASE(1)
-                              !Compute the other xi directions of the face normal, i.e. xi positions input for calculating interpolated point
+                            !Compute the other xi directions of the face normal, i.e. xi positions input for calculating interpolated point
                               XI_POSITION(1)=XI(2)
                               XI_POSITION(2)=XI(3)
                             CASE(2)
@@ -3072,27 +3063,40 @@ CONTAINS
                               XI_POSITION(1)=XI(1)
                               XI_POSITION(2)=XI(2)
                             END SELECT
-                            !Compute interpolation parameters for the face for the couple mesh field
-                            CALL FIELD_INTERPOLATION_PARAMETERS_FACE_GET(FIELD_VALUES_SET_TYPE,globalContactNumber, &
-                              & INTERFACE_EQUATIONS%INTERPOLATION%VARIABLE_INTERPOLATION(interface_matrix_idx)% &
-                              & GEOMETRIC_INTERPOLATION(1)%INTERPOLATION_PARAMETERS(FIELD_U_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)
                           CASE DEFAULT
-                            CALL FLAG_ERROR("Xi dimension of coupled mesh should be <= 3 and >=0.",ERR,ERROR,*999)
-                          END SELECT                     
+                              CALL FLAG_ERROR("Xi dimension of coupled mesh should be <= 3 and >=0.",ERR,ERROR,*999)
+                          END SELECT                                          
+                   
                           CALL FIELD_INTERPOLATE_XI(FIRST_PART_DERIV,XI_POSITION(1:coupledMeshNumberOfXi-1),INTERFACE_EQUATIONS% &
-                            & INTERPOLATION%VARIABLE_INTERPOLATION(interface_matrix_idx)%GEOMETRIC_INTERPOLATION(1)% &
+                            & INTERPOLATION%VARIABLE_INTERPOLATION(interface_matrix_idx)%DEPENDENT_INTERPOLATION(1)% &
                             & INTERPOLATED_POINT(FIELD_U_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)!Needed for computing metrics
+                          ALLOCATE(INTERFACE_EQUATIONS% &
+                            & INTERPOLATION%VARIABLE_INTERPOLATION(interface_matrix_idx)%DEPENDENT_INTERPOLATION(1)% &
+                            & INTERPOLATED_POINT_METRICS(FIELD_NUMBER_OF_VARIABLE_TYPES),STAT=ERR)
+                          IF(ERR/=0) CALL FLAG_ERROR("Could not allocate interpolated points metrics.",ERR,ERROR,*999)
+                          NULLIFY(INTERFACE_EQUATIONS% &
+                            & INTERPOLATION%VARIABLE_INTERPOLATION(interface_matrix_idx)%DEPENDENT_INTERPOLATION(1)% &
+                            & INTERPOLATED_POINT_METRICS(FIELD_U_VARIABLE_TYPE)%PTR)
+                          CALL FIELD_INTERPOLATED_POINT_METRICS_INITIALISE(INTERFACE_EQUATIONS% &
+                            & INTERPOLATION%VARIABLE_INTERPOLATION(interface_matrix_idx)%DEPENDENT_INTERPOLATION(1)% &
+                            & INTERPOLATED_POINT(FIELD_U_VARIABLE_TYPE)%PTR,INTERFACE_EQUATIONS% &
+                            & INTERPOLATION%VARIABLE_INTERPOLATION(interface_matrix_idx)%DEPENDENT_INTERPOLATION(1)% &
+                            & INTERPOLATED_POINT_METRICS(FIELD_U_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)
+                            
                           CALL FIELD_INTERPOLATED_POINT_METRICS_CALCULATE(coupledMeshNumberOfXi,INTERFACE_EQUATIONS% &
-                            & INTERPOLATION%VARIABLE_INTERPOLATION(interface_matrix_idx)%GEOMETRIC_INTERPOLATION(1)% &
+                            & INTERPOLATION%VARIABLE_INTERPOLATION(interface_matrix_idx)%DEPENDENT_INTERPOLATION(1)% &
                             & INTERPOLATED_POINT_METRICS(FIELD_U_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)                      
                           INTERPOLATED_POINT_METRICS=>INTERFACE_EQUATIONS%INTERPOLATION% &
-                            & VARIABLE_INTERPOLATION(interface_matrix_idx)%GEOMETRIC_INTERPOLATION(1)% &
+                            & VARIABLE_INTERPOLATION(interface_matrix_idx)%DEPENDENT_INTERPOLATION(1)% &
                             & INTERPOLATED_POINT_METRICS(FIELD_U_VARIABLE_TYPE)%PTR                 
                           !Calculate outward normal of the contact surface in the coupled mesh
                           CALL FIELD_POSITION_NORMAL_TANGENTS_CALCULATE_INT_PT_METRIC(INTERPOLATED_POINT_METRICS, &
                             & REVERSE_NORMAL,POSITION(1:coupledMeshNumberOfGeometricComponents), &
                             & NORMAL(1:coupledMeshNumberOfGeometricComponents),TANGENTS(1:coupledMeshNumberOfGeometricComponents, &
-                            & 1:coupledMeshNumberOfXi),ERR,ERROR,*999)    
+                            & 1:coupledMeshNumberOfXi),ERR,ERROR,*999)  
+                          CALL FIELD_INTERPOLATED_POINT_METRICS_FINALISE(INTERFACE_EQUATIONS% &
+                            & INTERPOLATION%VARIABLE_INTERPOLATION(interface_matrix_idx)%DEPENDENT_INTERPOLATION(1)% &
+                            & INTERPOLATED_POINT_METRICS(FIELD_U_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)  
                           COUPLED_MESH_BASIS=>INTERFACE_MATRIX_DEPENDENT_FIELD%DECOMPOSITION%DOMAIN &
                             & (rowMeshComponentNumber)%PTR%TOPOLOGY%ELEMENTS%ELEMENTS(coupledMeshElementNumber)%BASIS   
                           DO rowParameterIdx=1,COUPLED_MESH_BASIS%NUMBER_OF_ELEMENT_PARAMETERS                    
@@ -3109,37 +3113,44 @@ CONTAINS
                             weight=POINTS_CONNECTIVITY%INTERFACE%DATA_POINTS%DATA_POINTS(dataPointNumber)% &
                               & weightS(colComponentIdx)
                             INTERFACE_ELEMENT_MATRIX%MATRIX(rowIdx,colIdx)=INTERFACE_ELEMENT_MATRIX%MATRIX(rowIdx, &
-                              & colIdx)+PGMSI*weight
-                             !INTERFACE_ELEMENT_MATRIX%MATRIX(rowIdx,colIdx)=0
+                              & colIdx)+PGMSI  
                           ENDDO !rowParameterIdx
                         ENDDO !component_idx     
                       ENDIF !If the data point has been orthogonally projected      
                     ENDDO !dataPointIdx        
                             
                     !scale factor update
-                    rowIdx=0
-                    DO coupledMeshElementIdx=1,POINTS_CONNECTIVITY%COUPLED_MESH_ELEMENTS(ELEMENT_NUMBER,interface_matrix_idx)% &
-                        & NUMBER_OF_COUPLED_MESH_ELEMENTS
-                      coupledMeshElementNumber=POINTS_CONNECTIVITY%COUPLED_MESH_ELEMENTS(ELEMENT_NUMBER,interface_matrix_idx)% &
-                        & ELEMENT_NUMBERS(coupledMeshElementIdx)
-                      CALL FIELD_INTERPOLATION_PARAMETERS_SCALE_FACTORS_ELEM_GET(coupledMeshElementNumber,INTERFACE_EQUATIONS% &
-                        & INTERPOLATION%VARIABLE_INTERPOLATION(interface_matrix_idx)%DEPENDENT_INTERPOLATION(1)% &
-                        & INTERPOLATION_PARAMETERS(INTERFACE_MATRIX_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)
+                    IF(INTERFACE_MATRIX_DEPENDENT_FIELD%SCALINGS%SCALING_TYPE/=FIELD_NO_SCALING) THEN
+                      rowIdx=0
                       DO rowComponentIdx=1,coupledMeshNumberOfGeometricComponents
-                        DO rowParameterIdx=1,COUPLED_MESH_BASIS%NUMBER_OF_ELEMENT_PARAMETERS 
-                          rowIdx=rowIdx+1
-                          colComponentIdx=rowComponentIdx !X and Y are decoupled
-                          DO dataPointIdx=1,DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(ELEMENT_NUMBER)%NUMBER_OF_PROJECTED_DATA
-                            colIdx=dataPointIdx+DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(ELEMENT_NUMBER)% &
-                              & NUMBER_OF_PROJECTED_DATA*(colComponentIdx-1)
-                            INTERFACE_ELEMENT_MATRIX%MATRIX(rowIdx,colIdx)=INTERFACE_ELEMENT_MATRIX%MATRIX(rowIdx, &
-                              & colIdx)*INTERFACE_EQUATIONS%INTERPOLATION%VARIABLE_INTERPOLATION(interface_matrix_idx)% &
-                              & DEPENDENT_INTERPOLATION(1)%INTERPOLATION_PARAMETERS(INTERFACE_MATRIX_VARIABLE_TYPE)% &
-                              & PTR%SCALE_FACTORS(rowParameterIdx,rowComponentIdx)
-                          ENDDO !dataPointIdx
-                        ENDDO !rowParameterIdx 
-                      ENDDO !rowComponentIdx
-                    ENDDO !coupledMeshElementIdx
+                      DO coupledMeshElementIdx=1,POINTS_CONNECTIVITY%COUPLED_MESH_ELEMENTS(ELEMENT_NUMBER,interface_matrix_idx)% &
+                          & NUMBER_OF_COUPLED_MESH_ELEMENTS
+                        coupledMeshElementNumber=POINTS_CONNECTIVITY%COUPLED_MESH_ELEMENTS(ELEMENT_NUMBER,interface_matrix_idx)% &
+                          & ELEMENT_NUMBERS(coupledMeshElementIdx)
+                        CALL FIELD_INTERPOLATION_PARAMETERS_SCALE_FACTORS_ELEM_GET(coupledMeshElementNumber,INTERFACE_EQUATIONS% &
+                          & INTERPOLATION%VARIABLE_INTERPOLATION(interface_matrix_idx)%DEPENDENT_INTERPOLATION(1)% &
+                          & INTERPOLATION_PARAMETERS(INTERFACE_MATRIX_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)
+                        
+                          DO rowParameterIdx=1,COUPLED_MESH_BASIS%NUMBER_OF_ELEMENT_PARAMETERS 
+                            rowIdx=rowIdx+1
+                            colComponentIdx=rowComponentIdx !X and Y are decoupled
+                            DO dataPointIdx=1,DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(ELEMENT_NUMBER)%NUMBER_OF_PROJECTED_DATA
+                              colIdx=dataPointIdx+DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(ELEMENT_NUMBER)% &
+                                & NUMBER_OF_PROJECTED_DATA*(colComponentIdx-1)
+                              dataPointNumber=DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(ELEMENT_NUMBER)%DATA_INDICES(dataPointIdx)% &
+                                & GLOBAL_NUMBER
+                              IF(POINTS_CONNECTIVITY%POINTS_CONNECTIVITY(dataPointNumber,interface_matrix_idx)% &
+                                  & COUPLED_MESH_ELEMENT_NUMBER==coupledMeshElementNumber) THEN
+                                INTERFACE_ELEMENT_MATRIX%MATRIX(rowIdx,colIdx)=INTERFACE_ELEMENT_MATRIX%MATRIX(rowIdx, &
+                                  & colIdx)*INTERFACE_EQUATIONS%INTERPOLATION%VARIABLE_INTERPOLATION(interface_matrix_idx)% &
+                                  & DEPENDENT_INTERPOLATION(1)%INTERPOLATION_PARAMETERS(INTERFACE_MATRIX_VARIABLE_TYPE)% &
+                                  & PTR%SCALE_FACTORS(rowParameterIdx,rowComponentIdx)
+                              ENDIF
+                            ENDDO !dataPointIdx
+                          ENDDO !rowParameterIdx 
+                        ENDDO !rowComponentIdx
+                      ENDDO !coupledMeshElementIdx
+                    ENDIF
                     
                     !Evaluate RHS element vector for frictionless contact
                     RHS_VEC=>INTERFACE_EQUATIONS%INTERFACE_MATRICES%RHS_VECTOR
