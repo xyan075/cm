@@ -119,8 +119,11 @@ CONTAINS
           SELECT CASE(INTERFACE_CONDITION%METHOD)
           CASE(INTERFACE_CONDITION_LAGRANGE_MULTIPLIERS_METHOD,INTERFACE_CONDITION_PENALTY_METHOD)
             IF(INTERFACE_CONDITION%OPERATOR==INTERFACE_CONDITION_FRICTIONLESS_CONTACT_OPERATOR) THEN
-            !if point connectivity
-              CALL INTERFACE_CONDITION_DATA_REPROJECTION(INTERFACE_CONDITION,ERR,ERROR,*999)
+              !IF(INTERFACE_CONDITION)
+              IF (INTERFACE_CONDITION%LAGRANGE%LAGRANGE_FIELD%VARIABLES(1)%COMPONENTS(1)%INTERPOLATION_TYPE== &
+                  & FIELD_DATA_POINT_BASED_INTERPOLATION) THEN
+                CALL INTERFACE_CONDITION_DATA_REPROJECTION(INTERFACE_CONDITION,ERR,ERROR,*999)
+              ENDIF
             ENDIF
             CALL INTERFACE_CONDITION_ASSEMBLE_FEM(INTERFACE_CONDITION,ERR,ERROR,*999)
           CASE(INTERFACE_CONDITION_AUGMENTED_LAGRANGE_METHOD)
@@ -390,7 +393,7 @@ CONTAINS
             INTERFACE_DEPENDENT=>INTERFACE_CONDITION%DEPENDENT
             IF(ASSOCIATED(INTERFACE_DEPENDENT)) THEN
               !Check the dependent field variables have been set.
-              IF(INTERFACE_DEPENDENT%NUMBER_OF_DEPENDENT_VARIABLES<2) THEN
+              IF(INTERFACE_DEPENDENT%NUMBER_OF_DEPENDENT_VARIABLES<2 .AND. .NOT. INTERFACE_CONDITION%INTERFACE%SELF_CONTACT) THEN
                 LOCAL_ERROR="The number of added dependent variables of "// &
                   & TRIM(NUMBER_TO_VSTRING(INTERFACE_DEPENDENT%NUMBER_OF_DEPENDENT_VARIABLES,"*",ERR,ERROR))// &
                   & " is invalid. The number must be >= 2."
@@ -795,7 +798,8 @@ CONTAINS
                     DO WHILE(variable_idx<=INTERFACE_DEPENDENT%NUMBER_OF_DEPENDENT_VARIABLES.AND. &
                       & .NOT.ASSOCIATED(INTERFACE_VARIABLE))
                       !To check if the field variable is the variable associated with the interface
-                      IF(ASSOCIATED(FIELD_VARIABLE,INTERFACE_DEPENDENT%FIELD_VARIABLES(variable_idx)%PTR)) THEN
+                      IF(ASSOCIATED(FIELD_VARIABLE,INTERFACE_DEPENDENT%FIELD_VARIABLES(variable_idx)%PTR) .AND.  &
+                          & .NOT. INTERFACE_CONDITION%INTERFACE%SELF_CONTACT) THEN
                         INTERFACE_VARIABLE=>INTERFACE_DEPENDENT%FIELD_VARIABLES(variable_idx)%PTR
                       ELSE
                         variable_idx=variable_idx+1
@@ -1023,6 +1027,10 @@ CONTAINS
             CASE(INTERFACE_CONDITION_PENALTY_METHOD)
               number_of_dependent_variables=INTERFACE_DEPENDENT%NUMBER_OF_DEPENDENT_VARIABLES+1
             ENDSELECT
+            !if there's only one mesh in self-contact but two interface matrices that'll be assembled into one global inteface matrix
+            IF(INTERFACE_CONDITION%INTERFACE%SELF_CONTACT) THEN
+              number_of_dependent_variables=number_of_dependent_variables+1
+            ENDIF
             CALL INTERFACE_MAPPING_MATRICES_NUMBER_SET(INTERFACE_MAPPING,number_of_dependent_variables,ERR,ERROR,*999)
             ALLOCATE(MATRICES_TRANSPOSE(number_of_dependent_variables),STAT=ERR)
             IF(ERR/=0) CALL FLAG_ERROR("Could not allocate matrices transpose.",ERR,ERROR,*999)
@@ -3123,14 +3131,13 @@ CONTAINS
                     IF(INTERFACE_MATRIX_DEPENDENT_FIELD%SCALINGS%SCALING_TYPE/=FIELD_NO_SCALING) THEN
                       rowIdx=0
                       DO rowComponentIdx=1,coupledMeshNumberOfGeometricComponents
-                      DO coupledMeshElementIdx=1,POINTS_CONNECTIVITY%COUPLED_MESH_ELEMENTS(ELEMENT_NUMBER,interface_matrix_idx)% &
+                        DO coupledMeshElementIdx=1,POINTS_CONNECTIVITY%COUPLED_MESH_ELEMENTS(ELEMENT_NUMBER,interface_matrix_idx)% &
                           & NUMBER_OF_COUPLED_MESH_ELEMENTS
-                        coupledMeshElementNumber=POINTS_CONNECTIVITY%COUPLED_MESH_ELEMENTS(ELEMENT_NUMBER,interface_matrix_idx)% &
-                          & ELEMENT_NUMBERS(coupledMeshElementIdx)
-                        CALL FIELD_INTERPOLATION_PARAMETERS_SCALE_FACTORS_ELEM_GET(coupledMeshElementNumber,INTERFACE_EQUATIONS% &
-                          & INTERPOLATION%VARIABLE_INTERPOLATION(interface_matrix_idx)%DEPENDENT_INTERPOLATION(1)% &
-                          & INTERPOLATION_PARAMETERS(INTERFACE_MATRIX_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)
-                        
+                          coupledMeshElementNumber=POINTS_CONNECTIVITY%COUPLED_MESH_ELEMENTS(ELEMENT_NUMBER,interface_matrix_idx)% &
+                            & ELEMENT_NUMBERS(coupledMeshElementIdx)
+                          CALL FIELD_INTERPOLATION_PARAMETERS_SCALE_FACTORS_ELEM_GET(coupledMeshElementNumber,INTERFACE_EQUATIONS% &
+                            & INTERPOLATION%VARIABLE_INTERPOLATION(interface_matrix_idx)%DEPENDENT_INTERPOLATION(1)% &
+                            & INTERPOLATION_PARAMETERS(INTERFACE_MATRIX_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)
                           DO rowParameterIdx=1,COUPLED_MESH_BASIS%NUMBER_OF_ELEMENT_PARAMETERS 
                             rowIdx=rowIdx+1
                             colComponentIdx=rowComponentIdx !X and Y are decoupled
@@ -3148,8 +3155,8 @@ CONTAINS
                               ENDIF
                             ENDDO !dataPointIdx
                           ENDDO !rowParameterIdx 
-                        ENDDO !rowComponentIdx
-                      ENDDO !coupledMeshElementIdx
+                        ENDDO !coupledMeshElementIdx
+                      ENDDO !rowComponentIdx
                     ENDIF
                     
                     !Evaluate RHS element vector for frictionless contact

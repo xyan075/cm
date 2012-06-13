@@ -158,7 +158,12 @@ CONTAINS
                 DO matrix_idx=1,number_of_interface_matrices
                   !Initialise and setup the interface matrix
                   CALL INTERFACE_MAPPING_MATRIX_TO_VAR_MAP_INITIALISE(INTERFACE_MAPPING,matrix_idx,ERR,ERROR,*999)
-                  mesh_idx=CREATE_VALUES_CACHE%MATRIX_ROW_FIELD_VARIABLE_INDICES(matrix_idx)
+                  IF(INTERFACE_CONDITION%INTERFACE%SELF_CONTACT) THEN
+                    mesh_idx=CREATE_VALUES_CACHE%MATRIX_ROW_FIELD_VARIABLE_INDICES(1)!Same as the first mesh.
+                  ELSE
+                    mesh_idx=CREATE_VALUES_CACHE%MATRIX_ROW_FIELD_VARIABLE_INDICES(matrix_idx)
+                  ENDIF
+                  
                   NULLIFY(EQUATIONS_SET)
                   NULLIFY(FIELD_VARIABLE)
                   DO variable_idx=1,INTERFACE_DEPENDENT%NUMBER_OF_DEPENDENT_VARIABLES
@@ -488,6 +493,10 @@ CONTAINS
                       INTERFACE_DEPENDENT%NUMBER_OF_DEPENDENT_VARIABLES+1
                     END SELECT
                     !Default the Lagrange variable to the first Lagrange variable
+                    IF(INTERFACE_MAPPING%INTERFACE_EQUATIONS%INTERFACE_CONDITION%INTERFACE%SELF_CONTACT) THEN
+                      INTERFACE_MAPPING%CREATE_VALUES_CACHE%NUMBER_OF_INTERFACE_MATRICES= &
+                        INTERFACE_MAPPING%CREATE_VALUES_CACHE%NUMBER_OF_INTERFACE_MATRICES+1
+                    ENDIF          
                     INTERFACE_MAPPING%CREATE_VALUES_CACHE%LAGRANGE_VARIABLE_TYPE=0
                     DO variable_type_idx=1,FIELD_NUMBER_OF_VARIABLE_TYPES
                       IF(ASSOCIATED(LAGRANGE_FIELD%VARIABLE_TYPE_MAP(variable_type_idx)%PTR)) THEN
@@ -522,9 +531,15 @@ CONTAINS
                     IF(ERR/=0) CALL FLAG_ERROR("Could not allocate create values cache matrix row field variable indexes.", &
                       & ERR,ERROR,*999)
                     !Default the interface matrices to be in mesh index order.
-                    DO variable_idx=1,INTERFACE_DEPENDENT%NUMBER_OF_DEPENDENT_VARIABLES
-                      INTERFACE_MAPPING%CREATE_VALUES_CACHE%MATRIX_ROW_FIELD_VARIABLE_INDICES(variable_idx)=variable_idx
-                    ENDDO !variable_idx
+                    IF(INTERFACE_MAPPING%INTERFACE_EQUATIONS%INTERFACE_CONDITION%INTERFACE%SELF_CONTACT) THEN
+                      DO variable_idx=1,INTERFACE_DEPENDENT%NUMBER_OF_DEPENDENT_VARIABLES+1
+                        INTERFACE_MAPPING%CREATE_VALUES_CACHE%MATRIX_ROW_FIELD_VARIABLE_INDICES(variable_idx)=variable_idx
+                      ENDDO !variable_idx
+                    ELSE
+                      DO variable_idx=1,INTERFACE_DEPENDENT%NUMBER_OF_DEPENDENT_VARIABLES
+                        INTERFACE_MAPPING%CREATE_VALUES_CACHE%MATRIX_ROW_FIELD_VARIABLE_INDICES(variable_idx)=variable_idx
+                      ENDDO !variable_idx
+                    ENDIF
                     !The pointers below have been checked for association above.
                     SELECT CASE(INTERFACE_CONDITION%METHOD)
                     CASE(INTERFACE_CONDITION_PENALTY_METHOD)
@@ -535,6 +550,15 @@ CONTAINS
                       INTERFACE_MAPPING%CREATE_VALUES_CACHE%MATRIX_ROW_FIELD_VARIABLE_INDICES(INTERFACE_DEPENDENT% &
                         & NUMBER_OF_DEPENDENT_VARIABLES+1)=1
                     END SELECT
+                    IF(INTERFACE_MAPPING%INTERFACE_EQUATIONS%INTERFACE_CONDITION%INTERFACE%SELF_CONTACT) THEN
+                      DO variable_idx=1,INTERFACE_DEPENDENT%NUMBER_OF_DEPENDENT_VARIABLES+1
+                        INTERFACE_MAPPING%CREATE_VALUES_CACHE%MATRIX_ROW_FIELD_VARIABLE_INDICES(variable_idx)=variable_idx
+                      ENDDO !variable_idx
+                    ELSE
+                      DO variable_idx=1,INTERFACE_DEPENDENT%NUMBER_OF_DEPENDENT_VARIABLES
+                        INTERFACE_MAPPING%CREATE_VALUES_CACHE%MATRIX_ROW_FIELD_VARIABLE_INDICES(variable_idx)=variable_idx
+                      ENDDO !variable_idx
+                    ENDIF
                   ELSE
                     CALL FLAG_ERROR("Interface condition depdendent is not associated.",ERR,ERROR,*999)
                   ENDIF
@@ -1143,7 +1167,8 @@ CONTAINS
                     CASE(INTERFACE_CONDITION_PENALTY_METHOD)
                       number_of_dependent_variables=INTERFACE_DEPENDENT%NUMBER_OF_DEPENDENT_VARIABLES+1
                     END SELECT
-                    IF(NUMBER_OF_INTERFACE_MATRICES<=number_of_dependent_variables) THEN
+                    IF(NUMBER_OF_INTERFACE_MATRICES<=number_of_dependent_variables .OR.  &
+                        & INTERFACE_MAPPING%INTERFACE_EQUATIONS%INTERFACE_CONDITION%INTERFACE%SELF_CONTACT) THEN
                       !If we need to reallocate and reset all the create values cache arrays and change the number of matrices
                       IF(NUMBER_OF_INTERFACE_MATRICES/=CREATE_VALUES_CACHE%NUMBER_OF_INTERFACE_MATRICES) THEN
                         ALLOCATE(OLD_MATRIX_COEFFICIENTS(CREATE_VALUES_CACHE%NUMBER_OF_INTERFACE_MATRICES),STAT=ERR)

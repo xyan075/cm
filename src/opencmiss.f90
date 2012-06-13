@@ -3904,6 +3904,12 @@ MODULE OPENCMISS
     MODULE PROCEDURE CMISSInterface_CreateStartObj
   END INTERFACE !CMISSInterface_CreateStart
   
+  !>Set the interface region to deal with contact mechanics
+  INTERFACE CMISSInterfaceSelfContactSet
+    MODULE PROCEDURE CMISSInterfaceSelfContactSetNumber
+    MODULE PROCEDURE CMISSInterfaceSelfContactSetObj
+  END INTERFACE CMISSInterfaceSelfContactSet
+  
   !>Set the coordinate system of an inteface
   INTERFACE CMISSInterface_CoordinateSystemSet
     MODULE PROCEDURE CMISSInterface_CoordinateSystemSetNumber
@@ -32995,6 +33001,76 @@ CONTAINS
     RETURN
     
   END SUBROUTINE CMISSInterface_SelfContactSetObj
+  
+  !  
+  !================================================================================================================================
+  !  
+  
+  !>Starts the creation of an interface identified by a user number.
+  SUBROUTINE CMISSInterfaceSelfContactSetNumber(InterfaceUserNumber,RegionUserNumber,Err)
+  
+    !Argument variables
+    INTEGER(INTG), INTENT(IN) :: InterfaceUserNumber !<The user number of the interface to start the creation of.
+    INTEGER(INTG), INTENT(IN) :: RegionUserNumber !<The user number of the region containing the interface to start the creation of.
+    INTEGER(INTG), INTENT(OUT) :: Err !<The error code.
+    !Local variables
+    TYPE(INTERFACE_TYPE), POINTER :: INTERFACE
+    TYPE(REGION_TYPE), POINTER :: REGION
+    TYPE(VARYING_STRING) :: LOCAL_ERROR
+    
+    CALL ENTERS("CMISSInterfaceSelfContactSetNumber",Err,ERROR,*999)
+ 
+    NULLIFY(REGION)
+    NULLIFY(INTERFACE)
+    CALL REGION_USER_NUMBER_FIND(RegionUserNumber,REGION,Err,ERROR,*999)
+    IF(ASSOCIATED(REGION)) THEN
+      CALL INTERFACE_USER_NUMBER_FIND(InterfaceUserNumber,REGION,INTERFACE,Err,ERROR,*999)
+      IF(ASSOCIATED(INTERFACE)) THEN
+        CALL INTERFACE_SELF_CONTACT_SET(INTERFACE,Err,ERROR,*999)
+      ELSE
+        LOCAL_ERROR="An interface with an user number of "//TRIM(NUMBER_TO_VSTRING(InterfaceUserNumber,"*",Err,ERROR))// &
+          & " does not exist on the region with an user number of "//TRIM(NUMBER_TO_VSTRING(RegionUserNumber,"*",Err,ERROR))//"."
+        CALL FLAG_ERROR(LOCAL_ERROR,Err,ERROR,*999)
+      ENDIF
+    ELSE
+      LOCAL_ERROR="A region with an user number of "//TRIM(NUMBER_TO_VSTRING(RegionUserNumber,"*",Err,ERROR))// &
+        & " does not exist."
+      CALL FLAG_ERROR(LOCAL_ERROR,Err,ERROR,*999)
+    ENDIF
+
+    CALL EXITS("CMISSInterfaceSelfContactSetNumber")
+    RETURN
+999 CALL ERRORS("CMISSInterfaceSelfContactSetNumber",Err,ERROR)
+    CALL EXITS("CMISSInterfaceSelfContactSetNumber")
+    CALL CMISS_HANDLE_ERROR(Err,ERROR)
+    RETURN
+    
+  END SUBROUTINE CMISSInterfaceSelfContactSetNumber
+
+  !  
+  !================================================================================================================================
+  !  
+ 
+  !>Starts the creation of an interface identified by an object.
+  SUBROUTINE CMISSInterfaceSelfContactSetObj(Interface,Err)
+  
+    !Argument variables
+    TYPE(CMISSInterfaceType), INTENT(IN) :: Interface !<On return, the created interface.
+    INTEGER(INTG), INTENT(OUT) :: Err !<The error code.
+    !Local variables
+  
+    CALL ENTERS("CMISSInterfaceSelfContactSetObj",Err,ERROR,*999)
+ 
+    CALL INTERFACE_SELF_CONTACT_SET(Interface%INTERFACE,Err,ERROR,*999)
+
+    CALL EXITS("CMISSInterfaceSelfContactSetObj")
+    RETURN
+999 CALL ERRORS("CMISSInterfaceSelfContactSetObj",Err,ERROR)
+    CALL EXITS("CMISSInterfaceSelfContactSetObj")
+    CALL CMISS_HANDLE_ERROR(Err,ERROR)
+    RETURN
+    
+  END SUBROUTINE CMISSInterfaceSelfContactSetObj
   
   !  
   !================================================================================================================================
