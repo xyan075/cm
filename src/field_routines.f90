@@ -382,6 +382,11 @@ MODULE FIELD_ROUTINES
     MODULE PROCEDURE FIELD_PARAMETER_SET_GET_CONSTANT_DP
     MODULE PROCEDURE FIELD_PARAMETER_SET_GET_CONSTANT_L
   END INTERFACE !FIELD_PARAMETER_SET_GET_CONSTANT
+  
+  !>Returns from the given parameter set a value for the specified data point.  TODO: sp/int/l versions
+  INTERFACE FIELD_PARAMETER_SET_GET_DATA_POINT
+    MODULE PROCEDURE FIELD_PARAMETER_SET_GET_DATA_POINT_DP
+  END INTERFACE !FIELD_PARAMETER_SET_GET_DATA_POINT
 
   !>Returns from the given parameter set a value for the specified element of a field variable component.
   INTERFACE FIELD_PARAMETER_SET_GET_ELEMENT
@@ -619,7 +624,7 @@ MODULE FIELD_ROUTINES
   PUBLIC FIELD_PARAMETER_SET_DATA_GET,FIELD_PARAMETER_SET_DATA_RESTORE
 
   PUBLIC FIELD_PARAMETER_SET_GET_CONSTANT,FIELD_PARAMETER_SET_GET_ELEMENT,FIELD_PARAMETER_SET_GET_LOCAL_DOF, &
-    & FIELD_PARAMETER_SET_GET_NODE,FIELD_PARAMETER_SET_GET_GAUSS_POINT
+    & FIELD_PARAMETER_SET_GET_NODE,FIELD_PARAMETER_SET_GET_GAUSS_POINT,FIELD_PARAMETER_SET_GET_DATA_POINT
 
   PUBLIC FIELD_PARAMETER_SET_OUTPUT
 
@@ -16982,6 +16987,161 @@ CONTAINS
 
     RETURN 1
   END SUBROUTINE FIELD_PARAMETER_SET_GET_CONSTANT_L
+  
+  !
+  !================================================================================================================================
+  !
+  
+ !>Returns from the given parameter set a double precision value for the specified gauss point of a field variable component. \see OPENCMISS::CMISSFieldParameterSetGetGaussPoint
+  SUBROUTINE FIELD_PARAMETER_SET_GET_DATA_POINT_DP(FIELD,VARIABLE_TYPE,FIELD_SET_TYPE,USER_DATA_POINT_NUMBER, &
+    & COMPONENT_NUMBER,VALUE,ERR,ERROR,*)
+
+    !Argument variables
+    TYPE(FIELD_TYPE), POINTER :: FIELD !<A pointer to the field to get the value for
+    INTEGER(INTG), INTENT(IN) :: VARIABLE_TYPE !<The field variable type to get the value for \see FIELD_ROUTINES_VariableTypes,FIELD_ROUTINES
+    INTEGER(INTG), INTENT(IN) :: FIELD_SET_TYPE !<The field parameter set identifier
+    INTEGER(INTG), INTENT(IN) :: USER_DATA_POINT_NUMBER !<The data point number to get the value for
+    INTEGER(INTG), INTENT(IN) :: COMPONENT_NUMBER !<The field variable component number to get the value for
+    REAL(DP), INTENT(OUT) :: VALUE !<On return, the value
+    INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
+    !Local Variables
+    INTEGER(INTG) :: DOMAIN_LOCAL_DATA_POINT_NUMBER,dof_idx
+    LOGICAL :: GHOST_DATA_POINT,DATA_POINT_EXISTS
+    TYPE(DOMAIN_TYPE), POINTER :: DOMAIN
+    TYPE(DOMAIN_TOPOLOGY_TYPE), POINTER :: DOMAIN_TOPOLOGY
+    TYPE(DOMAIN_DATA_POINTS_TYPE), POINTER :: DOMAIN_DATA_POINT
+    TYPE(FIELD_PARAMETER_SET_TYPE), POINTER :: PARAMETER_SET
+    TYPE(FIELD_VARIABLE_TYPE), POINTER :: FIELD_VARIABLE
+    TYPE(VARYING_STRING) :: LOCAL_ERROR
+
+    CALL ENTERS("FIELD_PARAMETER_SET_GET_GAUSS_POINT_DP",ERR,ERROR,*999)
+
+    IF(ASSOCIATED(FIELD)) THEN
+      IF(FIELD%FIELD_FINISHED) THEN
+        IF(VARIABLE_TYPE>=1.AND.VARIABLE_TYPE<=FIELD_NUMBER_OF_VARIABLE_TYPES) THEN
+          FIELD_VARIABLE=>FIELD%VARIABLE_TYPE_MAP(VARIABLE_TYPE)%PTR
+          IF(ASSOCIATED(FIELD_VARIABLE)) THEN
+            IF(FIELD_VARIABLE%DATA_TYPE==FIELD_DP_TYPE) THEN
+              IF(FIELD_SET_TYPE>0.AND.FIELD_SET_TYPE<=FIELD_NUMBER_OF_SET_TYPES) THEN
+                PARAMETER_SET=>FIELD_VARIABLE%PARAMETER_SETS%SET_TYPE(FIELD_SET_TYPE)%PTR
+                IF(ASSOCIATED(PARAMETER_SET)) THEN
+                  IF(COMPONENT_NUMBER>=1.AND.COMPONENT_NUMBER<=FIELD_VARIABLE%NUMBER_OF_COMPONENTS) THEN
+                    SELECT CASE(FIELD_VARIABLE%COMPONENTS(COMPONENT_NUMBER)%INTERPOLATION_TYPE)
+                    CASE(FIELD_CONSTANT_INTERPOLATION)
+                      LOCAL_ERROR="Can not get by gauss point for component number "// &
+                        & TRIM(NUMBER_TO_VSTRING(COMPONENT_NUMBER,"*",ERR,ERROR))//" of variable type "// &
+                        & TRIM(NUMBER_TO_VSTRING(VARIABLE_TYPE,"*",ERR,ERROR))//" of field number "// &
+                        & TRIM(NUMBER_TO_VSTRING(FIELD%USER_NUMBER,"*",ERR,ERROR))//" which has constant interpolation."
+                      CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
+                    CASE(FIELD_ELEMENT_BASED_INTERPOLATION)
+                      LOCAL_ERROR="Can not get by gauss point for component number "// &
+                        & TRIM(NUMBER_TO_VSTRING(COMPONENT_NUMBER,"*",ERR,ERROR))//" of variable type "// &
+                        & TRIM(NUMBER_TO_VSTRING(VARIABLE_TYPE,"*",ERR,ERROR))//" of field number "// &
+                        & TRIM(NUMBER_TO_VSTRING(FIELD%USER_NUMBER,"*",ERR,ERROR))//" which has element based interpolation."
+                      CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
+                    CASE(FIELD_NODE_BASED_INTERPOLATION)
+                      LOCAL_ERROR="Can not get by gauss point for component number "// &
+                        & TRIM(NUMBER_TO_VSTRING(COMPONENT_NUMBER,"*",ERR,ERROR))//" of variable type "// &
+                        & TRIM(NUMBER_TO_VSTRING(VARIABLE_TYPE,"*",ERR,ERROR))//" of field number "// &
+                        & TRIM(NUMBER_TO_VSTRING(FIELD%USER_NUMBER,"*",ERR,ERROR))//" which has node based interpolation."
+                      CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
+                    CASE(FIELD_GRID_POINT_BASED_INTERPOLATION)
+                      LOCAL_ERROR="Can not get by grid point for component number "// &
+                        & TRIM(NUMBER_TO_VSTRING(COMPONENT_NUMBER,"*",ERR,ERROR))//" of variable type "// &
+                        & TRIM(NUMBER_TO_VSTRING(VARIABLE_TYPE,"*",ERR,ERROR))//" of field number "// &
+                        & TRIM(NUMBER_TO_VSTRING(FIELD%USER_NUMBER,"*",ERR,ERROR))//" which has grid point based interpolation."
+                      CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
+                    CASE(FIELD_GAUSS_POINT_BASED_INTERPOLATION)
+                      LOCAL_ERROR="Can not get by Gauss point for component number "// &
+                        & TRIM(NUMBER_TO_VSTRING(COMPONENT_NUMBER,"*",ERR,ERROR))//" of variable type "// &
+                        & TRIM(NUMBER_TO_VSTRING(VARIABLE_TYPE,"*",ERR,ERROR))//" of field number "// &
+                        & TRIM(NUMBER_TO_VSTRING(FIELD%USER_NUMBER,"*",ERR,ERROR))//" which has Gauss point based interpolation."
+                      CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
+                    CASE(FIELD_DATA_POINT_BASED_INTERPOLATION)
+                      DOMAIN=>FIELD_VARIABLE%COMPONENTS(COMPONENT_NUMBER)%DOMAIN
+                      IF(ASSOCIATED(DOMAIN)) THEN
+                        DOMAIN_TOPOLOGY=>DOMAIN%TOPOLOGY
+                        CALL DOMAIN_TOPOLOGY_DATA_POINT_CHECK_EXISTS(DOMAIN_TOPOLOGY,USER_DATA_POINT_NUMBER,DATA_POINT_EXISTS, &
+                          & DOMAIN_LOCAL_DATA_POINT_NUMBER,GHOST_DATA_POINT,ERR,ERROR,*999)
+                        IF(DATA_POINT_EXISTS) THEN
+                          DOMAIN_DATA_POINT=>DOMAIN_TOPOLOGY%DATA_POINTS
+                          IF(ASSOCIATED(DOMAIN_DATA_POINT)) THEN
+                            dof_idx=FIELD_VARIABLE%COMPONENTS(COMPONENT_NUMBER)%PARAM_TO_DOF_MAP% &
+                              & DATA_POINT_PARAM2DOF_MAP%DATA_POINTS(DOMAIN_LOCAL_DATA_POINT_NUMBER)       
+                            CALL DISTRIBUTED_VECTOR_VALUES_GET(PARAMETER_SET%PARAMETERS,dof_idx,VALUE,ERR,ERROR,*999)
+                          ELSE
+                            CALL FLAG_ERROR("Domain topology data points is not associated.",ERR,ERROR,*999)
+                          ENDIF
+                        ELSE
+                          LOCAL_ERROR="The specified user data point number of "// &
+                            & TRIM(NUMBER_TO_VSTRING(USER_DATA_POINT_NUMBER,"*",ERR,ERROR))// &
+                            &  " does not exist in the domain for field component number "// &
+                            & TRIM(NUMBER_TO_VSTRING(COMPONENT_NUMBER,"*",ERR,ERROR))//" of field variable type "// &
+                            & TRIM(NUMBER_TO_VSTRING(VARIABLE_TYPE,"*",ERR,ERROR))//" of field number "// &
+                            & TRIM(NUMBER_TO_VSTRING(FIELD%USER_NUMBER,"*",ERR,ERROR))//"."
+                          CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
+                        ENDIF
+                      ELSE
+                        CALL FLAG_ERROR("Domain is not associated.",ERR,ERROR,*999)
+                      ENDIF
+                    CASE DEFAULT
+                      LOCAL_ERROR="The field component interpolation type of "//TRIM(NUMBER_TO_VSTRING(FIELD_VARIABLE% &
+                        & COMPONENTS(COMPONENT_NUMBER)%INTERPOLATION_TYPE,"*",ERR,ERROR))// &
+                        & " is invalid for component number "//TRIM(NUMBER_TO_VSTRING(COMPONENT_NUMBER,"*",ERR,ERROR))// &
+                        & " of variable type "//TRIM(NUMBER_TO_VSTRING(VARIABLE_TYPE,"*",ERR,ERROR))// &
+                        & " of field number "//TRIM(NUMBER_TO_VSTRING(FIELD%USER_NUMBER,"*",ERR,ERROR))//"."
+                      CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
+                    END SELECT
+                  ELSE
+                    LOCAL_ERROR="Component number "//TRIM(NUMBER_TO_VSTRING(COMPONENT_NUMBER,"*",ERR,ERROR))// &
+                      & " is invalid for variable type "//TRIM(NUMBER_TO_VSTRING(VARIABLE_TYPE,"*",ERR,ERROR))// &
+                      & " of field number "//TRIM(NUMBER_TO_VSTRING(FIELD%USER_NUMBER,"*",ERR,ERROR))//" which has "// &
+                      & TRIM(NUMBER_TO_VSTRING(FIELD_VARIABLE%NUMBER_OF_COMPONENTS,"*",ERR,ERROR))//" components."
+                    CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
+                  ENDIF
+                ELSE
+                  LOCAL_ERROR="The field parameter set type of "//TRIM(NUMBER_TO_VSTRING(FIELD_SET_TYPE,"*",ERR,ERROR))// &
+                    & " has not been created on field number "//TRIM(NUMBER_TO_VSTRING(FIELD%USER_NUMBER,"*",ERR,ERROR))
+                  CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
+                ENDIF
+              ELSE
+                LOCAL_ERROR="The field parameter set type of "//TRIM(NUMBER_TO_VSTRING(FIELD_SET_TYPE,"*",ERR,ERROR))// &
+                  & " is invalid. The field parameter set type must be between 1 and "// &
+                  & TRIM(NUMBER_TO_VSTRING(FIELD_NUMBER_OF_SET_TYPES,"*",ERR,ERROR))
+                CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
+              ENDIF
+            ELSE
+              LOCAL_ERROR="The field variable data type of "//TRIM(NUMBER_TO_VSTRING(FIELD_VARIABLE%DATA_TYPE,"*",ERR,ERROR))// &
+                & " does not correspond to the double precision data type of the given value."
+              CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
+            ENDIF
+          ELSE
+            LOCAL_ERROR="The specified field variable type of "//TRIM(NUMBER_TO_VSTRING(VARIABLE_TYPE,"*",ERR,ERROR))// &
+              & " has not been defined on field number "//TRIM(NUMBER_TO_VSTRING(FIELD%USER_NUMBER,"*",ERR,ERROR))//"."
+            CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
+          ENDIF
+        ELSE
+          LOCAL_ERROR="The specified variable type of "//TRIM(NUMBER_TO_VSTRING(VARIABLE_TYPE,"*",ERR,ERROR))// &
+            & " is invalid. The variable type must be between 1 and  "// &
+            & TRIM(NUMBER_TO_VSTRING(FIELD_NUMBER_OF_VARIABLE_TYPES,"*",ERR,ERROR))//"."
+          CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
+        ENDIF
+      ELSE
+        LOCAL_ERROR="Field number "//TRIM(NUMBER_TO_VSTRING(FIELD%USER_NUMBER,"*",ERR,ERROR))// &
+          & " has not been finished."
+        CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
+      ENDIF
+    ELSE
+      CALL FLAG_ERROR("Field is not associated.",ERR,ERROR,*999)
+    ENDIF
+
+    CALL EXITS("FIELD_PARAMETER_SET_GET_DATA_POINT_DP")
+    RETURN
+999 CALL ERRORS("FIELD_PARAMETER_SET_GET_DATA_POINT_DP",ERR,ERROR)
+    CALL EXITS("FIELD_PARAMETER_SET_GET_DATA_POINT_DP")
+    RETURN 1
+  END SUBROUTINE FIELD_PARAMETER_SET_GET_DATA_POINT_DP
 
   !
   !================================================================================================================================

@@ -3356,6 +3356,12 @@ MODULE OPENCMISS
     MODULE PROCEDURE CMISSField_ParameterSetGetConstantLNumber
     MODULE PROCEDURE CMISSField_ParameterSetGetConstantLObj
   END INTERFACE !CMISSField_ParameterSetGetConstant
+  
+  !>Returns from the given parameter set a value for the specified data pont of a field variable component.
+  INTERFACE CMISSField_ParameterSetGetDataPoint
+    MODULE PROCEDURE CMISSField_ParameterSetGetDataPointDPNumber
+    MODULE PROCEDURE CMISSField_ParameterSetGetDataPointDPObj
+  END INTERFACE !CMISSField_ParameterSetGetDataPoint
 
   !>Returns from the given parameter set a value for the specified element of a field variable component.
   INTERFACE CMISSField_ParameterSetGetElement
@@ -3596,6 +3602,8 @@ MODULE OPENCMISS
   PUBLIC CMISSField_ParameterSetDataGet,CMISSField_ParameterSetDataRestore
 
   PUBLIC CMISSField_ParameterSetGetConstant,CMISSField_ParameterSetGetElement,CMISSField_ParameterSetGetNode
+  
+  PUBLIC CMISSField_ParameterSetGetDataPoint
 
   PUBLIC CMISSField_ParameterSetUpdateConstant,CMISSField_ParameterSetUpdateElement,CMISSField_ParameterSetUpdateNode
   PUBLIC CMISSField_ParameterSetUpdateGaussPoint, CMISSField_ParameterSetGetGaussPoint
@@ -28185,6 +28193,88 @@ CONTAINS
     RETURN
 
   END SUBROUTINE CMISSField_ParameterSetGetConstantLObj
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Returns from the given parameter set a double precision value for the specified constant of a field variable component for a field identified by a user number.
+  SUBROUTINE CMISSField_ParameterSetGetDataPointDPNumber(regionUserNumber,fieldUserNumber,variableType,fieldSetType, &
+    & userDataPointNumber,componentNumber,value,err)
+
+    !Argument variables
+    INTEGER(INTG), INTENT(IN) :: regionUserNumber !<The user number of the region containing the field to get the constant value from the field parameter set.
+    INTEGER(INTG), INTENT(IN) :: fieldUserNumber !<The user number of the field to get the constant value from the field parameter set.
+    INTEGER(INTG), INTENT(IN) :: variableType !<The variable type of the field to get the constant value from the field parameter set. \see OPENCMISS_FieldVariableTypes
+    INTEGER(INTG), INTENT(IN) :: fieldSetType !<The parameter set type of the field to get the constant value from. \see OPENCMISS_FieldParameterSetTypes
+    INTEGER(INTG), INTENT(IN) :: userDataPointNumber  !<The user data point number to get the value for
+    INTEGER(INTG), INTENT(IN) :: componentNumber !<The component number of the field variable to get the constant value from the field parameter set.
+    REAL(DP), INTENT(OUT) :: value !<On return, the value from the field parameter set.
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code.
+    !Local variables
+    TYPE(FIELD_TYPE), POINTER :: FIELD
+    TYPE(REGION_TYPE), POINTER :: REGION
+    TYPE(VARYING_STRING) :: LOCAL_ERROR
+
+    CALL ENTERS("CMISSField_ParameterSetGetDataPointDPNumber",err,error,*999)
+
+    NULLIFY(REGION)
+    NULLIFY(FIELD)
+    CALL REGION_USER_NUMBER_FIND(regionUserNumber,REGION,err,error,*999)
+    IF(ASSOCIATED(REGION)) THEN
+      CALL FIELD_USER_NUMBER_FIND(fieldUserNumber,REGION,FIELD,err,error,*999)
+      IF(ASSOCIATED(FIELD)) THEN
+        CALL FIELD_PARAMETER_SET_GET_DATA_POINT(FIELD,variableType,fieldSetType,userDataPointNumber,componentNumber,value, &
+          & err,error,*999)
+      ELSE
+        LOCAL_ERROR="A field with an user number of "//TRIM(NUMBER_TO_VSTRING(fieldUserNumber,"*",err,error))// &
+          & " does not exist on region number "//TRIM(NUMBER_TO_VSTRING(regionUserNumber,"*",err,error))//"."
+        CALL FLAG_ERROR(LOCAL_ERROR,err,error,*999)
+      END IF
+    ELSE
+      LOCAL_ERROR="A region with an user number of "//TRIM(NUMBER_TO_VSTRING(regionUserNumber,"*",err,error))//" does not exist."
+      CALL FLAG_ERROR(LOCAL_ERROR,err,error,*999)
+    END IF
+
+    CALL EXITS("CMISSField_ParameterSetGetDataPointDPNumber")
+    RETURN
+999 CALL ERRORS("CMISSField_ParameterSetGetDataPointDPNumber",err,error)
+    CALL EXITS("CMISSField_ParameterSetGetDataPointDPNumber")
+    CALL CMISS_HANDLE_ERROR(err,error)
+    RETURN
+
+  END SUBROUTINE CMISSField_ParameterSetGetDataPointDPNumber
+
+  !
+  !================================================================================================================================
+  !
+
+  !>Returns from the given parameter set a double precision value for the specified constant of a field variable component for a field identified by an object.
+  SUBROUTINE CMISSField_ParameterSetGetDataPointDPObj(field,variableType,fieldSetType,userDataPointNumber,componentNumber,value,err)
+
+    !Argument variables
+    TYPE(CMISSFieldType), INTENT(IN) :: field !<The field to get the constant value from the field parameter set.
+    INTEGER(INTG), INTENT(IN) :: variableType !<The variable type of the field to get the constant value from the field parameter set. \see OPENCMISS_FieldVariableTypes
+    INTEGER(INTG), INTENT(IN) :: fieldSetType !<The parameter set type of the field to get the constant value from. \see OPENCMISS_FieldParameterSetTypes
+    INTEGER(INTG), INTENT(IN) :: userDataPointNumber  !<The user data point number to get the value for
+    INTEGER(INTG), INTENT(IN) :: componentNumber !<The component number of the field variable to get the constant value from the field parameter set.
+    REAL(DP), INTENT(OUT) :: value !<On return, the value from the field parameter set.
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code.
+    !Local variables
+
+    CALL ENTERS("CMISSField_ParameterSetGetDataPointDPObj",err,error,*999)
+
+    CALL FIELD_PARAMETER_SET_GET_DATA_POINT(field%FIELD,variableType,fieldSetType,userDataPointNumber,componentNumber, &
+      & value,err,error,*999)
+
+    CALL EXITS("CMISSField_ParameterSetGetDataPointDPObj")
+    RETURN
+999 CALL ERRORS("CMISSField_ParameterSetGetDataPointDPObj",err,error)
+    CALL EXITS("CMISSField_ParameterSetGetDataPointDPObj")
+    CALL CMISS_HANDLE_ERROR(err,error)
+    RETURN
+
+  END SUBROUTINE CMISSField_ParameterSetGetDataPointDPObj
 
   !
   !================================================================================================================================
