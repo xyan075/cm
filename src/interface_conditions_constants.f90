@@ -42,7 +42,7 @@
 !>
 
 !> This module defines all constants shared across interface condition routines.
-MODULE INTERFACE_CONDITIONS_CONSTANTS
+MODULE INTERFACE_CONDITIONS_CONSTANTS 
 
   USE KINDS
 
