@@ -319,6 +319,8 @@ MODULE OPENCMISS
   PUBLIC CMISSCoordinateSystemType,CMISSCoordinateSystem_Finalise,CMISSCoordinateSystem_Initialise
 
   PUBLIC CMISSDataPointsType,CMISSDataPoints_Finalise,CMISSDataPoints_Initialise
+  
+  PUBLIC CMISSDataProjectionTypesCopy
 
   PUBLIC CMISSDataProjectionType,CMISSDataProjection_Finalise,CMISSDataProjection_Initialise
 
@@ -6647,6 +6649,52 @@ CONTAINS
     RETURN
 
   END SUBROUTINE CMISSDataPoints_Initialise
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Copy an array of CMISSDataProjectionTypes from C to an allocated Fortran array, for use by the C bindings
+  SUBROUTINE CMISSDataProjectionTypesCopy(dataProjections,dataProjectionsSize,dataProjectionsPtr,err)
+
+    !Argument variables
+    TYPE(CMISSDataProjectionType), INTENT(INOUT) :: dataProjections(:) !<On return, the array of CMISSDataProjectionTypes
+    INTEGER(C_INT), INTENT(IN) :: dataProjectionsSize !<The length of the C array of pointers to CMISSDataProjectionTypes
+    TYPE(C_PTR), INTENT(IN) :: dataProjectionsPtr !<The pointer to the first CMISSDataProjectionType pointer
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code.
+    !Local variables
+    INTEGER(INTG) :: data_projection_idx
+    TYPE(C_PTR), POINTER :: dataProjectionsCPtrs(:)
+    TYPE(CMISSDataProjectionType), POINTER :: dataProjection
+
+    CALL ENTERS("CMISSDataProjectionTypesCopy",err,error,*999)
+
+    IF(C_ASSOCIATED(dataProjectionsPtr)) THEN
+      CALL C_F_POINTER(dataProjectionsPtr,DataProjectionsCPtrs,[dataProjectionsSize])
+      IF(ASSOCIATED(DataProjectionsCPtrs)) THEN
+        DO data_projection_idx=1,dataProjectionsSize
+          CALL C_F_POINTER(DataProjectionsCPtrs(data_projection_idx),dataProjection)
+          IF(ASSOCIATED(DataProjectionsCPtrs)) THEN
+            dataProjections(data_projection_idx)%DATA_PROJECTION => dataProjection%DATA_PROJECTION
+          ELSE
+            CALL FLAG_ERROR("error converting C pointer.",ERR,error,*999)
+          END IF
+        END DO
+      ELSE
+        CALL FLAG_ERROR("error converting C pointer.",ERR,error,*999)
+      END IF
+    ELSE
+      CALL FLAG_ERROR("Data projection C pointer is not associated.",ERR,error,*999)
+    END IF
+
+    CALL EXITS("CMISSDataProjectionTypesCopy")
+    RETURN
+999 CALL ERRORS("CMISSDataProjectionTypesCopy",err,error)
+    CALL EXITS("CMISSDataProjectionTypesCopy")
+    CALL CMISS_HANDLE_ERROR(err,error)
+    RETURN
+
+  END SUBROUTINE CMISSDataProjectionTypesCopy
 
   !
   !================================================================================================================================
