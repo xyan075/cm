@@ -8233,9 +8233,14 @@ CONTAINS
     TYPE(DATA_PROJECTION_RESULT_TYPE), POINTER :: DATA_PROJECTION_RESULT
     TYPE(MESH_ELEMENTS_TYPE), POINTER :: ELEMENTS
     INTEGER(INTG) :: data_projection_idx,data_point_idx,ELEMENT_NUMBER,element_idx,count_idx,PROJECTION_NUMBER,global_count_idx
+    INTEGER(INTG), ALLOCATABLE :: element_count_idx(:)
        
     IF(ASSOCIATED(MESH)) THEN
       IF(DATA_PROJECTION%DATA_PROJECTION_FINISHED) THEN 
+        NULLIFY(DATA_POINTS)
+        NULLIFY(DATA_POINTS_TOPOLOGY)
+        NULLIFY(DATA_PROJECTION_RESULT)
+        NULLIFY(ELEMENTS)
         DATA_POINTS=>DATA_PROJECTION%DATA_POINTS
         DATA_POINTS_TOPOLOGY=>MESH%TOPOLOGY(1)%PTR%DATA_POINTS
         !Extract the global number of the data projection 
@@ -8246,6 +8251,7 @@ CONTAINS
         DATA_POINTS_TOPOLOGY%NUMBER_OF_ELEMENTS=ELEMENTS%NUMBER_OF_ELEMENTS
         DO element_idx=1,DATA_POINTS_TOPOLOGY%NUMBER_OF_ELEMENTS
           DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(element_idx)%ELEMENT_NUMBER=ELEMENTS%ELEMENTS(element_idx)%GLOBAL_NUMBER
+          DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(element_idx)%NUMBER_OF_PROJECTED_DATA=0
         ENDDO        
         !Calculate number of projected data points on an element
         DO data_point_idx=1,DATA_POINTS%NUMBER_OF_DATA_POINTS
@@ -8269,20 +8275,23 @@ CONTAINS
         ENDDO     
         !Record the indecies of the data that projected on the elements 
         global_count_idx=0
+        DATA_POINTS_TOPOLOGY%TOTAL_NUMBER_OF_PROJECTED_DATA=0
+        ALLOCATE(element_count_idx(DATA_POINTS_TOPOLOGY%NUMBER_OF_ELEMENTS),STAT=ERR)
+        DO element_idx=1,DATA_POINTS_TOPOLOGY%NUMBER_OF_ELEMENTS
+          element_count_idx(element_idx)=0
+        ENDDO
         DO data_point_idx=1,DATA_POINTS%NUMBER_OF_DATA_POINTS
           !The last projection is hard-coded to be the interface mesh projection
           DATA_PROJECTION_RESULT=>DATA_PROJECTION%DATA_PROJECTION_RESULTS(data_point_idx)
           ELEMENT_NUMBER=DATA_PROJECTION_RESULT%ELEMENT_NUMBER
-          DO element_idx=1,DATA_POINTS_TOPOLOGY%NUMBER_OF_ELEMENTS
-            count_idx=1         
+          DO element_idx=1,DATA_POINTS_TOPOLOGY%NUMBER_OF_ELEMENTS        
             IF(DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(element_idx)%ELEMENT_NUMBER==ELEMENT_NUMBER) THEN
               global_count_idx=global_count_idx+1
-              !Find the next data point index in this element
-              DO WHILE(DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(element_idx)%DATA_INDICES(count_idx)%GLOBAL_NUMBER/=0)
-                count_idx=count_idx+1
-              ENDDO
-              DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(element_idx)%DATA_INDICES(count_idx)%USER_NUMBER=data_point_idx
-              DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(element_idx)%DATA_INDICES(count_idx)%GLOBAL_NUMBER=global_count_idx
+              element_count_idx(element_idx)=element_count_idx(element_idx)+1
+              DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(element_idx)%DATA_INDICES(element_count_idx(element_idx))%USER_NUMBER= &
+                & data_point_idx
+              DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(element_idx)%DATA_INDICES(element_count_idx(element_idx))%GLOBAL_NUMBER= &
+                & global_count_idx
               DATA_POINTS_TOPOLOGY%TOTAL_NUMBER_OF_PROJECTED_DATA=DATA_POINTS_TOPOLOGY%TOTAL_NUMBER_OF_PROJECTED_DATA+1
             ENDIF             
           ENDDO !element_idx
@@ -8296,13 +8305,14 @@ CONTAINS
           DO data_point_idx=1,DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(element_idx)%NUMBER_OF_PROJECTED_DATA
             DATA_POINTS_TOPOLOGY%DATA_POINTS(count_idx)%USER_NUMBER=DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(element_idx)% &
               & DATA_INDICES(data_point_idx)%USER_NUMBER
-             DATA_POINTS_TOPOLOGY%DATA_POINTS(count_idx)%GLOBAL_NUMBER=DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(element_idx)% &
-              & DATA_INDICES(data_point_idx)%GLOBAL_NUMBER
-             DATA_POINTS_TOPOLOGY%DATA_POINTS(count_idx)%ELEMENT_NUMBER=DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(element_idx)% &
-               & ELEMENT_NUMBER
-             count_idx=count_idx+1
+            DATA_POINTS_TOPOLOGY%DATA_POINTS(count_idx)%GLOBAL_NUMBER=DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(element_idx)% &
+             & DATA_INDICES(data_point_idx)%GLOBAL_NUMBER
+            DATA_POINTS_TOPOLOGY%DATA_POINTS(count_idx)%ELEMENT_NUMBER=DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(element_idx)% &
+              & ELEMENT_NUMBER
+            count_idx=count_idx+1
           ENDDO !data_point_idx
-        ENDDO !element_idx                      
+        ENDDO !element_idx   
+        DEALLOCATE(element_count_idx)           
       ELSE
         CALL FLAG_ERROR("Data projection is not finished.",ERR,ERROR,*999)
       ENDIF     

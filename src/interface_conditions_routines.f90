@@ -2382,8 +2382,6 @@ CONTAINS
                 MATRIX_COEFFICIENT=-1.0_DP
               ENDIF
               !Pointers to the interface_matrix_idx'th coupled mesh variables (rows of interface element matrix)
-              INTERFACE_MATRIX_DEPENDENT_FIELD=>INTERFACE_EQUATIONS%INTERPOLATION%VARIABLE_INTERPOLATION(interface_matrix_idx)% &
-                & DEPENDENT_FIELD
               INTERFACE_MATRIX_VARIABLE=>INTERFACE_EQUATIONS%INTERFACE_MAPPING% & 
                 & INTERFACE_MATRIX_ROWS_TO_VAR_MAPS(interface_matrix_idx)%VARIABLE
               INTERFACE_MATRIX_VARIABLE_TYPE=INTERFACE_MATRIX_VARIABLE%VARIABLE_TYPE
@@ -2773,17 +2771,18 @@ CONTAINS
               !Contact Mechanics starts here.                          
               CASE(INTERFACE_CONDITION_FRICTIONLESS_CONTACT_OPERATOR)
                 INTERFACE_ELEMENT_MATRIX=>INTERFACE_EQUATIONS%INTERFACE_MATRICES%MATRICES(interface_matrix_idx)%PTR%ELEMENT_MATRIX                    
-                COUPLED_MESH_GEOMETRIC_FIELD=>INTERFACE_EQUATIONS%INTERPOLATION%VARIABLE_INTERPOLATION(interface_matrix_idx)% &
-                  & GEOMETRIC_FIELD  
-                INTERFACE_MATRIX_DEPENDENT_FIELD=>INTERFACE_EQUATIONS%INTERPOLATION%VARIABLE_INTERPOLATION(interface_matrix_idx)% &
-                  & DEPENDENT_FIELD     
+  
                 INTERFACE_MATRIX_VARIABLE=>INTERFACE_EQUATIONS%INTERFACE_MAPPING%INTERFACE_MATRIX_ROWS_TO_VAR_MAPS &
                   & (interface_matrix_idx)%VARIABLE
                 INTERFACE_MATRIX_VARIABLE_TYPE=INTERFACE_MATRIX_VARIABLE%VARIABLE_TYPE
                 InterfaceNumberOfGeometricComponent=INTERFACE_GEOMETRIC_FIELD%VARIABLES(1)%NUMBER_OF_COMPONENTS 
                 IF (.NOT. (INTERFACE_CONDITION%METHOD==INTERFACE_CONDITION_PENALTY_METHOD .AND. &
                     & interface_matrix_idx==INTERFACE_EQUATIONS%INTERFACE_MATRICES%NUMBER_OF_INTERFACE_MATRICES)) THEN
+                  COUPLED_MESH_GEOMETRIC_FIELD=>INTERFACE_EQUATIONS%INTERPOLATION%VARIABLE_INTERPOLATION(interface_matrix_idx)% &
+                    & GEOMETRIC_FIELD 
                   coupledMeshNumberOfGeometricComponents=COUPLED_MESH_GEOMETRIC_FIELD%VARIABLES(1)%NUMBER_OF_COMPONENTS 
+                  INTERFACE_MATRIX_DEPENDENT_FIELD=>INTERFACE_EQUATIONS%INTERPOLATION% &
+                    & VARIABLE_INTERPOLATION(interface_matrix_idx)%DEPENDENT_FIELD   
                 ENDIF    
                 SELECT CASE(INTERFACE_CONDITION%LAGRANGE%LAGRANGE_FIELD%VARIABLES(1)%COMPONENTS(1)%INTERPOLATION_TYPE)
                 CASE(FIELD_NODE_BASED_INTERPOLATION) !Mesh connectivity
@@ -2974,7 +2973,7 @@ CONTAINS
                         !sign changes from + to - when flipping the matrices to RHS
                         !RHS_VEC%ELEMENT_VECTOR%VECTOR(colIdx)=RHS_VEC%ELEMENT_VECTOR%VECTOR(colIdx)- &
                         !  & INTERFACE_ELEMENT_MATRIX%MATRIX(rowIdx,colIdx)*dofValue
-                        RHS_VEC%ELEMENT_VECTOR%VECTOR(colIdx)=0 !finite elasticity RHS=0   
+                        RHS_VEC%ELEMENT_VECTOR%VECTOR(colIdx)=0.0_DP !finite elasticity RHS=0   
                       ENDDO !rowParameterIdx
                     ENDDO !colParameterIdx
                   ENDDO !colComponentIdx        
@@ -3119,8 +3118,7 @@ CONTAINS
                           ENDDO !rowParameterIdx
                         ENDDO !component_idx     
                       ENDIF !If the data point has been orthogonally projected      
-                    ENDDO !dataPointIdx        
-                            
+                    ENDDO !dataPointIdx               
                     !scale factor update
                     IF(INTERFACE_MATRIX_DEPENDENT_FIELD%SCALINGS%SCALING_TYPE/=FIELD_NO_SCALING) THEN
                       rowIdx=0
@@ -3153,7 +3151,6 @@ CONTAINS
                         ENDDO !rowComponentIdx
                       ENDDO !coupledMeshElementIdx
                     ENDIF
-                    
                     !Evaluate RHS element vector for frictionless contact
                     RHS_VEC=>INTERFACE_EQUATIONS%INTERFACE_MATRICES%RHS_VECTOR
                     DO colComponentIdx=1,InterfaceNumberOfGeometricComponent
@@ -3171,7 +3168,7 @@ CONTAINS
                             & interface_matrix_idx)%ELEMENT_NUMBERS(coupledMeshElementIdx))
                           coupledMeshElementIdx=coupledMeshElementIdx+1
                         ENDDO  
-                        junk=0                 
+                        !junk=0.0                 
                         DO rowParameterIdx=1,COUPLED_MESH_BASIS%NUMBER_OF_ELEMENT_PARAMETERS
                           rowIdx=COUPLED_MESH_BASIS%NUMBER_OF_ELEMENT_PARAMETERS*POINTS_CONNECTIVITY% &
                             & COUPLED_MESH_ELEMENTS(ELEMENT_NUMBER,interface_matrix_idx)%NUMBER_OF_COUPLED_MESH_ELEMENTS* &
@@ -3183,7 +3180,7 @@ CONTAINS
                           !sign changes from + to - when flipping the matrices to RHS
                           RHS_VEC%ELEMENT_VECTOR%VECTOR(colIdx)=RHS_VEC%ELEMENT_VECTOR%VECTOR(colIdx)- &
                             & INTERFACE_ELEMENT_MATRIX%MATRIX(rowIdx,colIdx)*dofValue     
-                          junk=junk+INTERFACE_ELEMENT_MATRIX%MATRIX(rowIdx,colIdx)*dofValue            
+                          !junk=junk+INTERFACE_ELEMENT_MATRIX%MATRIX(rowIdx,colIdx)*dofValue            
                           !RHS_VEC%ELEMENT_VECTOR%VECTOR(colIdx)=0 !finite elasticity RHS=0
                         ENDDO !rowParameterIdx
                       ENDDO !dataPointIdx  
@@ -3246,7 +3243,7 @@ CONTAINS
                           & (rowComponentIdx-1)+COUPLED_MESH_BASIS%NUMBER_OF_ELEMENT_PARAMETERS* &
                           & (coupledMeshElementIdx-1)+rowParameterIdx
                         IF(-RHS_VEC%ELEMENT_VECTOR%VECTOR(colIdx)<0.000000001_DP) THEN !If the gap is a separation
-                          INTERFACE_ELEMENT_MATRIX%MATRIX(rowIdx,colIdx)=0 !Only needed if reproject in every iteration. Since initial penetration may be zero
+                          INTERFACE_ELEMENT_MATRIX%MATRIX(rowIdx,colIdx)=0.0_DP !Only needed if reproject in every iteration. Since initial penetration may be zero
                         ENDIF
                       ENDDO !rowParameterIdx
                     ENDDO !dataPointIdx  
@@ -3255,7 +3252,7 @@ CONTAINS
                 ENDIF !point connectivity
               ENDIF !UPDATE_MATRIX
             ENDDO ! interface_matrix_idx
-            RHS_VEC%ELEMENT_VECTOR%VECTOR=0 !finite elasticity RHS=0  
+            RHS_VEC%ELEMENT_VECTOR%VECTOR=0.0_DP !finite elasticity RHS=0  
           ENDIF
         CASE(INTERFACE_CONDITION_AUGMENTED_LAGRANGE_METHOD)
           CALL FLAG_ERROR("Not implemented.",ERR,ERROR,*999)
