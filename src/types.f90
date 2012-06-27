@@ -2178,7 +2178,7 @@ END TYPE GENERATED_MESH_ELLIPSOID_TYPE
     LOGICAL :: POINTS_CONNECTIVITY_FINISHED !<Is .TRUE. if the coupled mesh data points connectivity has finished being created, .FALSE. if not.
     INTEGER(INTG) :: NUMBER_OF_DATA_POINTS !<Is the number of data points in the interface
     INTEGER(INTG) :: NUMBER_OF_ELEMENTS !<Number of element in the interface mesh
-    INTEGER(INTG) :: NUMBER_INT_DOM !<Is the number of domains coupled via the interface
+    INTEGER(INTG) :: NUMBER_OF_COUPLED_MESHES !<The number of coupled meshes in the interface
     TYPE(INTERFACE_POINT_CONNECTIVITY_TYPE), ALLOCATABLE :: POINTS_CONNECTIVITY(:,:) !<POINTS_CONNECTIVITY(point_index,coupled_mesh_idx)
     TYPE(INTERFACE_POINTS_CONNECTIVITY_COUPLED_ELEMENTS_TYPE), ALLOCATABLE :: COUPLED_MESH_ELEMENTS(:,:) !<COUPLED_MESH_ELEMENTS(interface_element_idx,coupled_mesh_idx)
   END TYPE INTERFACE_POINTS_CONNECTIVITY_TYPE
