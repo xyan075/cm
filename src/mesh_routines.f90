@@ -6133,7 +6133,6 @@ CONTAINS
     INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
     TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
     !Local Variables
-    TYPE(REGION_TYPE), POINTER :: PARENT_REGION
     TYPE(VARYING_STRING) :: LOCAL_ERROR
 
     CALL ENTERS("MESH_CREATE_START_INTERFACE",ERR,ERROR,*999)
@@ -6151,31 +6150,22 @@ CONTAINS
               & TRIM(NUMBER_TO_VSTRING(INTERFACE%USER_NUMBER,"*",ERR,ERROR))//"."
             CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
           ELSE
-            IF(ASSOCIATED(INTERFACE%INTERFACES)) THEN
-              PARENT_REGION=>INTERFACE%INTERFACES%PARENT_REGION
-              IF(ASSOCIATED(PARENT_REGION)) THEN
-                IF(ASSOCIATED(PARENT_REGION%COORDINATE_SYSTEM)) THEN                  
-                  IF(NUMBER_OF_DIMENSIONS>0) THEN
-                    IF(NUMBER_OF_DIMENSIONS<=PARENT_REGION%COORDINATE_SYSTEM%NUMBER_OF_DIMENSIONS) THEN
-                      CALL MESH_CREATE_START_GENERIC(INTERFACE%MESHES,USER_NUMBER,NUMBER_OF_DIMENSIONS,MESH,ERR,ERROR,*999)
-                      MESH%INTERFACE=>INTERFACE
-                    ELSE
-                      LOCAL_ERROR="Number of mesh dimensions ("//TRIM(NUMBER_TO_VSTRING(NUMBER_OF_DIMENSIONS,"*",ERR,ERROR))// &
-                        & ") must be <= number of parent region dimensions ("// &
-                        & TRIM(NUMBER_TO_VSTRING(PARENT_REGION%COORDINATE_SYSTEM%NUMBER_OF_DIMENSIONS,"*",ERR,ERROR))//")."
-                      CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
-                    ENDIF
-                  ELSE
-                    CALL FLAG_ERROR("Number of mesh dimensions must be > 0.",ERR,ERROR,*999)
-                  ENDIF
+            IF(ASSOCIATED(INTERFACE%COORDINATE_SYSTEM)) THEN                  
+              IF(NUMBER_OF_DIMENSIONS>0) THEN
+                IF(NUMBER_OF_DIMENSIONS<=INTERFACE%COORDINATE_SYSTEM%NUMBER_OF_DIMENSIONS) THEN
+                  CALL MESH_CREATE_START_GENERIC(INTERFACE%MESHES,USER_NUMBER,NUMBER_OF_DIMENSIONS,MESH,ERR,ERROR,*999)
+                  MESH%INTERFACE=>INTERFACE
                 ELSE
-                  CALL FLAG_ERROR("Parent region coordinate system is not associated.",ERR,ERROR,*999)
+                  LOCAL_ERROR="Number of mesh dimensions ("//TRIM(NUMBER_TO_VSTRING(NUMBER_OF_DIMENSIONS,"*",ERR,ERROR))// &
+                    & ") must be <= number of interface dimensions ("// &
+                    & TRIM(NUMBER_TO_VSTRING(INTERFACE%COORDINATE_SYSTEM%NUMBER_OF_DIMENSIONS,"*",ERR,ERROR))//")."
+                  CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
                 ENDIF
               ELSE
-                CALL FLAG_ERROR("Interfaces parent region is not associated.",ERR,ERROR,*999)
+                CALL FLAG_ERROR("Number of mesh dimensions must be > 0.",ERR,ERROR,*999)
               ENDIF
             ELSE
-              CALL FLAG_ERROR("Interface interfaces is not associated.",ERR,ERROR,*999)
+              CALL FLAG_ERROR("Interface coordinate system is not associated.",ERR,ERROR,*999)
             ENDIF
           ENDIF
         ELSE
