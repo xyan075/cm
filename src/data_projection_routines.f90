@@ -2557,27 +2557,37 @@ CONTAINS
   !
   
   !>Sets the projection type for a data projection.
-  SUBROUTINE DATA_PROJECTION_PROJECTION_ELEMENTS_SET(DATA_PROJECTION,ELEMENT_NUMBERS,FACE_NUMBERS,ERR,ERROR,*)
+  SUBROUTINE DATA_PROJECTION_PROJECTION_ELEMENTS_SET(DATA_PROJECTION,ELEMENT_USER_NUMBERS,FACE_NUMBERS,ERR,ERROR,*)
 
     !Argument variables
     TYPE(DATA_PROJECTION_TYPE), POINTER :: DATA_PROJECTION !<A pointer to the data projection to set the projection type for
-    INTEGER(INTG), INTENT(IN) :: ELEMENT_NUMBERS(:) !<the projection candidate global element numbers
-    INTEGER(INTG), INTENT(IN) :: FACE_NUMBERS(:) !<the projection candidate element face numbers
+    INTEGER(INTG), INTENT(IN) :: ELEMENT_USER_NUMBERS(:) !<the projection candidate global element numbers
+    INTEGER(INTG), INTENT(IN) :: FACE_NUMBERS(:) !<the projection candidate element face numbers-element face numbers 1-6
     INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
     TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
     !Local Variables
     INTEGER(INTG) :: element_idx
+    INTEGER(INTG) :: ELEMENT_GLOBAL_NUMBER
+    INTEGER(INTG) :: MESH_COMPONENT_NUMBER=1 !<TODO:mesh component is harded coded to be 1, need to be generalised
+    LOGICAL :: ELEMENT_EXISTS
     
     CALL ENTERS("DATA_PROJECTION_PROJECTION_ELEMENTS_SET",ERR,ERROR,*999)
 
     IF(ASSOCIATED(DATA_PROJECTION)) THEN
-      IF(SIZE(ELEMENT_NUMBERS,1)==SIZE(FACE_NUMBERS,1)) THEN
-        ALLOCATE(DATA_PROJECTION%CANDIDATE_ELEMENT_NUMBERS(SIZE(ELEMENT_NUMBERS,1)),STAT=ERR)
+      IF(SIZE(ELEMENT_USER_NUMBERS,1)==SIZE(FACE_NUMBERS,1)) THEN
+        ALLOCATE(DATA_PROJECTION%CANDIDATE_ELEMENT_NUMBERS(SIZE(ELEMENT_USER_NUMBERS,1)),STAT=ERR)
         ALLOCATE(DATA_PROJECTION%CANDIDATE_FACE_NUMBERS(SIZE(FACE_NUMBERS,1)),STAT=ERR)
-        DO element_idx=1,SIZE(ELEMENT_NUMBERS,1)
-          DATA_PROJECTION%CANDIDATE_ELEMENT_NUMBERS(element_idx)=ELEMENT_NUMBERS(element_idx)
-          DATA_PROJECTION%CANDIDATE_FACE_NUMBERS(element_idx)=FACE_NUMBERS(element_idx)
-        ENDDO
+        DO element_idx=1,SIZE(ELEMENT_USER_NUMBERS,1)
+          CALL MESH_TOPOLOGY_ELEMENT_CHECK_EXISTS(DATA_PROJECTION%MESH,MESH_COMPONENT_NUMBER,ELEMENT_USER_NUMBERS(element_idx), &
+            & ELEMENT_EXISTS,ELEMENT_GLOBAL_NUMBER,ERR,ERROR,*999)       
+          IF(ELEMENT_EXISTS) THEN
+            DATA_PROJECTION%CANDIDATE_ELEMENT_NUMBERS(element_idx)=ELEMENT_GLOBAL_NUMBER
+            DATA_PROJECTION%CANDIDATE_FACE_NUMBERS(element_idx)=FACE_NUMBERS(element_idx)
+          ELSE
+            CALL FLAG_ERROR("Element with user number ("//TRIM(NUMBER_TO_VSTRING &
+              & (ELEMENT_USER_NUMBERS(element_idx),"*",ERR,ERROR))//") does not exist.",ERR,ERROR,*999)
+          ENDIF
+        ENDDO !element_idx
       ELSE
         CALL FLAG_ERROR("Input element numbers and face numbers sizes do not match.",ERR,ERROR,*999)
       ENDIF
