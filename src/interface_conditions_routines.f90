@@ -619,15 +619,6 @@ CONTAINS
         !Get the mesh component number for this field
         !MESH_COMPONENT_NUMBER=DEPENDENT_FIELD_1%DECOMPOSITION%MESH_COMPONENT_NUMBER
         MESH_COMPONENT_NUMBER=1
-        POINTS_CONNECTIVITY%DATA_POINT_PROJECTED=.TRUE.
-        DO data_point_idx=1,POINTS_CONNECTIVITY%NUMBER_OF_DATA_POINTS
-          DO xi_idx=1,SIZE(DATA_POINTS%DATA_PROJECTIONS(2)%PTR%DATA_PROJECTION_RESULTS(data_point_idx)%XI)
-              IF(DATA_POINTS%DATA_PROJECTIONS(2)%PTR%DATA_PROJECTION_RESULTS(data_point_idx)%XI(xi_idx)==0.0_DP .OR.  &
-                  & DATA_POINTS%DATA_PROJECTIONS(2)%PTR%DATA_PROJECTION_RESULTS(data_point_idx)%XI(xi_idx)==1.0_DP) THEN
-                POINTS_CONNECTIVITY%DATA_POINT_PROJECTED(data_point_idx)=.FALSE.
-              ENDIF
-            ENDDO
-        ENDDO
         DO coupled_mesh_idx=2,INTERFACE_CONDITION%INTERFACE%NUMBER_OF_COUPLED_MESHES
           DATA_PROJECTION=>DATA_POINTS%DATA_PROJECTIONS(coupled_mesh_idx)%PTR
           DEPENDENT_FIELD_PROJECTION=>INTERFACE_CONDITION%DEPENDENT%EQUATIONS_SETS(coupled_mesh_idx)%PTR%DEPENDENT%DEPENDENT_FIELD
@@ -673,6 +664,15 @@ CONTAINS
               END SELECT
             ENDIF
           ENDDO !data_point_idx      
+        ENDDO
+        POINTS_CONNECTIVITY%DATA_POINT_PROJECTED=.TRUE.
+        DO data_point_idx=1,POINTS_CONNECTIVITY%NUMBER_OF_DATA_POINTS
+          DO xi_idx=1,SIZE(DATA_POINTS%DATA_PROJECTIONS(2)%PTR%DATA_PROJECTION_RESULTS(data_point_idx)%XI)
+              IF(DATA_POINTS%DATA_PROJECTIONS(2)%PTR%DATA_PROJECTION_RESULTS(data_point_idx)%XI(xi_idx)==0.0_DP .OR.  &
+                  & DATA_POINTS%DATA_PROJECTIONS(2)%PTR%DATA_PROJECTION_RESULTS(data_point_idx)%XI(xi_idx)==1.0_DP) THEN
+                POINTS_CONNECTIVITY%DATA_POINT_PROJECTED(data_point_idx)=.FALSE.
+              ENDIF
+            ENDDO
         ENDDO
       ELSE
         CALL FLAG_ERROR("Interface condition points connectivity is not associated.",ERR,ERROR,*999)
