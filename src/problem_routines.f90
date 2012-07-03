@@ -131,6 +131,8 @@ MODULE PROBLEM_ROUTINES
   
   PUBLIC PROBLEM_SOLVER_GET
   
+  PUBLIC PROBLEM_SOLVER_NONLINEAR_MONITOR
+  
   PUBLIC PROBLEM_SOLVE
   
   PUBLIC PROBLEM_SOLVERS_CREATE_START,PROBLEM_SOLVERS_CREATE_FINISH
@@ -3095,6 +3097,116 @@ CONTAINS
   !================================================================================================================================
   !
 
+  !>Monitors the problem nonlinear solve
+  SUBROUTINE PROBLEM_SOLVER_NONLINEAR_MONITOR(SOLVER,ITS,NORM,ERR,ERROR,*)
+
+    !Argument variables
+    TYPE(SOLVER_TYPE), POINTER :: SOLVER !<A pointer to the solver to monitor
+    INTEGER(INTG), INTENT(IN) :: ITS !<The number of iterations
+    REAL(DP), INTENT(IN) :: NORM !<The residual norm
+    INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
+    !Local Variables
+    TYPE(SOLVERS_TYPE), POINTER :: SOLVERS
+    TYPE(CONTROL_LOOP_TYPE), POINTER :: CONTROL_LOOP
+    TYPE(PROBLEM_TYPE), POINTER :: PROBLEM
+    TYPE(NONLINEAR_SOLVER_TYPE), POINTER :: NONLINEAR_SOLVER 
+    TYPE(SOLVER_EQUATIONS_TYPE), POINTER :: SOLVER_EQUATIONS
+    TYPE(SOLVER_MAPPING_TYPE), POINTER :: SOLVER_MAPPING
+    TYPE(INTERFACE_CONDITION_TYPE), POINTER :: INTERFACE_CONDITION
+    INTEGER(INTG) :: interfaceConditionIdx
+       
+    TYPE(VARYING_STRING) :: LOCAL_ERROR
+    
+    CALL ENTERS("PROBLEM_SOLVER_NONLINEAR_MONITOR",ERR,ERROR,*998)
+    
+    IF(ASSOCIATED(SOLVER)) THEN
+      SOLVERS=>SOLVER%SOLVERS
+      IF(ASSOCIATED(SOLVERS)) THEN
+        CONTROL_LOOP=>SOLVERS%CONTROL_LOOP
+        IF(ASSOCIATED(CONTROL_LOOP)) THEN
+          PROBLEM=>CONTROL_LOOP%PROBLEM
+          IF(ASSOCIATED(PROBLEM)) THEN
+            SELECT CASE(PROBLEM%CLASS)
+            CASE(PROBLEM_ELASTICITY_CLASS)
+              !Check for interface condition
+              SOLVER_EQUATIONS=>SOLVER%SOLVER_EQUATIONS
+              IF(ASSOCIATED(SOLVER_EQUATIONS)) THEN
+                SOLVER_MAPPING=>SOLVER_EQUATIONS%SOLVER_MAPPING
+                IF(ASSOCIATED(SOLVER_MAPPING)) THEN
+                  DO interfaceConditionIdx=1,SOLVER_MAPPING%NUMBER_OF_INTERFACE_CONDITIONS
+                    INTERFACE_CONDITION=>SOLVER_MAPPING%INTERFACE_CONDITIONS(interfaceConditionIdx)%PTR
+                    IF(ASSOCIATED(INTERFACE_CONDITION)) THEN
+                      IF(INTERFACE_CONDITION%OPERATOR==INTERFACE_CONDITION_FRICTIONLESS_CONTACT_OPERATOR) THEN
+                        CALL INTERFACE_CONDITION_DATA_REPROJECTION(INTERFACE_CONDITION,ERR,ERROR,*999)
+                        CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"*****************************************",ERR,ERROR,*999)
+                        CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"Data projected!!!",ERR,ERROR,*999)
+                        CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"*****************************************",ERR,ERROR,*999)
+                        CALL INTERFACE_CONDITION_ASSEMBLE(INTERFACE_CONDITION,ERR,ERROR,*999)
+                        
+                      ENDIF
+                    ELSE
+                    CALL FLAG_ERROR("Interface condition is not associated.",ERR,ERROR,*999)
+                  ENDIF
+                  ENDDO
+                ELSE
+                  CALL FLAG_ERROR("Solver equations is not associated.",ERR,ERROR,*999)
+                ENDIF
+              ELSE
+                CALL FLAG_ERROR("Solver equations is not associated.",ERR,ERROR,*999)
+              ENDIF
+            CASE(PROBLEM_BIOELECTRICS_CLASS)
+              !Do nothing???
+            CASE(PROBLEM_FLUID_MECHANICS_CLASS)
+              !Do nothing???
+            CASE(PROBLEM_ELECTROMAGNETICS_CLASS)
+              !Do nothing???
+            CASE(PROBLEM_CLASSICAL_FIELD_CLASS)
+              !Do nothing???
+            CASE(PROBLEM_FITTING_CLASS)
+              !Do nothing???
+            CASE(PROBLEM_MODAL_CLASS)
+              !Do nothing???
+            CASE(PROBLEM_MULTI_PHYSICS_CLASS)
+              !Do nothing???
+            CASE DEFAULT
+              LOCAL_ERROR="The problem class of "//TRIM(NUMBER_TO_VSTRING(PROBLEM%CLASS,"*",ERR,ERROR))//" &
+                & is invalid."
+              CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
+            END SELECT
+          ELSE
+            CALL FLAG_ERROR("Problem is not associated.",ERR,ERROR,*999)
+          ENDIF
+        ELSE
+          CALL FLAG_ERROR("Problem control loop is not associated.",ERR,ERROR,*999)
+        ENDIF
+      ELSE
+        CALL FLAG_ERROR("Solvers is not associated.",ERR,ERROR,*999)
+      ENDIF
+      
+      !Nonlinear solve monitor--progress output if required
+      NONLINEAR_SOLVER=>SOLVER%NONLINEAR_SOLVER
+      IF(ASSOCIATED(NONLINEAR_SOLVER)) THEN
+        CALL SOLVER_NONLINEAR_MONITOR(NONLINEAR_SOLVER,ITS,NORM,ERR,ERROR,*999)
+      ELSE
+        CALL FLAG_ERROR("Nonlinear solver is not associated.",ERR,ERROR,*999)
+      ENDIF
+    ELSE
+      CALL FLAG_ERROR("Solver is not associated.",ERR,ERROR,*999)
+    ENDIF
+    
+    CALL EXITS("PROBLEM_SOLVER_NONLINEAR_MONITOR")
+    RETURN
+999 NULLIFY(SOLVER)
+998 CALL ERRORS("PROBLEM_SOLVER_NONLINEAR_MONITOR",ERR,ERROR)
+    CALL EXITS("PROBLEM_SOLVER_NONLINEAR_MONITOR")
+    RETURN 1
+  END SUBROUTINE PROBLEM_SOLVER_NONLINEAR_MONITOR
+  
+  !
+  !================================================================================================================================
+  !
+
   !>Gets the problem specification i.e., problem class, type and subtype for a problem identified by a pointer. \see OPENCMISS::CMISSProblemSpecificationGet
   SUBROUTINE PROBLEM_SPECIFICATION_GET(PROBLEM,PROBLEM_CLASS,PROBLEM_EQUATION_TYPE,PROBLEM_SUBTYPE,ERR,ERROR,*)
 
@@ -3657,4 +3769,57 @@ SUBROUTINE PROBLEM_SOLVER_RESIDUAL_EVALUATE_PETSC(SNES,X,F,CTX,ERR)
 995 RETURN    
 
 END SUBROUTINE PROBLEM_SOLVER_RESIDUAL_EVALUATE_PETSC
+
+!
+!================================================================================================================================
+!
+
+!>Called from the PETSc SNES solvers to evaluate the residual for a Newton like nonlinear solver
+SUBROUTINE PROBLEM_SOLVER_NONLINEAR_MONITOR_PETSC(SNES,ITS,NORM,CTX,ERR)
+
+  USE BASE_ROUTINES
+  USE CMISS_PETSC_TYPES
+  USE DISTRIBUTED_MATRIX_VECTOR
+  USE ISO_VARYING_STRING
+  USE KINDS
+  USE PROBLEM_ROUTINES
+  USE STRINGS
+  USE TYPES
+
+  IMPLICIT NONE
+  
+  !Argument variables
+  TYPE(PETSC_SNES_TYPE), INTENT(INOUT) :: SNES !<The PETSc SNES type
+  INTEGER(INTG), INTENT(INOUT) :: ITS !<The iteration number
+  REAL(DP), INTENT(INOUT) :: NORM !<The residual norm
+  TYPE(SOLVER_TYPE), POINTER :: CTX !<The passed through context
+  INTEGER(INTG), INTENT(INOUT) :: ERR !<The error code
+  !Local Variables
+  TYPE(NONLINEAR_SOLVER_TYPE), POINTER :: NONLINEAR_SOLVER
+  TYPE(SOLVER_TYPE), POINTER :: SOLVER
+  TYPE(VARYING_STRING) :: ERROR,LOCAL_ERROR
+
+  IF(ASSOCIATED(CTX)) THEN
+    NONLINEAR_SOLVER=>CTX%NONLINEAR_SOLVER
+    IF(ASSOCIATED(NONLINEAR_SOLVER)) THEN
+      SOLVER=>NONLINEAR_SOLVER%SOLVER
+      IF(ASSOCIATED(SOLVER)) THEN
+        CALL PROBLEM_SOLVER_NONLINEAR_MONITOR(SOLVER,ITS,NORM,ERR,ERROR,*999)
+      ELSE
+        CALL FLAG_ERROR("Solver is not associated.",ERR,ERROR,*999)
+      ENDIF
+    ELSE
+      CALL FLAG_ERROR("Solver nonlinear solver is not associated.",ERR,ERROR,*999)
+    ENDIF
+  ELSE
+    CALL FLAG_ERROR("Solver context is not associated.",ERR,ERROR,*999)
+  ENDIF
+  
+  RETURN
+
+999 CALL WRITE_ERROR(ERR,ERROR,*998)
+998 CALL FLAG_WARNING("Error evaluating nonlinear residual.",ERR,ERROR,*997)
+997 RETURN    
+
+END SUBROUTINE PROBLEM_SOLVER_NONLINEAR_MONITOR_PETSC
 

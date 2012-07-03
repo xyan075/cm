@@ -12689,7 +12689,7 @@ CONTAINS
     EXTERNAL :: PROBLEM_SOLVER_JACOBIAN_EVALUATE_PETSC
     EXTERNAL :: PROBLEM_SOLVER_JACOBIAN_FD_CALCULATE_PETSC
     EXTERNAL :: PROBLEM_SOLVER_RESIDUAL_EVALUATE_PETSC
-    EXTERNAL :: SOLVER_NONLINEAR_MONITOR_PETSC
+    EXTERNAL :: PROBLEM_SOLVER_NONLINEAR_MONITOR_PETSC
     INTEGER(INTG) :: equations_matrix_idx,equations_set_idx,interface_condition_idx,interface_matrix_idx
     TYPE(DISTRIBUTED_MATRIX_TYPE), POINTER :: JACOBIAN_MATRIX
     TYPE(DISTRIBUTED_VECTOR_TYPE), POINTER :: RESIDUAL_VECTOR
@@ -12983,12 +12983,9 @@ CONTAINS
                         & TRIM(NUMBER_TO_VSTRING(SOLVER_MATRICES%NUMBER_OF_MATRICES,"*",ERR,ERROR))//" and it should be 1."
                       CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
                     ENDIF
-                    IF(SOLVER%OUTPUT_TYPE>=SOLVER_PROGRESS_OUTPUT) THEN
-                      !Set the monitor
-                      !Pass the linesearch solver object rather than the temporary solver
-                      CALL PETSC_SNESMONITORSET(LINESEARCH_SOLVER%SNES,SOLVER_NONLINEAR_MONITOR_PETSC, &
-                        & LINESEARCH_SOLVER%NEWTON_SOLVER%NONLINEAR_SOLVER%SOLVER,ERR,ERROR,*999)
-                    ENDIF
+                    !Pass the linesearch solver object rather than the temporary solver
+                    CALL PETSC_SNESMONITORSET(LINESEARCH_SOLVER%SNES,PROBLEM_SOLVER_NONLINEAR_MONITOR_PETSC, &
+                      & LINESEARCH_SOLVER%NEWTON_SOLVER%NONLINEAR_SOLVER%SOLVER,ERR,ERROR,*999)
                     !Set the line search type
                     SELECT CASE(LINESEARCH_SOLVER%LINESEARCH_TYPE)
                     CASE(SOLVER_NEWTON_LINESEARCH_NONORMS)
@@ -14791,7 +14788,7 @@ CONTAINS
   !>Monitors the nonlinear solve.
   SUBROUTINE SOLVER_NONLINEAR_MONITOR(NONLINEAR_SOLVER,ITS,NORM,ERR,ERROR,*)
 
-   !Argument variables
+    !Argument variables
     TYPE(NONLINEAR_SOLVER_TYPE), POINTER :: NONLINEAR_SOLVER !<A pointer to the nonlinear solver to monitor
     INTEGER(INTG), INTENT(IN) :: ITS !<The number of iterations
     REAL(DP), INTENT(IN) :: NORM !<The residual norm
@@ -14799,39 +14796,46 @@ CONTAINS
     TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
     !Local Variables
     TYPE(NEWTON_SOLVER_TYPE), POINTER :: NEWTON_SOLVER
+    TYPE(SOLVER_TYPE), POINTER :: SOLVER
     TYPE(VARYING_STRING) :: LOCAL_ERROR
     
     CALL ENTERS("SOLVER_NONLINEAR_MONITOR",ERR,ERROR,*999)
 
     IF(ASSOCIATED(NONLINEAR_SOLVER)) THEN
-        
-      CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"",ERR,ERROR,*999)
-      CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"Nonlinear solve monitor: ",ERR,ERROR,*999)
-      CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"",ERR,ERROR,*999)
-      CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"  Iteration number = ",ITS,ERR,ERROR,*999)
-      CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"  Function Norm    = ",NORM,ERR,ERROR,*999)
-      SELECT CASE(NONLINEAR_SOLVER%NONLINEAR_SOLVE_TYPE)
-      CASE(SOLVER_NONLINEAR_NEWTON)
-        NEWTON_SOLVER=>NONLINEAR_SOLVER%NEWTON_SOLVER
-        IF(ASSOCIATED(NEWTON_SOLVER)) THEN
-          CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"  Newton solver information: ",ERR,ERROR,*999)          
-          CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"    Number of function evaluations = ",NEWTON_SOLVER% &
-            & TOTAL_NUMBER_OF_FUNCTION_EVALUATIONS,ERR,ERROR,*999)
-          CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"    Number of Jacobian evaluations = ",NEWTON_SOLVER% &
-            & TOTAL_NUMBER_OF_JACOBIAN_EVALUATIONS,ERR,ERROR,*999)            
-        ELSE
-          CALL FLAG_ERROR("Nonlinear solver Newton solver is not associated.",ERR,ERROR,*999)
+      SOLVER=>NONLINEAR_SOLVER%SOLVER
+      IF(ASSOCIATED(SOLVER)) THEN
+        IF(SOLVER%OUTPUT_TYPE>=SOLVER_PROGRESS_OUTPUT) THEN
+          CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"",ERR,ERROR,*999)
+          CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"Nonlinear solve monitor: ",ERR,ERROR,*999)
+          CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"",ERR,ERROR,*999)
+          CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"  Iteration number = ",ITS,ERR,ERROR,*999)
+          CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"  Function Norm    = ",NORM,ERR,ERROR,*999)
+          SELECT CASE(NONLINEAR_SOLVER%NONLINEAR_SOLVE_TYPE)
+          CASE(SOLVER_NONLINEAR_NEWTON)
+            NEWTON_SOLVER=>NONLINEAR_SOLVER%NEWTON_SOLVER
+            IF(ASSOCIATED(NEWTON_SOLVER)) THEN
+              CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"  Newton solver information: ",ERR,ERROR,*999)          
+              CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"    Number of function evaluations = ",NEWTON_SOLVER% &
+                & TOTAL_NUMBER_OF_FUNCTION_EVALUATIONS,ERR,ERROR,*999)
+              CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"    Number of Jacobian evaluations = ",NEWTON_SOLVER% &
+                & TOTAL_NUMBER_OF_JACOBIAN_EVALUATIONS,ERR,ERROR,*999)            
+            ELSE
+              CALL FLAG_ERROR("Nonlinear solver Newton solver is not associated.",ERR,ERROR,*999)
+            ENDIF
+          CASE(SOLVER_NONLINEAR_BFGS_INVERSE)
+            !Do nothing
+          CASE(SOLVER_NONLINEAR_SQP)
+            !Do nothing
+          CASE DEFAULT
+            LOCAL_ERROR="The nonlinear solver type of "// &
+              & TRIM(NUMBER_TO_VSTRING(NONLINEAR_SOLVER%NONLINEAR_SOLVE_TYPE,"*",ERR,ERROR))// &
+              & " is invalid."
+            CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
+          END SELECT
         ENDIF
-      CASE(SOLVER_NONLINEAR_BFGS_INVERSE)
-        !Do nothing
-      CASE(SOLVER_NONLINEAR_SQP)
-        !Do nothing
-      CASE DEFAULT
-        LOCAL_ERROR="The nonlinear solver type of "// &
-          & TRIM(NUMBER_TO_VSTRING(NONLINEAR_SOLVER%NONLINEAR_SOLVE_TYPE,"*",ERR,ERROR))// &
-          & " is invalid."
-        CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
-      END SELECT
+      ELSE
+        CALL FLAG_ERROR("Solver is not associated.",ERR,ERROR,*999)
+      ENDIF
     ELSE
       CALL FLAG_ERROR("Nonlinear solver is not associated.",ERR,ERROR,*999)
     ENDIF
@@ -17120,52 +17124,4 @@ SUBROUTINE SOLVER_TIME_STEPPING_MONITOR_PETSC(TS,STEPS,TIME,X,CTX,ERR)
 998 CALL FLAG_WARNING("Error monitoring differential-algebraic equations solve.",ERR,ERROR,*997)
 997 RETURN    
 END SUBROUTINE SOLVER_TIME_STEPPING_MONITOR_PETSC
-
-!
-!================================================================================================================================
-!
-
-!>Called from the PETSc SNES solvers to monitor the Newton nonlinear solver
-SUBROUTINE SOLVER_NONLINEAR_MONITOR_PETSC(SNES,ITS,NORM,CTX,ERR)
-
-  USE BASE_ROUTINES
-  USE CMISS_PETSC_TYPES
-  USE ISO_VARYING_STRING
-  USE KINDS
-  USE SOLVER_ROUTINES
-  USE STRINGS
-  USE TYPES
-
-  IMPLICIT NONE
-  
-  !Argument variables
-  TYPE(PETSC_SNES_TYPE), INTENT(INOUT) :: SNES !<The PETSc SNES type
-  INTEGER(INTG), INTENT(INOUT) :: ITS !<The iteration number
-  REAL(DP), INTENT(INOUT) :: NORM !<The residual norm
-  TYPE(SOLVER_TYPE), POINTER :: CTX !<The passed through context
-  INTEGER(INTG), INTENT(INOUT) :: ERR !<The error code
-  !Local Variables
-  TYPE(NONLINEAR_SOLVER_TYPE), POINTER :: NONLINEAR_SOLVER
-  TYPE(VARYING_STRING) :: ERROR,LOCAL_ERROR
-
-  IF(ASSOCIATED(CTX)) THEN
-    IF(CTX%SOLVE_TYPE==SOLVER_NONLINEAR_TYPE) THEN
-      NONLINEAR_SOLVER=>CTX%NONLINEAR_SOLVER
-
-      CALL SOLVER_NONLINEAR_MONITOR(NONLINEAR_SOLVER,ITS,NORM,ERR,ERROR,*999)
-
-    ELSE
-      LOCAL_ERROR="Invalid solve type. The solve type of "//TRIM(NUMBER_TO_VSTRING(CTX%SOLVE_TYPE,"*",ERR,ERROR))// &
-        & " does not correspond to a nonlinear solver."
-      CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
-    ENDIF      
-  ELSE
-    CALL FLAG_ERROR("Solver context is not associated.",ERR,ERROR,*999)
-  ENDIF
-  
-  RETURN
-999 CALL WRITE_ERROR(ERR,ERROR,*998)
-998 CALL FLAG_WARNING("Error monitoring nonlinear solve.",ERR,ERROR,*997)
-997 RETURN    
-END SUBROUTINE SOLVER_NONLINEAR_MONITOR_PETSC
 
