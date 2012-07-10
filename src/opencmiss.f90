@@ -4711,6 +4711,8 @@ MODULE OPENCMISS
   INTEGER(INTG), PARAMETER :: CMISS_PROBLEM_NO_TYPE = PROBLEM_NO_TYPE !<No problem type \see OPENCMISS_ProblemTypes,OPENCMISS
   INTEGER(INTG), PARAMETER :: CMISS_PROBLEM_LINEAR_ELASTICITY_TYPE = PROBLEM_LINEAR_ELASTICITY_TYPE !<Linear elasticity problem type \see OPENCMISS_ProblemTypes,OPENCMISS
   INTEGER(INTG), PARAMETER :: CMISS_PROBLEM_FINITE_ELASTICITY_TYPE = PROBLEM_FINITE_ELASTICITY_TYPE !<Finite elasticity problem type \see OPENCMISS_ProblemTypes,OPENCMISS
+  INTEGER(INTG), PARAMETER :: CMISS_PROBLEM_LINEAR_ELASTICITY_CONTACT_TYPE = PROBLEM_LINEAR_ELASTICITY_CONTACT_TYPE !<Linear elasticity problem subject to contact contstraint type \see OPENCMISS_ProblemTypes,OPENCMISS
+  INTEGER(INTG), PARAMETER :: CMISS_PROBLEM_FINITE_ELASTICITY_CONTACT_TYPE = PROBLEM_FINITE_ELASTICITY_CONTACT_TYPE !<Finite elasticity problem subject to contact constraint type \see OPENCMISS_ProblemTypes,OPENCMISS
   INTEGER(INTG), PARAMETER :: CMISS_PROBLEM_STOKES_EQUATION_TYPE = PROBLEM_STOKES_EQUATION_TYPE !<Stokes equation problem type \see OPENCMISS_ProblemTypes,OPENCMISS
   INTEGER(INTG), PARAMETER :: CMISS_PROBLEM_NAVIER_STOKES_EQUATION_TYPE = PROBLEM_NAVIER_STOKES_EQUATION_TYPE !<Navier-Stokes problem type \see OPENCMISS_ProblemTypes,OPENCMISS
   INTEGER(INTG), PARAMETER :: CMISS_PROBLEM_DARCY_EQUATION_TYPE = PROBLEM_DARCY_EQUATION_TYPE !<Darcy equation problem type \see OPENCMISS_ProblemTypes,OPENCMISS
@@ -4856,7 +4858,14 @@ MODULE OPENCMISS
   INTEGER(INTG), PARAMETER :: CMISS_PROBLEM_BIDOMAIN_STRANG_SPLIT_SUBTYPE = PROBLEM_BIDOMAIN_STRANG_SPLIT_SUBTYPE !<Bidomain Gudunov split problem subtype \see OPENCMISS_ProblemSubtypes,OPENCMISS
   INTEGER(INTG), PARAMETER :: CMISS_PROBLEM_MONODOMAIN_BUENOOROVIO_SUBTYPE = PROBLEM_MONODOMAIN_BUENOOROVIO_SUBTYPE !<Generalised Laplace problem subtype \see OPENCMISS_ProblemSubtypes,OPENCMISS
   INTEGER(INTG), PARAMETER :: CMISS_PROBLEM_MONODOMAIN_TENTUSSCHER06_SUBTYPE = PROBLEM_MONODOMAIN_TENTUSSCHER06_SUBTYPE !<Generalised Laplace problem subtype \see OPENCMISS_ProblemSubtypes,OPENCMISS
-
+  
+  INTEGER(INTG), PARAMETER :: CMISS_PROBLEM_LE_CONTACT_TRANSFORM_REPROJECT_SUBTYPE=PROBLEM_LE_CONTACT_TRANSFORM_REPROJECT_SUBTYPE !<linear elasticity problem subject to contact constraint, transform field at load increments and reproject at Newton iterations \see OPENCMISS_ProblemSubtypes,OPENCMISS
+  INTEGER(INTG), PARAMETER :: CMISS_PROBLEM_LE_CONTACT_TRANSFORM_SUBTYPE=PROBLEM_LE_CONTACT_TRANSFORM_SUBTYPE !<linear elasticity problem subject to contact constraint, transform field at load increments \see OPENCMISS_ProblemSubtypes,OPENCMISS
+  INTEGER(INTG), PARAMETER :: CMISS_PROBLEM_LE_CONTACT_REPROJECT_SUBTYPE=PROBLEM_LE_CONTACT_REPROJECT_SUBTYPE !<linear elasticity problem subject to contact constraint, reproject at Newton iterations \see OPENCMISS_ProblemSubtypes,OPENCMISS
+    
+  INTEGER(INTG), PARAMETER :: CMISS_PROBLEM_FE_CONTACT_TRANSFORM_REPROJECT_SUBTYPE=PROBLEM_FE_CONTACT_TRANSFORM_REPROJECT_SUBTYPE !<linear elasticity problem subject to contact constraint, transform field at load increments and reproject at Newton iterations \see OPENCMISS_ProblemSubtypes,OPENCMISS
+  INTEGER(INTG), PARAMETER :: CMISS_PROBLEM_FE_CONTACT_TRANSFORM_SUBTYPE=PROBLEM_FE_CONTACT_TRANSFORM_SUBTYPE !<linear elasticity problem subject to contact constraint, transform field at load increments \see OPENCMISS_ProblemSubtypes,OPENCMISS
+  INTEGER(INTG), PARAMETER :: CMISS_PROBLEM_FE_CONTACT_REPROJECT_SUBTYPE=PROBLEM_FE_CONTACT_REPROJECT_SUBTYPE !<linear elasticity problem subject to contact constraint, reproject at Newton iterations \see OPENCMISS_ProblemSubtypes,OPENCMISS
 
   !>@}
   !> \addtogroup OPENCMISS_ProblemControlLoopTypes OPENCMISS::Problem::ControlLoopTypes
@@ -4884,7 +4893,8 @@ MODULE OPENCMISS
 
   PUBLIC CMISS_PROBLEM_NO_TYPE
 
-  PUBLIC CMISS_PROBLEM_LINEAR_ELASTICITY_TYPE,CMISS_PROBLEM_FINITE_ELASTICITY_TYPE
+  PUBLIC CMISS_PROBLEM_LINEAR_ELASTICITY_TYPE,CMISS_PROBLEM_FINITE_ELASTICITY_TYPE,CMISS_PROBLEM_LINEAR_ELASTICITY_CONTACT_TYPE, &
+    & CMISS_PROBLEM_FINITE_ELASTICITY_CONTACT_TYPE
 
   PUBLIC CMISS_PROBLEM_STOKES_EQUATION_TYPE,CMISS_PROBLEM_NAVIER_STOKES_EQUATION_TYPE,CMISS_PROBLEM_DARCY_EQUATION_TYPE, &
     & CMISS_PROBLEM_POISEUILLE_EQUATION_TYPE,CMISS_PROBLEM_BURGERS_EQUATION_TYPE
@@ -4908,7 +4918,13 @@ MODULE OPENCMISS
     & CMISS_PROBLEM_BIOELECTRIC_FINITE_ELASTICITY_TYPE
 
   PUBLIC CMISS_PROBLEM_NO_SUBTYPE
-
+  
+  PUBLIC CMISS_PROBLEM_LE_CONTACT_TRANSFORM_REPROJECT_SUBTYPE, CMISS_PROBLEM_LE_CONTACT_TRANSFORM_SUBTYPE, &
+    & CMISS_PROBLEM_LE_CONTACT_REPROJECT_SUBTYPE
+    
+  PUBLIC CMISS_PROBLEM_FE_CONTACT_TRANSFORM_REPROJECT_SUBTYPE, CMISS_PROBLEM_FE_CONTACT_TRANSFORM_SUBTYPE, &
+    & CMISS_PROBLEM_FE_CONTACT_REPROJECT_SUBTYPE
+  
   PUBLIC CMISS_PROBLEM_STATIC_STOKES_SUBTYPE,CMISS_PROBLEM_LAPLACE_STOKES_SUBTYPE,CMISS_PROBLEM_TRANSIENT_STOKES_SUBTYPE, &
     & CMISS_PROBLEM_OPTIMISED_STOKES_SUBTYPE,CMISS_PROBLEM_ALE_STOKES_SUBTYPE,CMISS_PROBLEM_PGM_STOKES_SUBTYPE
 
@@ -5581,6 +5597,18 @@ MODULE OPENCMISS
     MODULE PROCEDURE CMISSSolver_DynamicTimesSetNumber1
     MODULE PROCEDURE CMISSSolver_DynamicTimesSetObj
   END INTERFACE !CMISSSolver_DynamicTimesSet
+  
+  !Sets/change the field to translate
+  INTERFACE CMISSSolver_GeometricTransformationFieldSet
+    MODULE PROCEDURE CMISSSolver_GeometricTransformationFieldSetNumber
+    MODULE PROCEDURE CMISSSolver_GeometricTransformationFieldSetObj
+  END INTERFACE CMISSSolver_GeometricTransformationFieldSet
+  
+  !Sets/change the translation for field at a load increment
+  INTERFACE CMISSSolver_GeometricTransformationTranslationSet
+    MODULE PROCEDURE CMISSSolver_GeometricTransformationTranslationSetNumber
+    MODULE PROCEDURE CMISSSolver_GeometricTransformationTranslationSetObj
+  END INTERFACE CMISSSolver_GeometricTransformationTranslationSet
 
   !>Returns the label of a solver.
   INTERFACE CMISSSolver_LabelGet
@@ -5929,6 +5957,8 @@ MODULE OPENCMISS
   PUBLIC CMISSSolver_DynamicThetaSet
 
   PUBLIC CMISSSolver_DynamicTimesSet
+  
+  PUBLIC CMISSSolver_GeometricTransformationFieldSet,CMISSSolver_GeometricTransformationTranslationSet
 
   PUBLIC CMISSSolver_LabelGet,CMISSSolver_LabelSet
 
@@ -44690,6 +44720,7 @@ CONTAINS
 
   END SUBROUTINE CMISSSolver_DynamicTimesSetNumber1
 
+  !
   !================================================================================================================================
   !
 
@@ -44715,6 +44746,152 @@ CONTAINS
     RETURN
 
   END SUBROUTINE CMISSSolver_DynamicTimesSetObj
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Sets/changes the field for a geometric transformation identified by an user number.
+  SUBROUTINE CMISSSolver_GeometricTransformationFieldSetNumber(problemUserNumber,controlLoopIdentifier,solverIndex,field, &
+      & variableType,err)
+
+    !Argument variables
+    INTEGER(INTG), INTENT(IN) :: problemUserNumber !<The user number of the problem number with the solver to set the field for.
+    INTEGER(INTG), INTENT(IN) :: controlLoopIdentifier !<The control loop identifier with the solver to set the field for.
+    INTEGER(INTG), INTENT(IN) :: solverIndex !<The solver index to set the field for.
+    TYPE(CMISSFieldType), INTENT(IN) :: field !<The field for the solver to set.
+    INTEGER(INTG), INTENT(IN) :: variableType !<The field variable type to set the translation for
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code.
+    !Local variables
+    TYPE(PROBLEM_TYPE), POINTER :: PROBLEM
+    TYPE(SOLVER_TYPE), POINTER :: SOLVER
+    TYPE(VARYING_STRING) :: LOCAL_ERROR
+
+    CALL ENTERS("CMISSSolver_GeometricTransformationFieldSetNumber",err,error,*999)
+
+    NULLIFY(PROBLEM)
+    NULLIFY(SOLVER)
+    CALL PROBLEM_USER_NUMBER_FIND(problemUserNumber,PROBLEM,err,error,*999)
+    IF(ASSOCIATED(PROBLEM)) THEN
+      CALL PROBLEM_SOLVER_GET(PROBLEM,controlLoopIdentifier,solverIndex,SOLVER,err,error,*999)
+      CALL SOLVER_GEOMETRIC_TRANSFORMATION_FIELD_SET(SOLVER,field%FIELD,variableType,ERR,ERROR,*999)
+    ELSE
+      LOCAL_ERROR="A problem with an user number of "//TRIM(NUMBER_TO_VSTRING(problemUserNumber,"*",err,error))// &
+        & " does not exist."
+      CALL FLAG_ERROR(LOCAL_ERROR,err,error,*999)
+    END IF
+
+    CALL EXITS("CMISSSolver_GeometricTransformationFieldSetNumber")
+    RETURN
+999 CALL ERRORS("CMISSSolver_GeometricTransformationFieldSetNumber",err,error)
+    CALL EXITS("CMISSSolver_GeometricTransformationFieldSetNumber")
+    CALL CMISS_HANDLE_ERROR(err,error)
+    RETURN
+
+  END SUBROUTINE CMISSSolver_GeometricTransformationFieldSetNumber
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Sets/changes the field for a geometric transformation solver identified by an object.
+  SUBROUTINE CMISSSolver_GeometricTransformationFieldSetObj(solver,field,variableType,err)
+
+    !Argument variables
+    TYPE(CMISSSolverType), INTENT(IN) :: solver !<The geometric transformation solver to set the field for.
+    TYPE(CMISSFieldType), INTENT(IN) :: field !<The field for the solver to set.
+    INTEGER(INTG), INTENT(IN) :: variableType !<The field variable type to set the translation for
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code.
+    !Local variables
+
+    CALL ENTERS("CMISSSolver_GeometricTransformationFieldSetObj",err,error,*999)
+    
+    CALL SOLVER_GEOMETRIC_TRANSFORMATION_FIELD_SET(solver%SOLVER,field%FIELD,variableType,ERR,ERROR,*999)
+
+    CALL EXITS("CMISSSolver_GeometricTransformationFieldSetObj")
+    RETURN
+999 CALL ERRORS("CMISSSolver_GeometricTransformationFieldSetObj",err,error)
+    CALL EXITS("CMISSSolver_GeometricTransformationFieldSetObj")
+    CALL CMISS_HANDLE_ERROR(err,error)
+    RETURN
+
+  END SUBROUTINE CMISSSolver_GeometricTransformationFieldSetObj
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Sets/changes the translation for a geometric transformation identified by an user number.
+  SUBROUTINE CMISSSolver_GeometricTransformationTranslationSetNumber(problemUserNumber,controlLoopIdentifier,solverIndex,field, &
+      & variableType,loadIncrementNumber,translation,err)
+
+    !Argument variables
+    INTEGER(INTG), INTENT(IN) :: problemUserNumber !<The user number of the problem number with the solver to set the translation for.
+    INTEGER(INTG), INTENT(IN) :: controlLoopIdentifier !<The control loop identifier with the solver to set the translation for.
+    INTEGER(INTG), INTENT(IN) :: solverIndex !<The solver index to set the translation for.
+    TYPE(CMISSFieldType), INTENT(IN) :: field !<The field for the solver to set.
+    INTEGER(INTG), INTENT(IN) :: variableType !<The field variable type to set the translation for
+    INTEGER(INTG), INTENT(IN) :: loadIncrementNumber !<The load increment number to set the translations for
+    REAL(DP), INTENT(IN) :: translation(:) !<The translation components
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code.
+    !Local variables
+    TYPE(PROBLEM_TYPE), POINTER :: PROBLEM
+    TYPE(SOLVER_TYPE), POINTER :: SOLVER
+    TYPE(VARYING_STRING) :: LOCAL_ERROR
+
+    CALL ENTERS("CMISSSolver_GeometricTransformationTranslationSetNumber",err,error,*999)
+
+    NULLIFY(PROBLEM)
+    NULLIFY(SOLVER)
+    CALL PROBLEM_USER_NUMBER_FIND(problemUserNumber,PROBLEM,err,error,*999)
+    IF(ASSOCIATED(PROBLEM)) THEN
+      CALL PROBLEM_SOLVER_GET(PROBLEM,controlLoopIdentifier,solverIndex,SOLVER,err,error,*999)
+      CALL SOLVER_TRANSFORMATION_TRANSLATION_INCREMENT_SET(SOLVER,field%FIELD,variableType,loadIncrementNumber,translation, &
+        & ERR,ERROR,*999)
+    ELSE
+      LOCAL_ERROR="A problem with an user number of "//TRIM(NUMBER_TO_VSTRING(problemUserNumber,"*",err,error))// &
+        & " does not exist."
+      CALL FLAG_ERROR(LOCAL_ERROR,err,error,*999)
+    END IF
+
+    CALL EXITS("CMISSSolver_GeometricTransformationTranslationSetNumber")
+    RETURN
+999 CALL ERRORS("CMISSSolver_GeometricTransformationTranslationSetNumber",err,error)
+    CALL EXITS("CMISSSolver_GeometricTransformationTranslationSetNumber")
+    CALL CMISS_HANDLE_ERROR(err,error)
+    RETURN
+
+  END SUBROUTINE CMISSSolver_GeometricTransformationTranslationSetNumber
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Sets/changes the field for a geometric transformation solver identified by an object.
+  SUBROUTINE CMISSSolver_GeometricTransformationTranslationSetObj(solver,field,variableType,loadIncrementNumber,translation,err)
+
+    !Argument variables
+    TYPE(CMISSSolverType), INTENT(IN) :: solver !<The geometric transformation solver to set the translation for.
+    TYPE(CMISSFieldType), INTENT(IN) :: field !<The field for the solver to set.
+    INTEGER(INTG), INTENT(IN) :: variableType !<The field variable type to set the translation for
+    INTEGER(INTG), INTENT(IN) :: loadIncrementNumber !<The load increment number to set the translations for
+    REAL(DP), INTENT(IN) :: translation(:) !<The translation components
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code.
+    !Local variables
+
+    CALL ENTERS("CMISSSolver_GeometricTransformationTranslationSetObj",err,error,*999)
+    
+    CALL SOLVER_TRANSFORMATION_TRANSLATION_INCREMENT_SET(solver%SOLVER,field%FIELD,variableType,loadIncrementNumber,translation, &
+      & ERR,ERROR,*999)
+
+    CALL EXITS("CMISSSolver_GeometricTransformationTranslationSetObj")
+    RETURN
+999 CALL ERRORS("CMISSSolver_GeometricTransformationTranslationSetObj",err,error)
+    CALL EXITS("CMISSSolver_GeometricTransformationTranslationSetObj")
+    CALL CMISS_HANDLE_ERROR(err,error)
+    RETURN
+
+  END SUBROUTINE CMISSSolver_GeometricTransformationTranslationSetObj
 
   !
   !================================================================================================================================

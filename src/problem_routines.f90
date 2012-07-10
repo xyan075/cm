@@ -569,11 +569,11 @@ CONTAINS
                       SOLVER=>SOLVERS%SOLVERS(solver_idx)%PTR
                       IF(ASSOCIATED(SOLVER)) THEN
                         !Apply incremented boundary conditions here => 
-                        CALL PROBLEM_SOLVER_LOAD_INCREMENT_APPLY(SOLVER%SOLVER_EQUATIONS,LOAD_INCREMENT_LOOP%ITERATION_NUMBER, &
-                          & LOAD_INCREMENT_LOOP%MAXIMUM_NUMBER_OF_ITERATIONS,ERR,ERROR,*999)
-                        
-                        CALL PROBLEM_SOLVER_SOLVE(SOLVER,ERR,ERROR,*999)
-                        
+                        IF(.NOT.SOLVER%SOLVE_TYPE==SOLVER_GEOMETRIC_TRANSFORMATION_TYPE) THEN
+                          CALL PROBLEM_SOLVER_LOAD_INCREMENT_APPLY(SOLVER%SOLVER_EQUATIONS,LOAD_INCREMENT_LOOP%ITERATION_NUMBER, &
+                            & LOAD_INCREMENT_LOOP%MAXIMUM_NUMBER_OF_ITERATIONS,ERR,ERROR,*999)
+                        ENDIF
+                        CALL PROBLEM_SOLVER_SOLVE(SOLVER,ERR,ERROR,*999)   
                       ELSE
                         CALL FLAG_ERROR("Solver is not associated.",ERR,ERROR,*999)
                       ENDIF
@@ -2739,6 +2739,60 @@ CONTAINS
   !================================================================================================================================
   !
 
+  !>Solves geometric transformation for a field
+  SUBROUTINE PROBLEM_SOLVER_GEOMETRIC_TRANSFORMATION_SOLVE(SOLVER,ERR,ERROR,*)
+    
+   !Argument variables
+    TYPE(SOLVER_TYPE), POINTER :: SOLVER !<A pointer to the solver to solve
+    INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
+    !Local Variables
+    TYPE(FIELD_TYPE), POINTER :: FIELD
+    TYPE(BOUNDARY_CONDITIONS_VARIABLE_TYPE), POINTER :: BOUNDARY_CONDITIONS_VARIABLE
+    INTEGER(INTG) :: numberOfComponents
+    INTEGER(INTG) :: VERSION_NUMBER,DERIVATIVE_NUMBER,MESH_COMPONENT_NUMBER,NODE_USER_NUMBER
+    
+    CALL ENTERS("PROBLEM_SOLVER_GEOMETRIC_TRANSFORMATION_SOLVE",ERR,ERROR,*999)
+    
+    IF(ASSOCIATED(SOLVER)) THEN
+      IF(SOLVER%SOLVE_TYPE==SOLVER_GEOMETRIC_TRANSFORMATION_TYPE) THEN
+        IF(ASSOCIATED(SOLVER%GEOMETRIC_TRANSFORMATION_SOLVER)) THEN
+          IF(ASSOCIATED(SOLVER%GEOMETRIC_TRANSFORMATION_SOLVER%FIELD)) THEN
+            FIELD=>SOLVER%GEOMETRIC_TRANSFORMATION_SOLVER%FIELD
+            numberOfComponents=SIZE(SOLVER%GEOMETRIC_TRANSFORMATION_SOLVER%TRANSLATION,1)
+            VERSION_NUMBER=1;
+            DERIVATIVE_NUMBER=1;
+            NULLIFY(BOUNDARY_CONDITIONS_VARIABLE)
+!            CALL BOUNDARY_CONDITIONS_VARIABLE_GET(INTERFACE_CONDITION%BOUNDARY_CONDITIONS, &
+!              & INTERFACE_CONDITION%DEPENDENT%FIELD_VARIABLES(dependent_variable_idx)%PTR,BOUNDARY_CONDITIONS_VARIABLE, &
+!              & ERR,ERROR,*999)
+            
+          ELSE
+            CALL FLAG_ERROR("The field in geometric transformation solver is not associated.",ERR,ERROR,*999)
+          ENDIF
+        ELSE
+          CALL FLAG_ERROR("Geometric transformation solver is not associated.",ERR,ERROR,*999)
+        ENDIF
+      ELSE
+        CALL FLAG_ERROR("Solver is not geometric transformation type.",ERR,ERROR,*999)
+      ENDIF
+    ELSE
+      CALL FLAG_ERROR("Solver is not associated.",ERR,ERROR,*999)
+    ENDIF
+    
+
+    
+    CALL EXITS("PROBLEM_SOLVER_GEOMETRIC_TRANSFORMATION_SOLVE")
+    RETURN
+999 CALL ERRORS("PROBLEM_SOLVER_GEOMETRIC_TRANSFORMATION_SOLVE",ERR,ERROR)
+    CALL EXITS("PROBLEM_SOLVER_GEOMETRIC_TRANSFORMATION_SOLVE")
+    RETURN 1
+  END SUBROUTINE PROBLEM_SOLVER_GEOMETRIC_TRANSFORMATION_SOLVE
+  
+  !
+  !================================================================================================================================
+  !
+
 
   !>Solves a solver for a problem.
   SUBROUTINE PROBLEM_SOLVER_SOLVE(SOLVER,ERR,ERROR,*)
@@ -2773,6 +2827,8 @@ CONTAINS
         IF(ASSOCIATED(SOLVER%SOLVER_EQUATIONS)) THEN
           !A solver with solver equations.
           CALL PROBLEM_SOLVER_EQUATIONS_SOLVE(SOLVER%SOLVER_EQUATIONS,ERR,ERROR,*999)
+        ELSE IF(SOLVER%SOLVE_TYPE==SOLVER_GEOMETRIC_TRANSFORMATION_TYPE) THEN
+!          CALL PROBLEM_SOLVER_GEOMETRIC_TRANSFORMATION_SOLVE(SOLVER,ERR,ERROR,*999)
         ELSE
           !Check for other equations.
           IF(ASSOCIATED(SOLVER%CELLML_EQUATIONS)) THEN
