@@ -53,6 +53,7 @@ MODULE PROBLEM_ROUTINES
   USE EQUATIONS_SET_CONSTANTS
   USE EQUATIONS_SET_ROUTINES
   USE FIELD_ROUTINES
+  USE FIELD_IO_ROUTINES
   USE FINITE_ELASTICITY_ROUTINES
   USE FITTING_ROUTINES
   USE FLUID_MECHANICS_ROUTINES
@@ -1979,7 +1980,7 @@ CONTAINS
       IF(ASSOCIATED(CONTROL_LOOP%PROBLEM)) THEN
         SELECT CASE(CONTROL_LOOP%PROBLEM%CLASS)
         CASE(PROBLEM_ELASTICITY_CLASS)
-          !Do nothing
+          CALL ELASTICITY_CONTROL_LOOP_POST_LOOP(CONTROL_LOOP,ERR,ERROR,*999)
         CASE(PROBLEM_BIOELECTRICS_CLASS)
           CALL BIOELECTRIC_CONTROL_LOOP_POST_LOOP(CONTROL_LOOP,ERR,ERROR,*999)
         CASE(PROBLEM_FLUID_MECHANICS_CLASS)
@@ -3225,7 +3226,7 @@ CONTAINS
 !                        CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"*****************************************",ERR,ERROR,*999)
 !                        CALL INTERFACE_CONDITION_ASSEMBLE(INTERFACE_CONDITION,ERR,ERROR,*999)
                         !Output newton step solution
-                        
+                        CALL PROBLEM_SOLVER_NEWTION_FIELDS_OUTPUT(SOLVER,ITS,ERR,ERROR,*999)
                       ENDIF
                     ELSE
                     CALL FLAG_ERROR("Interface condition is not associated.",ERR,ERROR,*999)
@@ -3284,6 +3285,62 @@ CONTAINS
     CALL EXITS("PROBLEM_SOLVER_NONLINEAR_MONITOR")
     RETURN 1
   END SUBROUTINE PROBLEM_SOLVER_NONLINEAR_MONITOR
+  
+  !
+  !================================================================================================================================
+  !
+
+  !> Output fields at Newton iterations
+  SUBROUTINE PROBLEM_SOLVER_NEWTION_FIELDS_OUTPUT(SOLVER,ITERATION_NUMBER,ERR,ERROR,*)
+
+    !Argument variables
+    TYPE(SOLVER_TYPE), POINTER :: SOLVER !<A pointer to solver to output the fields for
+    INTEGER(INTG), INTENT(IN) :: ITERATION_NUMBER !<Iteration number
+    INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
+    !Local Variables
+    TYPE(VARYING_STRING) :: LOCAL_ERROR,fileName,method,directory
+    TYPE(REGION_TYPE), POINTER :: REGION !<A pointer to region to output the fields for
+    TYPE(SOLVER_MAPPING_TYPE), POINTER :: SOLVER_MAPPING 
+    TYPE(FIELDS_TYPE), POINTER :: FIELDS
+    LOGICAL :: dirExist
+    INTEGER(INTG) :: equationsSetIdx,incrementIdx
+
+    CALL ENTERS("PROBLEM_SOLVER_NEWTION_FIELDS_OUTPUT",ERR,ERROR,*999)
+    
+    IF(ASSOCIATED(SOLVER%SOLVER_EQUATIONS))THEN
+      incrementIdx=SOLVER%SOLVERS%CONTROL_LOOP%LOAD_INCREMENT_LOOP%ITERATION_NUMBER
+      SOLVER_MAPPING=>SOLVER%SOLVER_EQUATIONS%SOLVER_MAPPING
+      DO equationsSetIdx=1,SOLVER_MAPPING%NUMBER_OF_EQUATIONS_SETS
+        REGION=>SOLVER_MAPPING%EQUATIONS_SETS(equationsSetIdx)%PTR%REGION
+        IF(ASSOCIATED(REGION))THEN
+          NULLIFY(FIELDS)
+          FIELDS=>REGION%FIELDS
+          directory="results_iter/"
+          INQUIRE(FILE=CHAR(directory),EXIST=dirExist)
+          IF(.NOT.dirExist) THEN
+            CALL SYSTEM(CHAR("mkdir "//directory))
+          ENDIF
+          fileName=directory//"mesh"//TRIM(NUMBER_TO_VSTRING(equationsSetIdx,"*",err,error))// &
+            & "_load"//TRIM(NUMBER_TO_VSTRING(incrementIdx,"*",err,error))// &
+            & "_iter"//TRIM(NUMBER_TO_VSTRING(ITERATION_NUMBER,"*",err,error))
+          method="FORTRAN"
+          CALL FIELD_IO_ELEMENTS_EXPORT(FIELDS,fileName,method,err,error,*999)
+          CALL FIELD_IO_NODES_EXPORT(FIELDS,fileName,method,err,error,*999)
+        ELSE
+          CALL FLAG_ERROR("Region is not associated.",ERR,ERROR,*999)
+        ENDIF
+      ENDDO
+    ELSE
+      CALL FLAG_ERROR("Solver equations is not associated.",ERR,ERROR,*999)
+    ENDIF
+    
+    CALL EXITS("PROBLEM_SOLVER_NEWTION_FIELDS_OUTPUT")
+    RETURN
+999 CALL ERRORS("PROBLEM_SOLVER_NEWTION_FIELDS_OUTPUT",ERR,ERROR)
+    CALL EXITS("PROBLEM_SOLVER_NEWTION_FIELDS_OUTPUT")
+    RETURN 1
+  END SUBROUTINE PROBLEM_SOLVER_NEWTION_FIELDS_OUTPUT
   
   !
   !================================================================================================================================

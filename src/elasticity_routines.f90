@@ -70,6 +70,8 @@ MODULE ELASTICITY_ROUTINES
 
   !Interfaces
 
+  PUBLIC ELASTICITY_CONTROL_LOOP_POST_LOOP
+  
   PUBLIC ELASTICITY_EQUATIONS_SET_CLASS_TYPE_SET
 
   PUBLIC ELASTICITY_FINITE_ELEMENT_CALCULATE
@@ -95,6 +97,56 @@ MODULE ELASTICITY_ROUTINES
   PUBLIC ELASTICITY_LOAD_INCREMENT_APPLY
 
 CONTAINS
+
+  !
+  !================================================================================================================================
+  !
+
+  !>Executes after each loop of a control loop for elasticity problems, i.e., after each load increment in a load increment loop
+  SUBROUTINE ELASTICITY_CONTROL_LOOP_POST_LOOP(CONTROL_LOOP,ERR,ERROR,*)
+
+    !Argument variables
+    TYPE(CONTROL_LOOP_TYPE), POINTER :: CONTROL_LOOP !<A pointer to the control loop to solve.
+    INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
+    !Local Variables
+    TYPE(PROBLEM_TYPE), POINTER :: PROBLEM
+    TYPE(VARYING_STRING) :: LOCAL_ERROR
+
+    CALL ENTERS("ELASTICITY_CONTROL_LOOP_POST_LOOP",ERR,ERROR,*999)
+
+    IF(ASSOCIATED(CONTROL_LOOP)) THEN
+      PROBLEM=>CONTROL_LOOP%PROBLEM
+      IF(ASSOCIATED(PROBLEM)) THEN
+        SELECT CASE(CONTROL_LOOP%LOOP_TYPE)
+        CASE(PROBLEM_CONTROL_LOAD_INCREMENT_LOOP_TYPE)
+          SELECT CASE(PROBLEM%TYPE)
+          CASE(PROBLEM_LINEAR_ELASTICITY_TYPE,PROBLEM_FINITE_ELASTICITY_TYPE,PROBLEM_LINEAR_ELASTICITY_CONTACT_TYPE)
+            !Do nothing
+          CASE(PROBLEM_FINITE_ELASTICITY_CONTACT_TYPE)
+            CALL FINITE_ELASTICITY_CONTROL_LOOP_POST_LOOP(CONTROL_LOOP,ERR,ERROR,*999)
+          CASE DEFAULT
+            LOCAL_ERROR="Problem type "//TRIM(NUMBER_TO_VSTRING(PROBLEM%TYPE,"*",ERR,ERROR))// &
+              & " is not valid for a elasticity problem class."
+            CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
+          END SELECT
+        CASE DEFAULT
+          !do nothing
+        END SELECT
+      ELSE
+        CALL FLAG_ERROR("Control loop problem is not associated.",ERR,ERROR,*999)
+      ENDIF
+    ELSE
+      CALL FLAG_ERROR("Control loop is not associated.",ERR,ERROR,*999)
+    ENDIF
+
+    CALL EXITS("ELASTICITY_CONTROL_LOOP_POST_LOOP")
+    RETURN
+999 CALL ERRORS("ELASTICITY_CONTROL_LOOP_POST_LOOP",ERR,ERROR)
+    CALL EXITS("ELASTICITY_CONTROL_LOOP_POST_LOOP")
+    RETURN 1
+    
+  END SUBROUTINE ELASTICITY_CONTROL_LOOP_POST_LOOP
 
   !
   !================================================================================================================================

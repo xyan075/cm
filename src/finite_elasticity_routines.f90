@@ -59,6 +59,7 @@ MODULE FINITE_ELASTICITY_ROUTINES
   USE EQUATIONS_MATRICES_ROUTINES
   USE EQUATIONS_SET_CONSTANTS
   USE FIELD_ROUTINES
+  USE FIELD_IO_ROUTINES
   USE FLUID_MECHANICS_IO_ROUTINES
   USE GENERATED_MESH_ROUTINES
   USE INPUT_OUTPUT
@@ -106,6 +107,7 @@ MODULE FINITE_ELASTICITY_ROUTINES
     & FINITE_ELASTICITY_ANALYTIC_CYLINDER_PARAM_C1_IDX, FINITE_ELASTICITY_ANALYTIC_CYLINDER_PARAM_C2_IDX
 
   PUBLIC FINITE_ELASTICITY_ANALYTIC_CALCULATE, &
+    & FINITE_ELASTICITY_CONTROL_LOOP_POST_LOOP, &
     & FINITE_ELASTICITY_FINITE_ELEMENT_RESIDUAL_EVALUATE, &
     & FINITE_ELASTICITY_EQUATIONS_SET_SETUP,FINITE_ELASTICITY_EQUATIONS_SET_SOLUTION_METHOD_SET, &
     & FINITE_ELASTICITY_EQUATIONS_SET_SUBTYPE_SET, &
@@ -597,6 +599,73 @@ CONTAINS
   
     RETURN
   END FUNCTION FINITE_ELASTICITY_CYLINDER_ANALYTIC_FUNC_EVALUATE
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Executes after each loop of a control loop for finite elasticity problems, i.e., after each load increment in a load increment loop
+  SUBROUTINE FINITE_ELASTICITY_CONTROL_LOOP_POST_LOOP(CONTROL_LOOP,ERR,ERROR,*)
+
+    !Argument variables
+    TYPE(CONTROL_LOOP_TYPE), POINTER :: CONTROL_LOOP !<A pointer to the control loop 
+    INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
+    !Local Variables
+    TYPE(SOLVERS_TYPE), POINTER :: SOLVERS
+    TYPE(SOLVER_TYPE), POINTER :: SOLVER
+    TYPE(SOLVER_MAPPING_TYPE), POINTER :: SOLVER_MAPPING
+    TYPE(REGION_TYPE), POINTER :: REGION
+    TYPE(FIELDS_TYPE), POINTER :: FIELDS
+    INTEGER(INTG) :: solverIdx,equationsSetIdx,incrementIdx
+    LOGICAL :: dirExist
+    TYPE(VARYING_STRING) :: LOCAL_ERROR,fileName,method,directory
+
+    CALL ENTERS("FINITE_ELASTICITY_CONTROL_LOOP_POST_LOOP",ERR,ERROR,*999)
+
+    IF(ASSOCIATED(CONTROL_LOOP)) THEN
+      IF(CONTROL_LOOP%LOOP_TYPE==PROBLEM_CONTROL_LOAD_INCREMENT_LOOP_TYPE) THEN
+        incrementIdx=CONTROL_LOOP%LOAD_INCREMENT_LOOP%ITERATION_NUMBER
+        SOLVERS=>CONTROL_LOOP%SOLVERS
+        IF(ASSOCIATED(SOLVERS)) THEN
+          DO solverIdx=1,SOLVERS%NUMBER_OF_SOLVERS
+            SOLVER=>SOLVERS%SOLVERS(solverIdx)%PTR
+            IF(ASSOCIATED(SOLVER%SOLVER_EQUATIONS)) THEN
+              SOLVER_MAPPING=>SOLVER%SOLVER_EQUATIONS%SOLVER_MAPPING
+              IF(ASSOCIATED(SOLVER_MAPPING)) THEN
+                DO equationsSetIdx=1,SOLVER_MAPPING%NUMBER_OF_EQUATIONS_SETS
+                  REGION=>SOLVER_MAPPING%EQUATIONS_SETS(equationsSetIdx)%PTR%REGION
+                  NULLIFY(FIELDS)
+                  FIELDS=>REGION%FIELDS
+                  directory="results_load/"
+                  INQUIRE(FILE=CHAR(directory),EXIST=dirExist)
+                  IF(.NOT.dirExist) THEN
+                    CALL SYSTEM(CHAR("mkdir "//directory))
+                  ENDIF
+                  fileName=directory//"mesh"//TRIM(NUMBER_TO_VSTRING(equationsSetIdx,"*",err,error))// &
+                    & "_load"//TRIM(NUMBER_TO_VSTRING(incrementIdx,"*",err,error))
+                  method="FORTRAN"
+                  CALL FIELD_IO_ELEMENTS_EXPORT(FIELDS,fileName,method,err,error,*999)
+                  CALL FIELD_IO_NODES_EXPORT(FIELDS,fileName,method,err,error,*999)
+                ENDDO !equationsSetIdx
+              ENDIF
+            ENDIF
+          ENDDO !solverIdx
+        ELSE
+          CALL FLAG_ERROR("Control loop is not associated.",ERR,ERROR,*999)
+        ENDIF
+      ENDIF
+    ELSE
+      CALL FLAG_ERROR("Control loop is not associated.",ERR,ERROR,*999)
+    ENDIF
+
+    CALL EXITS("FINITE_ELASTICITY_CONTROL_LOOP_POST_LOOP")
+    RETURN
+999 CALL ERRORS("FINITE_ELASTICITY_CONTROL_LOOP_POST_LOOP",ERR,ERROR)
+    CALL EXITS("FINITE_ELASTICITY_CONTROL_LOOP_POST_LOOP")
+    RETURN 1
+    
+  END SUBROUTINE FINITE_ELASTICITY_CONTROL_LOOP_POST_LOOP
 
   !
   !================================================================================================================================
