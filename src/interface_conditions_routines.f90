@@ -122,6 +122,7 @@ CONTAINS
               IF (INTERFACE_CONDITION%LAGRANGE%LAGRANGE_FIELD%VARIABLES(1)%COMPONENTS(1)%INTERPOLATION_TYPE== &
                   & FIELD_DATA_POINT_BASED_INTERPOLATION) THEN
                 CALL INTERFACE_CONDITION_DATA_REPROJECTION(INTERFACE_CONDITION,ERR,ERROR,*999)
+                CALL INTERFACE_CONDITION_DATA_POINTS_NORMAL_CALCULATE(INTERFACE_CONDITION,ERR,ERROR,*999)
               ENDIF
             ENDIF
             CALL INTERFACE_CONDITION_ASSEMBLE_FEM(INTERFACE_CONDITION,ERR,ERROR,*999)
@@ -666,14 +667,15 @@ CONTAINS
           ENDDO !data_point_idx      
         ENDDO
         POINTS_CONNECTIVITY%DATA_POINT_PROJECTED=.TRUE.
+        ! Check if the data has been orthogonally projected
         DO data_point_idx=1,POINTS_CONNECTIVITY%NUMBER_OF_DATA_POINTS
           DO xi_idx=1,SIZE(DATA_POINTS%DATA_PROJECTIONS(2)%PTR%DATA_PROJECTION_RESULTS(data_point_idx)%XI)
               IF(DATA_POINTS%DATA_PROJECTIONS(2)%PTR%DATA_PROJECTION_RESULTS(data_point_idx)%XI(xi_idx)==0.0_DP .OR.  &
                   & DATA_POINTS%DATA_PROJECTIONS(2)%PTR%DATA_PROJECTION_RESULTS(data_point_idx)%XI(xi_idx)==1.0_DP) THEN
                 POINTS_CONNECTIVITY%DATA_POINT_PROJECTED(data_point_idx)=.FALSE.
               ENDIF
-            ENDDO
-        ENDDO
+            ENDDO !xi_idx
+        ENDDO !data_point_idx
       ELSE
         CALL FLAG_ERROR("Interface condition points connectivity is not associated.",ERR,ERROR,*999)
       ENDIF
@@ -687,6 +689,148 @@ CONTAINS
     CALL EXITS("INTERFACE_CONDITION_DATA_REPROJECTION")
     RETURN 1
   END SUBROUTINE INTERFACE_CONDITION_DATA_REPROJECTION
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Reprojecting contact points for frictionless contact
+  SUBROUTINE INTERFACE_CONDITION_DATA_POINTS_NORMAL_CALCULATE(INTERFACE_CONDITION,ERR,ERROR,*)
+
+    !Argument variables
+    TYPE(INTERFACE_CONDITION_TYPE), POINTER :: INTERFACE_CONDITION !<A pointer to the interface condition to assemble the equations for.
+    INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
+    !Local Variables
+    TYPE(INTERFACE_EQUATIONS_TYPE), POINTER :: INTERFACE_EQUATIONS
+    TYPE(INTERFACE_POINTS_CONNECTIVITY_TYPE), POINTER :: POINTS_CONNECTIVITY
+    TYPE(DATA_POINTS_TYPE), POINTER :: DATA_POINTS
+    TYPE(DATA_PROJECTION_TYPE), POINTER :: DATA_PROJECTION !<Data projection to store the xi locations and element number for the data points
+    TYPE(FIELD_TYPE), POINTER :: DEPENDENT_FIELD_PROJECTION!< Dependent field to interpolate
+    TYPE(DATA_PROJECTION_RESULT_TYPE), POINTER :: DATA_PROJECTION_RESULT
+     TYPE(FIELD_INTERPOLATED_POINT_METRICS_TYPE), POINTER :: INTERPOLATED_POINT_METRICS
+    INTEGER(INTG) :: dataPointIdx,projectionMeshIdx,xi_idx,MESH_COMPONENT_NUMBER,coupledMeshNumberOfXi,localContactXiNormal, &
+      & globalContactNumber,coupledMeshElementNumber,localContactNumber,numberOfDimensions
+    REAL(DP) :: XI_POSITION(2),XI(3),POSITION(3),NORMAL(3),TANGENTS(3,3)
+    LOGICAL :: REVERSE_NORMAL
+    TYPE(VARYING_STRING) :: LOCAL_ERROR
+    
+ 
+    CALL ENTERS("INTERFACE_CONDITION_DATA_POINTS_NORMAL_CALCULATE",ERR,ERROR,*999)
+
+    IF(ASSOCIATED(INTERFACE_CONDITION)) THEN
+      POINTS_CONNECTIVITY=>INTERFACE_CONDITION%INTERFACE%POINTS_CONNECTIVITY
+      IF(ASSOCIATED(POINTS_CONNECTIVITY)) THEN
+        DATA_POINTS=>INTERFACE_CONDITION%INTERFACE%DATA_POINTS
+        !TODO: Default normal to be on second mesh surface 
+        DEPENDENT_FIELD_PROJECTION=>INTERFACE_CONDITION%DEPENDENT%EQUATIONS_SETS(2)%PTR%DEPENDENT%DEPENDENT_FIELD
+        MESH_COMPONENT_NUMBER=1
+        coupledMeshNumberOfXi=INTERFACE_CONDITION%INTERFACE%MESHES%MESHES(1)%PTR%NUMBER_OF_DIMENSIONS+1
+        projectionMeshIdx=2
+        numberOfDimensions=INTERFACE_CONDITION%INTERFACE%COORDINATE_SYSTEM%NUMBER_OF_DIMENSIONS
+        INTERFACE_EQUATIONS=>INTERFACE_CONDITION%INTERFACE_EQUATIONS
+        DO dataPointIdx=1,POINTS_CONNECTIVITY%NUMBER_OF_DATA_POINTS
+          IF(POINTS_CONNECTIVITY%DATA_POINT_PROJECTED(dataPointIdx)) THEN
+            !The xi direction of the surface/line normal
+            localContactXiNormal=POINTS_CONNECTIVITY%POINTS_CONNECTIVITY(dataPointIdx,projectionMeshIdx)% &
+              & COUPLED_MESH_CONTACT_XI_NORMAL 
+            coupledMeshElementNumber=POINTS_CONNECTIVITY%POINTS_CONNECTIVITY(dataPointIdx,projectionMeshIdx)% &
+              & COUPLED_MESH_ELEMENT_NUMBER
+            !Local number of the line in contact
+            localContactNumber=POINTS_CONNECTIVITY%POINTS_CONNECTIVITY(dataPointIdx,projectionMeshIdx)% &
+              & COUPLED_MESH_CONTACT_NUMBER
+            !Decide if the normal vector should be reversed to be outward  
+            IF(ABS(localContactXiNormal)==localContactXiNormal) THEN
+              REVERSE_NORMAL=.FALSE.
+            ELSE
+              REVERSE_NORMAL=.TRUE. 
+            ENDIF   
+            
+            XI(1:coupledMeshNumberOfXi)=POINTS_CONNECTIVITY%POINTS_CONNECTIVITY(dataPointIdx, &
+              & projectionMeshIdx)%XI(1:coupledMeshNumberOfXi,MESH_COMPONENT_NUMBER)   
+            
+            
+            SELECT CASE(coupledMeshNumberOfXi)
+            CASE(2)
+              !Global number of the line in contact
+              globalContactNumber=POINTS_CONNECTIVITY%INTERFACE%COUPLED_MESHES(projectionMeshIdx)%PTR% &
+                & DECOMPOSITIONS%DECOMPOSITIONS(1)%PTR%TOPOLOGY%ELEMENTS%ELEMENTS(coupledMeshElementNumber)% &
+                & ELEMENT_LINES(localContactNumber)   
+              !Compute interpolation parameters for the line for the couple mesh field
+              CALL FIELD_INTERPOLATION_PARAMETERS_LINE_GET(FIELD_VALUES_SET_TYPE,globalContactNumber, &
+                & INTERFACE_EQUATIONS%INTERPOLATION%VARIABLE_INTERPOLATION(projectionMeshIdx)% &
+                & DEPENDENT_INTERPOLATION(1)%INTERPOLATION_PARAMETERS(FIELD_U_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)!Needed for computing metrics
+              !Compute the other xi direction of the line normal, i.e. xi position input for calculating interpolated point
+              XI_POSITION(1)=XI(OTHER_XI_DIRECTIONS2(ABS(localContactXiNormal)))
+            CASE(3)
+              !Global number of the line in contact
+              globalContactNumber=POINTS_CONNECTIVITY%INTERFACE%COUPLED_MESHES(projectionMeshIdx)%PTR% &
+                & DECOMPOSITIONS%DECOMPOSITIONS(1)%PTR%TOPOLOGY%ELEMENTS%ELEMENTS(coupledMeshElementNumber)% &
+                & ELEMENT_FACES(localContactNumber)   
+              !Compute interpolation parameters for the face for the couple mesh field
+              CALL FIELD_INTERPOLATION_PARAMETERS_FACE_GET(FIELD_VALUES_SET_TYPE,globalContactNumber, &
+                & INTERFACE_EQUATIONS%INTERPOLATION%VARIABLE_INTERPOLATION(projectionMeshIdx)% &
+                & DEPENDENT_INTERPOLATION(1)%INTERPOLATION_PARAMETERS(FIELD_U_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)
+              SELECT CASE(ABS(localContactXiNormal))
+              CASE(1)
+              !Compute the other xi directions of the face normal, i.e. xi positions input for calculating interpolated point
+                XI_POSITION(1)=XI(2)
+                XI_POSITION(2)=XI(3)
+              CASE(2)
+                XI_POSITION(1)=XI(1)
+                XI_POSITION(2)=XI(3)
+              CASE(3)
+                XI_POSITION(1)=XI(1)
+                XI_POSITION(2)=XI(2)
+              END SELECT
+            CASE DEFAULT
+                CALL FLAG_ERROR("Xi dimension of coupled mesh should be <= 3 and >=0.",ERR,ERROR,*999)
+            END SELECT
+            CALL FIELD_INTERPOLATE_XI(FIRST_PART_DERIV,XI_POSITION(1:coupledMeshNumberOfXi-1),INTERFACE_EQUATIONS% &
+              & INTERPOLATION%VARIABLE_INTERPOLATION(projectionMeshIdx)%DEPENDENT_INTERPOLATION(1)% &
+              & INTERPOLATED_POINT(FIELD_U_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)!Needed for computing metrics
+            ALLOCATE(INTERFACE_EQUATIONS% &
+              & INTERPOLATION%VARIABLE_INTERPOLATION(projectionMeshIdx)%DEPENDENT_INTERPOLATION(1)% &
+              & INTERPOLATED_POINT_METRICS(FIELD_NUMBER_OF_VARIABLE_TYPES),STAT=ERR)
+            IF(ERR/=0) CALL FLAG_ERROR("Could not allocate interpolated points metrics.",ERR,ERROR,*999)
+            NULLIFY(INTERFACE_EQUATIONS% &
+              & INTERPOLATION%VARIABLE_INTERPOLATION(projectionMeshIdx)%DEPENDENT_INTERPOLATION(1)% &
+              & INTERPOLATED_POINT_METRICS(FIELD_U_VARIABLE_TYPE)%PTR)
+            CALL FIELD_INTERPOLATED_POINT_METRICS_INITIALISE(INTERFACE_EQUATIONS% &
+              & INTERPOLATION%VARIABLE_INTERPOLATION(projectionMeshIdx)%DEPENDENT_INTERPOLATION(1)% &
+              & INTERPOLATED_POINT(FIELD_U_VARIABLE_TYPE)%PTR,INTERFACE_EQUATIONS% &
+              & INTERPOLATION%VARIABLE_INTERPOLATION(projectionMeshIdx)%DEPENDENT_INTERPOLATION(1)% &
+              & INTERPOLATED_POINT_METRICS(FIELD_U_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)
+              
+            CALL FIELD_INTERPOLATED_POINT_METRICS_CALCULATE(coupledMeshNumberOfXi,INTERFACE_EQUATIONS% &
+              & INTERPOLATION%VARIABLE_INTERPOLATION(projectionMeshIdx)%DEPENDENT_INTERPOLATION(1)% &
+              & INTERPOLATED_POINT_METRICS(FIELD_U_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)                      
+            INTERPOLATED_POINT_METRICS=>INTERFACE_EQUATIONS%INTERPOLATION% &
+              & VARIABLE_INTERPOLATION(projectionMeshIdx)%DEPENDENT_INTERPOLATION(1)% &
+              & INTERPOLATED_POINT_METRICS(FIELD_U_VARIABLE_TYPE)%PTR                 
+            !Calculate outward normal of the contact surface in the coupled mesh
+            CALL FIELD_POSITION_NORMAL_TANGENTS_CALCULATE_INT_PT_METRIC(INTERPOLATED_POINT_METRICS, &
+              & REVERSE_NORMAL,POSITION(1:numberOfDimensions), &
+              & NORMAL(1:numberOfDimensions),TANGENTS(1:numberOfDimensions, &
+              & 1:coupledMeshNumberOfXi),ERR,ERROR,*999)  
+            POINTS_CONNECTIVITY%NORMAL(1:numberOfDimensions,dataPointIdx)=NORMAL
+
+            
+          ENDIF
+        ENDDO !dataPointIdx
+      ELSE
+        CALL FLAG_ERROR("Interface condition points connectivity is not associated.",ERR,ERROR,*999)
+      ENDIF
+    ELSE
+      CALL FLAG_ERROR("Interface condition is not associated.",ERR,ERROR,*999)
+    ENDIF
+       
+    CALL EXITS("INTERFACE_CONDITION_DATA_POINTS_NORMAL_CALCULATE")
+    RETURN
+999 CALL ERRORS("INTERFACE_CONDITION_DATA_POINTS_NORMAL_CALCULATE",ERR,ERROR)
+    CALL EXITS("INTERFACE_CONDITION_DATA_POINTS_NORMAL_CALCULATE")
+    RETURN 1
+  END SUBROUTINE INTERFACE_CONDITION_DATA_POINTS_NORMAL_CALCULATE
   
   !
   !================================================================================================================================
@@ -3122,7 +3266,7 @@ CONTAINS
                               & (rowComponentIdx-1)+COUPLED_MESH_BASIS%NUMBER_OF_ELEMENT_PARAMETERS* &
                               & (coupledMeshElementIdx-1)+rowParameterIdx
                             PGMSI=BASIS_EVALUATE_XI(COUPLED_MESH_BASIS,rowParameterIdx,NO_PART_DERIV,XI,ERR,ERROR)* &
-                              & NORMAL(rowComponentIdx)
+                              & POINTS_CONNECTIVITY%NORMAL(rowComponentIdx,dataPointIdx)*MATRIX_COEFFICIENT*-1.0_dp
                             ROWBASIS=BASIS_EVALUATE_XI(COUPLED_MESH_BASIS,rowParameterIdx,NO_PART_DERIV,XI,ERR,ERROR)
                             colComponentIdx=rowComponentIdx !Since x and y are not coupled.
                             colIdx=dataPointIdx+DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(ELEMENT_NUMBER)% &
