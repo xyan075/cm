@@ -2181,7 +2181,9 @@ END TYPE GENERATED_MESH_ELLIPSOID_TYPE
     INTEGER(INTG) :: NUMBER_OF_COUPLED_MESHES !<The number of coupled meshes in the interface
     TYPE(INTERFACE_POINT_CONNECTIVITY_TYPE), ALLOCATABLE :: POINTS_CONNECTIVITY(:,:) !<POINTS_CONNECTIVITY(point_index,coupled_mesh_idx)
     LOGICAL, ALLOCATABLE :: DATA_POINT_PROJECTED(:) !<For the current step, .TRUE. if the data point has been orthogonally projected onto both mesh, to be used in matrix cal.
+    LOGICAL, ALLOCATABLE :: IS_PENETRATION(:) !<For the current step, .TRUE. if the normal gap is a penetration
     REAL(DP), ALLOCATABLE :: NORMAL(:,:) !<NORMAL(coordinate_idx,point_idx) !<normal for contact points
+    REAL(DP), ALLOCATABLE :: GAP(:,:) !<GAP(coordinate_idx,point_idx) !<gap vector for contact points
     TYPE(INTERFACE_POINTS_CONNECTIVITY_COUPLED_ELEMENTS_TYPE), ALLOCATABLE :: COUPLED_MESH_ELEMENTS(:,:) !<COUPLED_MESH_ELEMENTS(interface_element_idx,coupled_mesh_idx)
   END TYPE INTERFACE_POINTS_CONNECTIVITY_TYPE
  
