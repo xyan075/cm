@@ -301,6 +301,7 @@ MODULE TYPES
     REAL(DP) :: RELATIVE_TOLERANCE !<The relative tolerance of the iteration update
     LOGICAL :: DATA_PROJECTION_PROJECTED !<Is .TRUE. if the data projection have been projected, .FALSE. if not.
     LOGICAL :: ORTHOGONAL_PROJECTION !<Is .TRUE. if the data projection needs to be orthogonal, .FALSE. if not.
+    LOGICAL :: USE_LAST_PROJECTION_RESULTS !<Is .TRUE. if use last projection results as stating xi, .FALSE. if not.
     TYPE(DATA_PROJECTION_RESULT_TYPE), ALLOCATABLE :: DATA_PROJECTION_RESULTS(:)
     INTEGER(INTG), ALLOCATABLE :: CANDIDATE_ELEMENT_NUMBERS(:) !Global candidate element numbers 
     INTEGER(INTG), ALLOCATABLE :: CANDIDATE_FACE_NUMBERS(:) !Element candidate face/line numbers

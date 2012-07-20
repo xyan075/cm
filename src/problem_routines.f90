@@ -3220,11 +3220,13 @@ CONTAINS
                     INTERFACE_CONDITION=>SOLVER_MAPPING%INTERFACE_CONDITIONS(interfaceConditionIdx)%PTR
                     IF(ASSOCIATED(INTERFACE_CONDITION)) THEN
                       IF(INTERFACE_CONDITION%OPERATOR==INTERFACE_CONDITION_FRICTIONLESS_CONTACT_OPERATOR) THEN
-!                        CALL INTERFACE_CONDITION_DATA_REPROJECTION(INTERFACE_CONDITION,ERR,ERROR,*999)
-!                        CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"*****************************************",ERR,ERROR,*999)
-!                        CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"Data projected!!!",ERR,ERROR,*999)
-!                        CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"*****************************************",ERR,ERROR,*999)
-!                        CALL INTERFACE_CONDITION_ASSEMBLE(INTERFACE_CONDITION,ERR,ERROR,*999)
+!                        IF(ITS>4) THEN
+!                          CALL INTERFACE_CONDITION_DATA_REPROJECTION(INTERFACE_CONDITION,ERR,ERROR,*999)
+!                          CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"*****************************************",ERR,ERROR,*999)
+!                          CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"Data projected!!!",ERR,ERROR,*999)
+!                          CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"*****************************************",ERR,ERROR,*999)
+!                          CALL INTERFACE_CONDITION_ASSEMBLE(INTERFACE_CONDITION,ERR,ERROR,*999)
+!                        ENDIF
                         !Output newton step solution
                         CALL PROBLEM_SOLVER_NEWTION_FIELDS_OUTPUT(SOLVER,ITS,ERR,ERROR,*999)
                       ENDIF

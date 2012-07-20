@@ -617,11 +617,13 @@ CONTAINS
         !Evaluate the data points positions according to the xi locations of first mesh and its dependent field.
         CALL DATA_POINTS_VALUES_POINTS_CONNECTIVITY_FIELD_EVALUATE(DATA_POINTS,POINTS_CONNECTIVITY,1,DEPENDENT_FIELD_1, &
           & ERR,ERROR,*999)
+
         !Get the mesh component number for this field
         !MESH_COMPONENT_NUMBER=DEPENDENT_FIELD_1%DECOMPOSITION%MESH_COMPONENT_NUMBER
         MESH_COMPONENT_NUMBER=1
         DO coupled_mesh_idx=2,INTERFACE_CONDITION%INTERFACE%NUMBER_OF_COUPLED_MESHES
           DATA_PROJECTION=>DATA_POINTS%DATA_PROJECTIONS(coupled_mesh_idx)%PTR
+          DATA_PROJECTION%USE_LAST_PROJECTION_RESULTS=.TRUE.
           DEPENDENT_FIELD_PROJECTION=>INTERFACE_CONDITION%DEPENDENT%EQUATIONS_SETS(coupled_mesh_idx)%PTR%DEPENDENT%DEPENDENT_FIELD
           !Projection the data points (with know spatial positions) on the dependent field of the second (or more) mesh
           CALL DATA_PROJECTION_DATA_POINTS_PROJECTION_EVALUATE(DATA_PROJECTION,DEPENDENT_FIELD_PROJECTION,err,error,*999)
@@ -665,7 +667,7 @@ CONTAINS
               END SELECT
             ENDIF
             !Transfer the position of the contact points in the first field into GAP
-            POINTS_CONNECTIVITY%GAP(:,data_point_idx)=DATA_POINTS%DATA_POINTS(data_point_idx)%VALUES
+            POINTS_CONNECTIVITY%GAP(:,data_point_idx)=-DATA_POINTS%DATA_POINTS(data_point_idx)%VALUES
           ENDDO !data_point_idx      
         ENDDO
         
@@ -686,7 +688,7 @@ CONTAINS
             ENDIF
           ENDDO !xi_idx
           !Substract the gap by the position of contact points in the second region to get the final gap vector
-          POINTS_CONNECTIVITY%GAP(:,data_point_idx)=POINTS_CONNECTIVITY%GAP(:,data_point_idx)- &
+          POINTS_CONNECTIVITY%GAP(:,data_point_idx)=POINTS_CONNECTIVITY%GAP(:,data_point_idx)+ &
             & DATA_POINTS%DATA_POINTS(data_point_idx)%VALUES
         ENDDO !data_point_idx
       ELSE
@@ -723,7 +725,7 @@ CONTAINS
     TYPE(DATA_PROJECTION_RESULT_TYPE), POINTER :: DATA_PROJECTION_RESULT
      TYPE(FIELD_INTERPOLATED_POINT_METRICS_TYPE), POINTER :: INTERPOLATED_POINT_METRICS
     INTEGER(INTG) :: dataPointIdx,projectionMeshIdx,xi_idx,MESH_COMPONENT_NUMBER,coupledMeshNumberOfXi,localContactXiNormal, &
-      & globalContactNumber,coupledMeshElementNumber,localContactNumber,numberOfDimensions
+      & globalContactNumber,coupledMeshElementNumber,localContactNumber,numberOfDimensions,dimIdx
     REAL(DP) :: XI_POSITION(2),XI(3),POSITION(3),NORMAL(3),TANGENTS(3,3),gapScalar
     LOGICAL :: REVERSE_NORMAL
     TYPE(VARYING_STRING) :: LOCAL_ERROR
@@ -824,16 +826,18 @@ CONTAINS
               & INTERPOLATED_POINT_METRICS(FIELD_U_VARIABLE_TYPE)%PTR                 
             !Calculate outward normal of the contact surface in the coupled mesh
             CALL FIELD_POSITION_NORMAL_TANGENTS_CALCULATE_INT_PT_METRIC(INTERPOLATED_POINT_METRICS, &
-              & REVERSE_NORMAL,POSITION(1:numberOfDimensions), &
-              & NORMAL(1:numberOfDimensions),TANGENTS(1:numberOfDimensions, &
+              & REVERSE_NORMAL,POSITION(1:numberOfDimensions),NORMAL(1:numberOfDimensions),TANGENTS(1:numberOfDimensions, &
               & 1:coupledMeshNumberOfXi),ERR,ERROR,*999)  
             POINTS_CONNECTIVITY%NORMAL(1:numberOfDimensions,dataPointIdx)=NORMAL   
             !Take the dot product of gap vector and normal to check if the gap is a penetration
             IF(POINTS_CONNECTIVITY%IS_PENETRATION(dataPointIdx)) THEN
-              gapScalar=-DOT_PRODUCT(NORMAL,POINTS_CONNECTIVITY%GAP(1:numberOfDimensions,dataPointIdx))
+              gapScalar=DOT_PRODUCT(NORMAL,POINTS_CONNECTIVITY%GAP(1:numberOfDimensions,dataPointIdx))
               IF(gapScalar<0.00000000001_DP) THEN
                 POINTS_CONNECTIVITY%IS_PENETRATION(dataPointIdx)=.FALSE.
               ENDIF
+!              DO dimIdx=1,numberOfDimensions
+!                POINTS_CONNECTIVITY%GAP(dimIdx,dataPointIdx)=gapScalar*NORMAL(dimIdx)
+!              ENDDO
             ENDIF
           ENDIF
         ENDDO !dataPointIdx

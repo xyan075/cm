@@ -669,6 +669,7 @@ CONTAINS
               CALL MOVE_ALLOC(NEW_DATA_PROJECTIONS_PTR,DATA_POINTS%DATA_PROJECTIONS)
               DATA_POINTS%NUMBER_OF_DATA_PROJECTIONS=DATA_POINTS%NUMBER_OF_DATA_PROJECTIONS+1
               DATA_PROJECTION%GLOBAL_NUMBER=DATA_POINTS%NUMBER_OF_DATA_PROJECTIONS
+              DATA_PROJECTION%USE_LAST_PROJECTION_RESULTS=.FALSE.
             ELSE
               CALL FLAG_ERROR("Dimensions bewtween the mesh region/interface and data points region/interface does not match.", &
                 & ERR,ERROR,*999)        
@@ -1047,19 +1048,36 @@ CONTAINS
                       ENDIF
                     ENDDO
                   CASE (DATA_PROJECTION_BOUNDARY_FACES_PROJECTION_TYPE) !find closest candidate faces
-                    DO data_point_idx=1,NUMBER_OF_DATA_POINTS
-                      NUMBER_OF_CLOSEST_CANDIDATES=GLOBAL_TO_LOCAL_NUMBER_OF_CLOSEST_CANDIDATES(data_point_idx)
-                      IF(NUMBER_OF_CLOSEST_CANDIDATES>0) THEN 
-                        CALL DATA_PROJECTION_NEWTON_FACES_EVALUATE(DATA_PROJECTION,INTERPOLATED_POINT, &
-                          & DATA_POINTS%DATA_POINTS(data_point_idx)%VALUES,CLOSEST_ELEMENTS( &
-                          & data_point_idx,1:NUMBER_OF_CLOSEST_CANDIDATES),CLOSEST_FACES(data_point_idx,1: &
-                          & NUMBER_OF_CLOSEST_CANDIDATES),PROJECTION_EXIT_TAG(data_point_idx),PROJECTED_ELEMENT(data_point_idx), &
-                          & PROJECTED_FACE(data_point_idx),PROJECTED_DISTANCE(1,data_point_idx),PROJECTED_XI(:,data_point_idx), &
-                          & ERR,ERROR,*999)
-                        PROJECTED_ELEMENT(data_point_idx)=DOMAIN%MAPPINGS%ELEMENTS%LOCAL_TO_GLOBAL_MAP(PROJECTED_ELEMENT( &
-                          & data_point_idx)) !map the element number to global number
-                      ENDIF
-                    ENDDO
+                    IF(DATA_PROJECTION%USE_LAST_PROJECTION_RESULTS) THEN
+                      DO data_point_idx=1,NUMBER_OF_DATA_POINTS
+                        NUMBER_OF_CLOSEST_CANDIDATES=GLOBAL_TO_LOCAL_NUMBER_OF_CLOSEST_CANDIDATES(data_point_idx)
+                        IF(NUMBER_OF_CLOSEST_CANDIDATES>0) THEN 
+                          CALL DATA_PROJECTION_NEWTON_FACES_EVALUATE_PERTURBATION(DATA_PROJECTION,INTERPOLATED_POINT, &
+                            & DATA_POINTS%DATA_POINTS(data_point_idx)%VALUES,CLOSEST_ELEMENTS( &
+                            & data_point_idx,1:NUMBER_OF_CLOSEST_CANDIDATES),CLOSEST_FACES(data_point_idx,1: &
+                            & NUMBER_OF_CLOSEST_CANDIDATES),DATA_PROJECTION%DATA_PROJECTION_RESULTS(data_point_idx)%XI, &
+                            & PROJECTION_EXIT_TAG(data_point_idx),PROJECTED_ELEMENT(data_point_idx), &
+                            & PROJECTED_FACE(data_point_idx),PROJECTED_DISTANCE(1,data_point_idx),PROJECTED_XI(:,data_point_idx), &
+                            & ERR,ERROR,*999)
+                          PROJECTED_ELEMENT(data_point_idx)=DOMAIN%MAPPINGS%ELEMENTS%LOCAL_TO_GLOBAL_MAP(PROJECTED_ELEMENT( &
+                            & data_point_idx)) !map the element number to global number
+                        ENDIF
+                      ENDDO
+                    ELSE
+                      DO data_point_idx=1,NUMBER_OF_DATA_POINTS
+                        NUMBER_OF_CLOSEST_CANDIDATES=GLOBAL_TO_LOCAL_NUMBER_OF_CLOSEST_CANDIDATES(data_point_idx)
+                        IF(NUMBER_OF_CLOSEST_CANDIDATES>0) THEN 
+                          CALL DATA_PROJECTION_NEWTON_FACES_EVALUATE(DATA_PROJECTION,INTERPOLATED_POINT, &
+                            & DATA_POINTS%DATA_POINTS(data_point_idx)%VALUES,CLOSEST_ELEMENTS( &
+                            & data_point_idx,1:NUMBER_OF_CLOSEST_CANDIDATES),CLOSEST_FACES(data_point_idx,1: &
+                            & NUMBER_OF_CLOSEST_CANDIDATES),PROJECTION_EXIT_TAG(data_point_idx),PROJECTED_ELEMENT(data_point_idx), &
+                            & PROJECTED_FACE(data_point_idx),PROJECTED_DISTANCE(1,data_point_idx),PROJECTED_XI(:,data_point_idx), &
+                            & ERR,ERROR,*999)
+                          PROJECTED_ELEMENT(data_point_idx)=DOMAIN%MAPPINGS%ELEMENTS%LOCAL_TO_GLOBAL_MAP(PROJECTED_ELEMENT( &
+                            & data_point_idx)) !map the element number to global number
+                        ENDIF
+                      ENDDO
+                    ENDIF
                   CASE (DATA_PROJECTION_ALL_ELEMENTS_PROJECTION_TYPE) !find closest candidate elements
                     SELECT CASE(DATA_PROJECTION%NUMBER_OF_XI)
                       CASE (1) !1D element
@@ -1175,14 +1193,27 @@ CONTAINS
                         & data_point_idx)%DISTANCE,DATA_PROJECTION%DATA_PROJECTION_RESULTS(data_point_idx)%XI,ERR,ERROR,*999)
                     ENDDO
                   CASE (DATA_PROJECTION_BOUNDARY_FACES_PROJECTION_TYPE) !find closest candidate faces
-                    DO data_point_idx=1,NUMBER_OF_DATA_POINTS
-                      CALL DATA_PROJECTION_NEWTON_FACES_EVALUATE(DATA_PROJECTION,INTERPOLATED_POINT,DATA_POINTS%DATA_POINTS( &
-                        & data_point_idx)%VALUES,CLOSEST_ELEMENTS(data_point_idx,:),CLOSEST_FACES(data_point_idx,:), &
-                        & DATA_PROJECTION%DATA_PROJECTION_RESULTS(data_point_idx)%EXIT_TAG,DATA_PROJECTION% &
-                        & DATA_PROJECTION_RESULTS(data_point_idx)%ELEMENT_NUMBER,DATA_PROJECTION% &
-                        & DATA_PROJECTION_RESULTS(data_point_idx)%ELEMENT_FACE_NUMBER,DATA_PROJECTION%DATA_PROJECTION_RESULTS( &
-                        & data_point_idx)%DISTANCE,DATA_PROJECTION%DATA_PROJECTION_RESULTS(data_point_idx)%XI,ERR,ERROR,*999)
-                    ENDDO
+                    IF(DATA_PROJECTION%USE_LAST_PROJECTION_RESULTS) THEN
+                      DO data_point_idx=1,NUMBER_OF_DATA_POINTS
+                        CALL DATA_PROJECTION_NEWTON_FACES_EVALUATE_PERTURBATION(DATA_PROJECTION,INTERPOLATED_POINT, &
+                          & DATA_POINTS%DATA_POINTS(data_point_idx)%VALUES,CLOSEST_ELEMENTS(data_point_idx,:), &
+                          & CLOSEST_FACES(data_point_idx,:),DATA_PROJECTION%DATA_PROJECTION_RESULTS(data_point_idx)%XI, &
+                          & DATA_PROJECTION%DATA_PROJECTION_RESULTS(data_point_idx)%EXIT_TAG, &
+                          & DATA_PROJECTION%DATA_PROJECTION_RESULTS(data_point_idx)%ELEMENT_NUMBER, &
+                          & DATA_PROJECTION%DATA_PROJECTION_RESULTS(data_point_idx)%ELEMENT_FACE_NUMBER, &
+                          & DATA_PROJECTION%DATA_PROJECTION_RESULTS(data_point_idx)%DISTANCE,DATA_PROJECTION% &
+                          & DATA_PROJECTION_RESULTS(data_point_idx)%XI,ERR,ERROR,*999)
+                      ENDDO
+                    ELSE
+                      DO data_point_idx=1,NUMBER_OF_DATA_POINTS
+                        CALL DATA_PROJECTION_NEWTON_FACES_EVALUATE(DATA_PROJECTION,INTERPOLATED_POINT,DATA_POINTS%DATA_POINTS( &
+                          & data_point_idx)%VALUES,CLOSEST_ELEMENTS(data_point_idx,:),CLOSEST_FACES(data_point_idx,:), &
+                          & DATA_PROJECTION%DATA_PROJECTION_RESULTS(data_point_idx)%EXIT_TAG,DATA_PROJECTION% &
+                          & DATA_PROJECTION_RESULTS(data_point_idx)%ELEMENT_NUMBER,DATA_PROJECTION% &
+                          & DATA_PROJECTION_RESULTS(data_point_idx)%ELEMENT_FACE_NUMBER,DATA_PROJECTION%DATA_PROJECTION_RESULTS( &
+                          & data_point_idx)%DISTANCE,DATA_PROJECTION%DATA_PROJECTION_RESULTS(data_point_idx)%XI,ERR,ERROR,*999)
+                      ENDDO
+                    ENDIF
                   CASE (DATA_PROJECTION_ALL_ELEMENTS_PROJECTION_TYPE) !find closest candidate elements        
                     SELECT CASE(DATA_PROJECTION%NUMBER_OF_XI)
                       CASE (1) !1D mesh
@@ -2282,6 +2313,230 @@ CONTAINS
     RETURN 1
 
   END SUBROUTINE DATA_PROJECTION_NEWTON_FACES_EVALUATE
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Find the projection of a data point onto element faces (slight difference to DATA_PROJECTION_NEWTON_ELEMENTS_EVALUATE_2)
+  SUBROUTINE DATA_PROJECTION_NEWTON_FACES_EVALUATE_PERTURBATION(DATA_PROJECTION,INTERPOLATED_POINT,POINT_VALUES, &
+    & CANDIDATE_ELEMENTS,CANDIDATE_ELEMENT_FACES,STARTING_XI_PERTURBATION,PROJECTION_EXIT_TAG,PROJECTION_ELEMENT_NUMBER, &
+    & PROJECTION_ELEMENT_FACE_NUMBER,PROJECTION_DISTANCE,PROJECTION_XI,ERR,ERROR,*)
+    !Argument variables
+    TYPE(DATA_PROJECTION_TYPE), POINTER :: DATA_PROJECTION !<Data projection problem to evaluate
+    TYPE(FIELD_INTERPOLATED_POINT_TYPE), POINTER :: INTERPOLATED_POINT    
+    REAL(DP), INTENT(IN) :: POINT_VALUES(:)
+    INTEGER(INTG), INTENT(IN) :: CANDIDATE_ELEMENTS(:)
+    INTEGER(INTG), INTENT(IN) :: CANDIDATE_ELEMENT_FACES(:)
+    REAL(DP), INTENT(IN) :: STARTING_XI_PERTURBATION(2)
+    INTEGER(INTG), INTENT(OUT) :: PROJECTION_EXIT_TAG
+    INTEGER(INTG), INTENT(OUT) :: PROJECTION_ELEMENT_NUMBER
+    INTEGER(INTG), INTENT(OUT) :: PROJECTION_ELEMENT_FACE_NUMBER
+    REAL(DP), INTENT(OUT) :: PROJECTION_DISTANCE
+    REAL(DP), INTENT(OUT) :: PROJECTION_XI(2)
+    INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
+   
+    !Local Variables
+    TYPE(DOMAIN_MAPPING_TYPE), POINTER :: DOMAIN_MAPPING
+    LOGICAL :: FREE,CONVERGED,INSIDE_REGION
+    INTEGER(INTG) :: ELEMENT_NUMBER,ELEMENT_FACE_NUMBER,FACE_NUMBER
+    INTEGER(INTG) :: MESH_COMPONENT_NUMBER,REGION_DIMENSIONS
+    INTEGER(INTG) :: BOUND(2),EXIT_TAG
+    REAL(DP) :: XI(2),XI_NEW(2),XI_UPDATE(2),XI_UPDATE_NORM !<xi
+    REAL(DP) :: RELATIVE_TOLERANCE,ABSOLUTE_TOLERANCE !<tolerances
+    REAL(DP) :: DISTANCE_VECTOR(3),FUNCTION_VALUE,FUNCTION_VALUE_NEW
+    REAL(DP) :: FUNCTION_GRADIENT(2),FUNCTION_GRADIENT_NORM
+    REAL(DP) :: FUNCTION_HESSIAN(2,2),HESSIAN_DIAGONAL(2)
+    REAL(DP) :: TEMP1,TEMP2,DET,EIGEN_MIN,EIGEN_MAX,EIGEN_SHIFT
+    REAL(DP) :: MAXIMUM_DELTA,MINIMUM_DELTA,DELTA !<trust region size
+    REAL(DP) :: PREDICTED_REDUCTION,PREDICTION_ACCURACY
+    
+    
+    INTEGER(INTG) :: ne,ni,nifix,itr1,itr2
+    
+    CALL ENTERS("DATA_PROJECTION_NEWTON_FACES_EVALUATE_PERTURBATION",ERR,ERROR,*999)
+              
+    IF(ASSOCIATED(DATA_PROJECTION)) THEN
+      IF(DATA_PROJECTION%DATA_PROJECTION_FINISHED) THEN
+        PROJECTION_EXIT_TAG=DATA_PROJECTION_EXIT_TAG_NO_ELEMENT
+        MESH_COMPONENT_NUMBER=INTERPOLATED_POINT%INTERPOLATION_PARAMETERS%FIELD%DECOMPOSITION%MESH_COMPONENT_NUMBER
+        DOMAIN_MAPPING=>INTERPOLATED_POINT%INTERPOLATION_PARAMETERS%FIELD%DECOMPOSITION%DOMAIN(MESH_COMPONENT_NUMBER)% &
+          & PTR%MAPPINGS%ELEMENTS
+        REGION_DIMENSIONS=DATA_PROJECTION%COORDINATE_SYSTEM_DIMENSIONS
+        RELATIVE_TOLERANCE=DATA_PROJECTION%RELATIVE_TOLERANCE
+        ABSOLUTE_TOLERANCE=DATA_PROJECTION%ABSOLUTE_TOLERANCE
+        MAXIMUM_DELTA=DATA_PROJECTION%MAXIMUM_ITERATION_UPDATE
+        MINIMUM_DELTA=0.025_DP*MAXIMUM_DELTA !need to set a minimum, in case if it gets too small      
+        DO ne=1,SIZE(CANDIDATE_ELEMENTS,1) !project on each candidate elements
+          ELEMENT_NUMBER=CANDIDATE_ELEMENTS(ne)
+          ELEMENT_FACE_NUMBER=CANDIDATE_ELEMENT_FACES(ne)
+          FACE_NUMBER=INTERPOLATED_POINT%INTERPOLATION_PARAMETERS%FIELD%DECOMPOSITION%TOPOLOGY%ELEMENTS%ELEMENTS( &
+            & ELEMENT_NUMBER)%ELEMENT_FACES(ELEMENT_FACE_NUMBER)     
+          EXIT_TAG=DATA_PROJECTION_EXIT_TAG_NO_ELEMENT
+          CONVERGED=.FALSE.
+          DELTA=0.5_DP*MAXIMUM_DELTA !start at half the MAXIMUM_DELTA as we do not know if quadratic model is a good approximation yet            
+          CALL FIELD_INTERPOLATION_PARAMETERS_FACE_GET(FIELD_VALUES_SET_TYPE,FACE_NUMBER, &
+            & INTERPOLATED_POINT%INTERPOLATION_PARAMETERS,ERR,ERROR,*999)
+          XI=STARTING_XI_PERTURBATION
+          CALL FIELD_INTERPOLATE_XI(SECOND_PART_DERIV,XI,INTERPOLATED_POINT,ERR,ERROR,*999)
+          DISTANCE_VECTOR=POINT_VALUES-INTERPOLATED_POINT%VALUES(:,NO_PART_DERIV)
+          FUNCTION_VALUE=DOT_PRODUCT(DISTANCE_VECTOR(1:REGION_DIMENSIONS),DISTANCE_VECTOR(1:REGION_DIMENSIONS))   
+          main_loop: DO itr1=1,DATA_PROJECTION%MAXIMUM_NUMBER_OF_ITERATIONS !(outer loop)
+            !Check for bounds [0,1]
+            DO ni=1,2 
+              IF(XI(ni)==0.0_DP) THEN
+                BOUND(ni)=-1 !bound at negative direction             
+              ELSEIF(XI(ni)==1.0_DP) THEN
+                BOUND(ni)=1 !bound at positive direction
+              ELSE !inside the bounds
+                BOUND(ni)=0
+              ENDIF
+            ENDDO !ni              
+            !FUNCTION_GRADIENT 
+            FUNCTION_GRADIENT(1)= &
+              & -2.0_DP*(DOT_PRODUCT(DISTANCE_VECTOR(1:REGION_DIMENSIONS),INTERPOLATED_POINT%VALUES(:,PART_DERIV_S1)))
+            FUNCTION_GRADIENT(2)= &
+              & -2.0_DP*(DOT_PRODUCT(DISTANCE_VECTOR(1:REGION_DIMENSIONS),INTERPOLATED_POINT%VALUES(:,PART_DERIV_S2)))
+            !FUNCTION_HESSIAN 
+            FUNCTION_HESSIAN(1,1)= -2.0_DP*(&
+              & DOT_PRODUCT(DISTANCE_VECTOR(1:REGION_DIMENSIONS),INTERPOLATED_POINT%VALUES(:,PART_DERIV_S1_S1))- &
+              & DOT_PRODUCT(INTERPOLATED_POINT%VALUES(:,PART_DERIV_S1),INTERPOLATED_POINT%VALUES(:,PART_DERIV_S1))) 
+            FUNCTION_HESSIAN(1,2)= -2.0_DP*(&
+              & DOT_PRODUCT(DISTANCE_VECTOR(1:REGION_DIMENSIONS),INTERPOLATED_POINT%VALUES(:,PART_DERIV_S1_S2))- &         
+              & DOT_PRODUCT(INTERPOLATED_POINT%VALUES(:,PART_DERIV_S1),INTERPOLATED_POINT%VALUES(:,PART_DERIV_S2)))
+            FUNCTION_HESSIAN(2,2)= -2.0_DP*(&
+              & DOT_PRODUCT(DISTANCE_VECTOR(1:REGION_DIMENSIONS),INTERPOLATED_POINT%VALUES(:,PART_DERIV_S2_S2))- &
+              & DOT_PRODUCT(INTERPOLATED_POINT%VALUES(:,PART_DERIV_S2),INTERPOLATED_POINT%VALUES(:,PART_DERIV_S2)))
+            !A model trust region approach, a Newton step is taken if the minimum lies inside the trust region (DELTA), if not, shift the step towards the steepest descent
+            TEMP1=0.5_DP*(FUNCTION_HESSIAN(1,1)+FUNCTION_HESSIAN(2,2))
+            TEMP2=DSQRT((0.5_DP*(FUNCTION_HESSIAN(1,1)-FUNCTION_HESSIAN(2,2)))**2+FUNCTION_HESSIAN(1,2)**2)
+            EIGEN_MIN=TEMP1-TEMP2
+            EIGEN_MAX=TEMP1+TEMP2
+            FUNCTION_GRADIENT_NORM=DSQRT(DOT_PRODUCT(FUNCTION_GRADIENT,FUNCTION_GRADIENT))
+            DO itr2=1,DATA_PROJECTION%MAXIMUM_NUMBER_OF_ITERATIONS !(inner loop: adjust region size) usually EXIT at 1 or 2 iterations
+              TEMP1=FUNCTION_GRADIENT_NORM/DELTA
+              INSIDE_REGION=(EIGEN_MIN>=TEMP1).AND.(EIGEN_MIN>ABSOLUTE_TOLERANCE) !estimate if the solution is inside the trust region without calculating a newton step, this also guarantees the hessian matrix is positive definite
+              IF(INSIDE_REGION) THEN
+                DET=EIGEN_MIN*EIGEN_MAX !det(H)
+                HESSIAN_DIAGONAL(1)=FUNCTION_HESSIAN(1,1)
+                HESSIAN_DIAGONAL(2)=FUNCTION_HESSIAN(2,2)
+              ELSE
+                EIGEN_SHIFT=MAX(TEMP1-EIGEN_MIN,ABSOLUTE_TOLERANCE) !shift towards steepest decent
+                DET=TEMP1*(EIGEN_MAX+EIGEN_SHIFT) !det(H)
+                HESSIAN_DIAGONAL(1)=FUNCTION_HESSIAN(1,1)+EIGEN_SHIFT
+                HESSIAN_DIAGONAL(2)=FUNCTION_HESSIAN(2,2)+EIGEN_SHIFT
+              ENDIF
+              XI_UPDATE(1)=-(HESSIAN_DIAGONAL(2)*FUNCTION_GRADIENT(1)-FUNCTION_HESSIAN(1,2)*FUNCTION_GRADIENT(2))/DET
+              XI_UPDATE(2)=(FUNCTION_HESSIAN(1,2)*FUNCTION_GRADIENT(1)-HESSIAN_DIAGONAL(1)*FUNCTION_GRADIENT(2))/DET
+              XI_UPDATE_NORM=DSQRT(DOT_PRODUCT(XI_UPDATE,XI_UPDATE))
+              FREE=.TRUE.
+              DO ni=1,2
+                IF((BOUND(ni)/=0).AND.(BOUND(ni)>0.EQV.XI_UPDATE(ni)>0.0_DP)) THEN !projection go out of element bound
+                  IF(.NOT.FREE) THEN !both xi are fixed
+                    EXIT_TAG=DATA_PROJECTION_EXIT_TAG_BOUNDS
+                    EXIT main_loop
+                  ENDIF
+                  FREE=.FALSE.
+                  nifix=ni
+                ENDIF
+              ENDDO !ni
+              IF(FREE) THEN !both xi are free
+                IF(.NOT.INSIDE_REGION) THEN
+                  IF(XI_UPDATE_NORM>0.0_DP) THEN
+                    XI_UPDATE=DELTA/XI_UPDATE_NORM*XI_UPDATE !readjust XI_UPDATE to lie on the region bound                      
+                  ENDIF
+                ENDIF
+              ELSE !xi are not free
+                XI_UPDATE(nifix)=0.0_DP
+                ni=3-nifix
+                INSIDE_REGION=.FALSE.
+                IF(FUNCTION_HESSIAN(ni,ni)>0.0_DP) THEN !positive: minimum exists in the unbounded direction                
+                  XI_UPDATE(ni)=-FUNCTION_GRADIENT(ni)/FUNCTION_HESSIAN(ni,ni)
+                  XI_UPDATE_NORM=DABS(XI_UPDATE(ni))
+                  INSIDE_REGION=XI_UPDATE_NORM<=DELTA
+                ENDIF
+                IF(.NOT.INSIDE_REGION) THEN !minimum not in the region
+                  XI_UPDATE(ni)=-DSIGN(DELTA,FUNCTION_GRADIENT(ni))
+                  XI_UPDATE_NORM=DELTA
+                ENDIF            
+              ENDIF !if xi is free
+              CONVERGED=XI_UPDATE_NORM<ABSOLUTE_TOLERANCE !first half of the convergence test
+              XI_NEW=XI+XI_UPDATE !update XI
+              DO ni=1,2
+                IF(XI_NEW(ni)<0.0_DP) THEN !boundary collision check
+                  XI_NEW(ni)=0.0_DP
+                  XI_NEW(3-ni)=XI(3-ni)-XI_UPDATE(3-ni)*XI(ni)/XI_UPDATE(ni)
+                ELSEIF(XI_NEW(ni)>1.0_DP) THEN
+                  XI_NEW(ni)=1.0_DP  
+                  XI_NEW(3-ni)=XI(3-ni)+XI_UPDATE(3-ni)*(1.0_DP-XI(ni))/XI_UPDATE(ni)
+                ENDIF
+              ENDDO
+              CALL FIELD_INTERPOLATE_XI(SECOND_PART_DERIV,XI_NEW,INTERPOLATED_POINT,ERR,ERROR,*999)
+              DISTANCE_VECTOR=POINT_VALUES-INTERPOLATED_POINT%VALUES(:,NO_PART_DERIV)
+              FUNCTION_VALUE_NEW=DOT_PRODUCT(DISTANCE_VECTOR(1:REGION_DIMENSIONS),DISTANCE_VECTOR(1:REGION_DIMENSIONS))
+              CONVERGED=CONVERGED.AND.(DABS(FUNCTION_VALUE_NEW-FUNCTION_VALUE)/(1.0_DP+FUNCTION_VALUE)<RELATIVE_TOLERANCE) !second half of the convergence test (before collision detection)
+              IF(CONVERGED) EXIT !converged: exit inner loop first
+              IF(FUNCTION_VALUE_NEW>FUNCTION_VALUE) THEN !bad model: reduce step size
+                IF(DELTA<=MINIMUM_DELTA) THEN !something went wrong, MINIMUM_DELTA too large? not likely to happen if MINIMUM_DELTA is small
+                  EXIT_TAG=DATA_PROJECTION_EXIT_TAG_MAX_ITERATION ! it will get stucked!!
+                  EXIT main_loop
+                ENDIF
+                DELTA=DMAX1(MINIMUM_DELTA,0.25_DP*DELTA)
+              ELSE
+                PREDICTED_REDUCTION=DOT_PRODUCT(FUNCTION_GRADIENT,XI_UPDATE)+ &
+                  & 0.5_DP*(XI_UPDATE(1)*(XI_UPDATE(1)*FUNCTION_HESSIAN(1,1)+2.0_DP*XI_UPDATE(2)*FUNCTION_HESSIAN(1,2))+ &
+                  & XI_UPDATE(2)**2*FUNCTION_HESSIAN(2,2))
+                IF(PREDICTED_REDUCTION==0.0_DP) THEN ! if the predicted reduction is zero, then any new function value that is smaller than the previous value is an acceptable solution step
+                  EXIT
+                ENDIF                
+                PREDICTION_ACCURACY=(FUNCTION_VALUE_NEW-FUNCTION_VALUE)/PREDICTED_REDUCTION
+                IF(PREDICTION_ACCURACY<0.01_DP) THEN !bad model: reduce region size
+                  IF(DELTA<=MINIMUM_DELTA) THEN !something went wrong, MINIMUM_DELTA too large? not likely to happen if MINIMUM_DELTA is small
+                    EXIT_TAG=DATA_PROJECTION_EXIT_TAG_MAX_ITERATION ! it will get stucked!!
+                    EXIT main_loop
+                  ENDIF
+                  DELTA=DMAX1(MINIMUM_DELTA,0.5_DP*DELTA)
+                ELSEIF(PREDICTION_ACCURACY>0.9_DP.AND.PREDICTION_ACCURACY<1.1_DP) THEN !good model: increase region size
+                  DELTA=DMIN1(MAXIMUM_DELTA,2.0_DP*DELTA)
+                  EXIT
+                ELSE !ok model: keep the current region size
+                  EXIT
+                ENDIF
+              ENDIF
+            ENDDO !itr2 (inner loop: adjust region size)
+            FUNCTION_VALUE=FUNCTION_VALUE_NEW
+            XI=XI_NEW
+            IF(CONVERGED) THEN
+              EXIT_TAG=DATA_PROJECTION_EXIT_TAG_CONVERGED
+              EXIT
+            ENDIF
+          ENDDO main_loop !itr1 (outer loop)
+          IF(EXIT_TAG==DATA_PROJECTION_EXIT_TAG_NO_ELEMENT.AND.itr1>=DATA_PROJECTION%MAXIMUM_NUMBER_OF_ITERATIONS) &
+            & EXIT_TAG=DATA_PROJECTION_EXIT_TAG_MAX_ITERATION
+          IF((PROJECTION_EXIT_TAG==DATA_PROJECTION_EXIT_TAG_NO_ELEMENT).OR.(DSQRT(FUNCTION_VALUE)<PROJECTION_DISTANCE)) THEN
+            !IF(.NOT.ELEMENT_FOUND) ELEMENT_FOUND=.TRUE.
+            PROJECTION_EXIT_TAG=EXIT_TAG
+            PROJECTION_ELEMENT_NUMBER=ELEMENT_NUMBER
+            PROJECTION_ELEMENT_FACE_NUMBER=ELEMENT_FACE_NUMBER            
+            PROJECTION_DISTANCE=DSQRT(FUNCTION_VALUE)
+            PROJECTION_XI=XI
+          ENDIF
+        ENDDO !ne
+      ELSE
+        CALL FLAG_ERROR("Data projection have not been finished.",ERR,ERROR,*999)
+      ENDIF
+    ELSE
+      CALL FLAG_ERROR("Data projection is not associated.",ERR,ERROR,*999)
+    ENDIF
+    
+    CALL EXITS("DATA_PROJECTION_NEWTON_FACES_EVALUATE_PERTURBATION")
+    RETURN
+999 CALL ERRORS("DATA_PROJECTION_NEWTON_FACES_EVALUATE_PERTURBATION",ERR,ERROR)    
+    CALL EXITS("DATA_PROJECTION_NEWTON_FACES_EVALUATE_PERTURBATION")
+    RETURN 1
+
+  END SUBROUTINE DATA_PROJECTION_NEWTON_FACES_EVALUATE_PERTURBATION
 
   !
   !================================================================================================================================
