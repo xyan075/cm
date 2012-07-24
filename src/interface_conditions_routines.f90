@@ -1667,13 +1667,17 @@ CONTAINS
                 !coupled variable components don't have to always come before the uncoupled variable components
                 INTERFACE_CONDITION%LAGRANGE%NUMBER_OF_COMPONENTS=0
                 DO dependent_variable_number=1,INTERFACE_DEPENDENT%NUMBER_OF_DEPENDENT_VARIABLES
-                  IF (INTERFACE_DEPENDENT%FIELD_VARIABLES(dependent_variable_number)%PTR%NUMBER_OF_COMPONENTS< &
-                    & INTERFACE_CONDITION%LAGRANGE%NUMBER_OF_COMPONENTS) THEN
-                    INTERFACE_CONDITION%LAGRANGE%NUMBER_OF_COMPONENTS= &
-                      & INTERFACE_DEPENDENT%FIELD_VARIABLES(dependent_variable_number)%PTR%NUMBER_OF_COMPONENTS-1
-                  ELSEIF (INTERFACE_CONDITION%LAGRANGE%NUMBER_OF_COMPONENTS==0) THEN
-                    INTERFACE_CONDITION%LAGRANGE%NUMBER_OF_COMPONENTS= &
-                      & INTERFACE_DEPENDENT%FIELD_VARIABLES(dependent_variable_number)%PTR%NUMBER_OF_COMPONENTS-1
+                  IF(INTERFACE_CONDITION%OPERATOR==INTERFACE_CONDITION_FRICTIONLESS_CONTACT_OPERATOR) THEN
+                    INTERFACE_CONDITION%LAGRANGE%NUMBER_OF_COMPONENTS=1
+                  ELSE
+                    IF (INTERFACE_DEPENDENT%FIELD_VARIABLES(dependent_variable_number)%PTR%NUMBER_OF_COMPONENTS< &
+                      & INTERFACE_CONDITION%LAGRANGE%NUMBER_OF_COMPONENTS) THEN
+                      INTERFACE_CONDITION%LAGRANGE%NUMBER_OF_COMPONENTS= &
+                        & INTERFACE_DEPENDENT%FIELD_VARIABLES(dependent_variable_number)%PTR%NUMBER_OF_COMPONENTS-1
+                    ELSEIF (INTERFACE_CONDITION%LAGRANGE%NUMBER_OF_COMPONENTS==0) THEN
+                      INTERFACE_CONDITION%LAGRANGE%NUMBER_OF_COMPONENTS= &
+                        & INTERFACE_DEPENDENT%FIELD_VARIABLES(dependent_variable_number)%PTR%NUMBER_OF_COMPONENTS-1
+                    ENDIF
                   ENDIF
                 ENDDO
                 CALL FIELD_NUMBER_OF_COMPONENTS_SET(INTERFACE_CONDITION%LAGRANGE%LAGRANGE_FIELD,FIELD_U_VARIABLE_TYPE, &
@@ -3174,8 +3178,7 @@ CONTAINS
                       dataPointNumber=DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(ELEMENT_NUMBER)%DATA_INDICES(dataPointIdx)% &
                        & GLOBAL_NUMBER
                       DO colComponentIdx=1,LAGRANGE_VARIABLE%NUMBER_OF_COMPONENTS
-                        colIdx=dataPointIdx+DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(ELEMENT_NUMBER)% &
-                          & NUMBER_OF_PROJECTED_DATA*(colComponentIdx-1)
+                        colIdx=dataPointIdx
                         weight=POINTS_CONNECTIVITY%INTERFACE%DATA_POINTS%DATA_POINTS(dataPointNumber)% &
                           & weightS(colComponentIdx)
                         dofValue=INTERFACE_PENALTY_FIELD%VARIABLES(1)%PARAMETER_SETS%PARAMETER_SETS(1)%PTR%PARAMETERS%CMISS% &
@@ -3292,12 +3295,11 @@ CONTAINS
                               & (rowComponentIdx-1)+COUPLED_MESH_BASIS%NUMBER_OF_ELEMENT_PARAMETERS* &
                               & (coupledMeshElementIdx-1)+rowParameterIdx
                             PGMSI=BASIS_EVALUATE_XI(COUPLED_MESH_BASIS,rowParameterIdx,NO_PART_DERIV,XI,ERR,ERROR)* &
-                              & MATRIX_COEFFICIENT!*-1.0_dp*POINTS_CONNECTIVITY%NORMAL(rowComponentIdx,dataPointIdx)!* &
+                              & MATRIX_COEFFICIENT*-1.0_dp!*POINTS_CONNECTIVITY%NORMAL(rowComponentIdx,dataPointIdx)!* &
 !                              & POINTS_CONNECTIVITY%NORMAL(rowComponentIdx,dataPointIdx)
 !                            ROWBASIS=BASIS_EVALUATE_XI(COUPLED_MESH_BASIS,rowParameterIdx,NO_PART_DERIV,XI,ERR,ERROR)
                             colComponentIdx=rowComponentIdx !Since x and y are not coupled.
-                            colIdx=dataPointIdx+DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(ELEMENT_NUMBER)% &
-                              & NUMBER_OF_PROJECTED_DATA*(colComponentIdx-1)
+                            colIdx=dataPointIdx
                             weight=POINTS_CONNECTIVITY%INTERFACE%DATA_POINTS%DATA_POINTS(dataPointNumber)% &
                               & weightS(colComponentIdx)
                             INTERFACE_ELEMENT_MATRIX%MATRIX(rowIdx,colIdx)=INTERFACE_ELEMENT_MATRIX%MATRIX(rowIdx, &
@@ -3325,8 +3327,7 @@ CONTAINS
                             rowIdx=rowIdx+1
                             colComponentIdx=rowComponentIdx !X and Y are decoupled
                             DO dataPointIdx=1,DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(ELEMENT_NUMBER)%NUMBER_OF_PROJECTED_DATA
-                              colIdx=dataPointIdx+DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(ELEMENT_NUMBER)% &
-                                & NUMBER_OF_PROJECTED_DATA*(colComponentIdx-1)
+                              colIdx=dataPointIdx
                               dataPointNumber=DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(ELEMENT_NUMBER)%DATA_INDICES(dataPointIdx)% &
                                 & GLOBAL_NUMBER
                               IF(POINTS_CONNECTIVITY%POINTS_CONNECTIVITY(dataPointNumber,interface_matrix_idx)% &
