@@ -684,7 +684,7 @@ CONTAINS
             IF(DATA_POINTS%DATA_PROJECTIONS(2)%PTR%DATA_PROJECTION_RESULTS(data_point_idx)%XI(xi_idx)==0.0_DP .OR.  &
                 & DATA_POINTS%DATA_PROJECTIONS(2)%PTR%DATA_PROJECTION_RESULTS(data_point_idx)%XI(xi_idx)==1.0_DP) THEN
               POINTS_CONNECTIVITY%DATA_POINT_PROJECTED(data_point_idx)=.FALSE.
-              POINTS_CONNECTIVITY%IS_PENETRATION(data_point_idx)=.FALSE.
+              POINTS_CONNECTIVITY%IS_PENETRATION(:,data_point_idx)=.FALSE.
             ENDIF
           ENDDO !xi_idx
           !Substract the gap by the position of contact points in the second region to get the final gap vector
@@ -725,7 +725,7 @@ CONTAINS
     TYPE(DATA_PROJECTION_RESULT_TYPE), POINTER :: DATA_PROJECTION_RESULT
      TYPE(FIELD_INTERPOLATED_POINT_METRICS_TYPE), POINTER :: INTERPOLATED_POINT_METRICS
     INTEGER(INTG) :: dataPointIdx,projectionMeshIdx,xi_idx,MESH_COMPONENT_NUMBER,coupledMeshNumberOfXi,localContactXiNormal, &
-      & globalContactNumber,coupledMeshElementNumber,localContactNumber,numberOfDimensions,dimIdx
+      & globalContactNumber,coupledMeshElementNumber,localContactNumber,numberOfDimensions,coordIdx
     REAL(DP) :: XI_POSITION(2),XI(3),POSITION(3),NORMAL(3),TANGENTS(3,3),gapScalar
     LOGICAL :: REVERSE_NORMAL
     TYPE(VARYING_STRING) :: LOCAL_ERROR
@@ -830,14 +830,17 @@ CONTAINS
               & 1:coupledMeshNumberOfXi),ERR,ERROR,*999)  
             POINTS_CONNECTIVITY%NORMAL(1:numberOfDimensions,dataPointIdx)=NORMAL   
             !Take the dot product of gap vector and normal to check if the gap is a penetration
-            IF(POINTS_CONNECTIVITY%IS_PENETRATION(dataPointIdx)) THEN
+            IF(POINTS_CONNECTIVITY%IS_PENETRATION(1,dataPointIdx)) THEN
               gapScalar=DOT_PRODUCT(NORMAL,POINTS_CONNECTIVITY%GAP(1:numberOfDimensions,dataPointIdx))
-              IF(gapScalar<0.00000000001_DP) THEN
-                POINTS_CONNECTIVITY%IS_PENETRATION(dataPointIdx)=.FALSE.
+              IF(gapScalar<ZERO_TOLERANCE) THEN
+                POINTS_CONNECTIVITY%IS_PENETRATION(:,dataPointIdx)=.FALSE.
+              ELSE
+                DO coordIdx=1,SIZE(POINTS_CONNECTIVITY%IS_PENETRATION,1)
+                  IF(ABS(NORMAL(coordIdx))<ZERO_TOLERANCE) THEN
+                    POINTS_CONNECTIVITY%IS_PENETRATION(coordIdx,dataPointIdx)=.FALSE.
+                  ENDIF
+                ENDDO
               ENDIF
-!              DO dimIdx=1,numberOfDimensions
-!                POINTS_CONNECTIVITY%GAP(dimIdx,dataPointIdx)=gapScalar*NORMAL(dimIdx)
-!              ENDDO
             ENDIF
           ENDIF
         ENDDO !dataPointIdx
@@ -2236,6 +2239,7 @@ CONTAINS
               IF (INTERFACE_CONDITION%LAGRANGE%LAGRANGE_FIELD%VARIABLES(1)%COMPONENTS(1)%INTERPOLATION_TYPE== &
                   & FIELD_DATA_POINT_BASED_INTERPOLATION) THEN
                 CALL INTERFACE_CONDITION_DATA_REPROJECTION(INTERFACE_CONDITION,ERR,ERROR,*999)
+                CALL INTERFACE_CONDITION_DATA_POINTS_NORMAL_CALCULATE(INTERFACE_CONDITION,ERR,ERROR,*999)
               ENDIF
             ENDIF
             CALL INTERFACE_CONDITION_RESIDUAL_EVALUATE_FEM(INTERFACE_CONDITION,ERR,ERROR,*999)
@@ -3183,32 +3187,31 @@ CONTAINS
                     DO dataPointIdx=1,DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(ELEMENT_NUMBER)%NUMBER_OF_PROJECTED_DATA
                       dataPointNumber=DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(ELEMENT_NUMBER)%DATA_INDICES(dataPointIdx)% &
                        & GLOBAL_NUMBER        
-                      IF(POINTS_CONNECTIVITY%IS_PENETRATION(dataPointNumber)) THEN !If the point has been orthogonally projected
-                        !Get the global number of the coupled mesh element that this point is projected on
-                        coupledMeshElementNumber=POINTS_CONNECTIVITY%POINTS_CONNECTIVITY(dataPointNumber,interface_matrix_idx)% &
-                          & COUPLED_MESH_ELEMENT_NUMBER
-                        !Get the index of the coupled mesh element that this data point is projected on
-                        coupledMeshElementIdx=1
-                        DO WHILE (coupledMeshElementNumber/=POINTS_CONNECTIVITY%COUPLED_MESH_ELEMENTS(ELEMENT_NUMBER, &
-                          & interface_matrix_idx)%ELEMENT_NUMBERS(coupledMeshElementIdx))
-                          coupledMeshElementIdx=coupledMeshElementIdx+1
-                        ENDDO       
-                            
-                        !Local number of the line in contact
-                        localContactNumber=POINTS_CONNECTIVITY%POINTS_CONNECTIVITY(dataPointNumber,interface_matrix_idx)% &
-                          & COUPLED_MESH_CONTACT_NUMBER
-                                               
-                        !The xi direction of the surface/line normal
-                        localContactXiNormal=POINTS_CONNECTIVITY%POINTS_CONNECTIVITY(dataPointNumber,interface_matrix_idx)% &
-                          & COUPLED_MESH_CONTACT_XI_NORMAL 
+                      !Get the global number of the coupled mesh element that this point is projected on
+                      coupledMeshElementNumber=POINTS_CONNECTIVITY%POINTS_CONNECTIVITY(dataPointNumber,interface_matrix_idx)% &
+                        & COUPLED_MESH_ELEMENT_NUMBER
+                      !Get the index of the coupled mesh element that this data point is projected on
+                      coupledMeshElementIdx=1
+                      DO WHILE (coupledMeshElementNumber/=POINTS_CONNECTIVITY%COUPLED_MESH_ELEMENTS(ELEMENT_NUMBER, &
+                        & interface_matrix_idx)%ELEMENT_NUMBERS(coupledMeshElementIdx))
+                        coupledMeshElementIdx=coupledMeshElementIdx+1
+                      ENDDO       
+                          
+                      !Local number of the line in contact
+                      localContactNumber=POINTS_CONNECTIVITY%POINTS_CONNECTIVITY(dataPointNumber,interface_matrix_idx)% &
+                        & COUPLED_MESH_CONTACT_NUMBER
+                                             
+                      !The xi direction of the surface/line normal
+                      localContactXiNormal=POINTS_CONNECTIVITY%POINTS_CONNECTIVITY(dataPointNumber,interface_matrix_idx)% &
+                        & COUPLED_MESH_CONTACT_XI_NORMAL 
 !                        !Decide if the normal vector should be reversed to be outward  
 !                        IF(ABS(localContactXiNormal)==localContactXiNormal) THEN
 !                          REVERSE_NORMAL=.FALSE.
 !                        ELSE
 !                          REVERSE_NORMAL=.TRUE. 
 !                        ENDIF                                          
-                          
-                        DO rowComponentIdx=1,coupledMeshNumberOfGeometricComponents
+                      DO rowComponentIdx=1,coupledMeshNumberOfGeometricComponents
+                        IF(POINTS_CONNECTIVITY%IS_PENETRATION(rowComponentIdx,dataPointNumber)) THEN !If the point has been orthogonally projected
                           rowMeshComponentNumber=INTERFACE_MATRIX_VARIABLE%COMPONENTS(rowComponentIdx)%MESH_COMPONENT_NUMBER  
                           coupledMeshNumberOfXi=COUPLED_MESH_GEOMETRIC_FIELD%DECOMPOSITION%DOMAIN(rowMeshComponentNumber)% &
                             & PTR%TOPOLOGY%ELEMENTS%ELEMENTS(coupledMeshElementNumber)%BASIS%NUMBER_OF_XI 
@@ -3289,7 +3292,8 @@ CONTAINS
                               & (rowComponentIdx-1)+COUPLED_MESH_BASIS%NUMBER_OF_ELEMENT_PARAMETERS* &
                               & (coupledMeshElementIdx-1)+rowParameterIdx
                             PGMSI=BASIS_EVALUATE_XI(COUPLED_MESH_BASIS,rowParameterIdx,NO_PART_DERIV,XI,ERR,ERROR)* &
-                              & POINTS_CONNECTIVITY%NORMAL(rowComponentIdx,dataPointIdx)*MATRIX_COEFFICIENT*-1.0_dp
+                              & MATRIX_COEFFICIENT!*-1.0_dp*POINTS_CONNECTIVITY%NORMAL(rowComponentIdx,dataPointIdx)!* &
+!                              & POINTS_CONNECTIVITY%NORMAL(rowComponentIdx,dataPointIdx)
 !                            ROWBASIS=BASIS_EVALUATE_XI(COUPLED_MESH_BASIS,rowParameterIdx,NO_PART_DERIV,XI,ERR,ERROR)
                             colComponentIdx=rowComponentIdx !Since x and y are not coupled.
                             colIdx=dataPointIdx+DATA_POINTS_TOPOLOGY%ELEMENT_DATA_POINTS(ELEMENT_NUMBER)% &
@@ -3299,8 +3303,9 @@ CONTAINS
                             INTERFACE_ELEMENT_MATRIX%MATRIX(rowIdx,colIdx)=INTERFACE_ELEMENT_MATRIX%MATRIX(rowIdx, &
                               & colIdx)+PGMSI  
                           ENDDO !rowParameterIdx
-                        ENDDO !component_idx     
-                      ENDIF !If the data point has been orthogonally projected      
+                        ENDIF !If the data point has been orthogonally projected      
+                      ENDDO !component_idx     
+                      
                     ENDDO !dataPointIdx               
                     !scale factor update
                     IF(INTERFACE_MATRIX_DEPENDENT_FIELD%SCALINGS%SCALING_TYPE/=FIELD_NO_SCALING) THEN

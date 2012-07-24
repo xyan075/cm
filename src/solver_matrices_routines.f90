@@ -518,8 +518,8 @@ CONTAINS
           DO matrix_idx=1,SOLVER_MATRICES%NUMBER_OF_MATRICES
             SOLVER_MATRIX=>SOLVER_MATRICES%MATRICES(matrix_idx)%PTR
             IF(ASSOCIATED(SOLVER_MATRIX)) THEN
-              CALL WRITE_STRING_VALUE(ID,"Solver matrix : ",matrix_idx,ERR,ERROR,*999)
-              CALL DISTRIBUTED_MATRIX_OUTPUT(ID,SOLVER_MATRIX%MATRIX,ERR,ERROR,*999)
+!              CALL WRITE_STRING_VALUE(ID,"Solver matrix : ",matrix_idx,ERR,ERROR,*999)
+!              CALL DISTRIBUTED_MATRIX_OUTPUT(ID,SOLVER_MATRIX%MATRIX,ERR,ERROR,*999)
             ELSE
               CALL FLAG_ERROR("Solver matrix is not associated.",ERR,ERROR,*999)
             ENDIF
