@@ -3295,8 +3295,8 @@ CONTAINS
                               & (rowComponentIdx-1)+COUPLED_MESH_BASIS%NUMBER_OF_ELEMENT_PARAMETERS* &
                               & (coupledMeshElementIdx-1)+rowParameterIdx
                             PGMSI=BASIS_EVALUATE_XI(COUPLED_MESH_BASIS,rowParameterIdx,NO_PART_DERIV,XI,ERR,ERROR)* &
-                              & MATRIX_COEFFICIENT*-1.0_dp!*POINTS_CONNECTIVITY%NORMAL(rowComponentIdx,dataPointIdx)!* &
-!                              & POINTS_CONNECTIVITY%NORMAL(rowComponentIdx,dataPointIdx)
+                              & MATRIX_COEFFICIENT*-1.0_dp*POINTS_CONNECTIVITY%NORMAL(rowComponentIdx,dataPointNumber)!* &
+!                              & POINTS_CONNECTIVITY%NORMAL(rowComponentIdx,dataPointNumber)
 !                            ROWBASIS=BASIS_EVALUATE_XI(COUPLED_MESH_BASIS,rowParameterIdx,NO_PART_DERIV,XI,ERR,ERROR)
                             colComponentIdx=rowComponentIdx !Since x and y are not coupled.
                             colIdx=dataPointIdx
