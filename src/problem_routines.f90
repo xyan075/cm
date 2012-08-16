@@ -1470,7 +1470,7 @@ CONTAINS
                 !Make sure the interface conditions are up to date
                 DO interface_condition_idx=1,SOLVER_MAPPING%NUMBER_OF_INTERFACE_CONDITIONS
                   INTERFACE_CONDITION=>SOLVER_MAPPING%INTERFACE_CONDITIONS(interface_condition_idx)%PTR
-!                  CALL INTERFACE_CONDITION_RESIDUAL_EVALUATE(INTERFACE_CONDITION,ERR,ERROR,*999)
+                  CALL INTERFACE_CONDITION_RESIDUAL_EVALUATE(INTERFACE_CONDITION,ERR,ERROR,*999)
                 ENDDO
                 !Assemble the solver matrices
                 CALL SOLVER_MATRICES_STATIC_ASSEMBLE(SOLVER,SOLVER_MATRICES_RHS_RESIDUAL_ONLY,ERR,ERROR,*999)
@@ -3221,11 +3221,11 @@ CONTAINS
                     IF(ASSOCIATED(INTERFACE_CONDITION)) THEN
                       IF(INTERFACE_CONDITION%OPERATOR==INTERFACE_CONDITION_FRICTIONLESS_CONTACT_OPERATOR) THEN
 !                        IF(ITS>4) THEN
-                          CALL INTERFACE_CONDITION_DATA_REPROJECTION(INTERFACE_CONDITION,ERR,ERROR,*999)
-                          CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"*****************************************",ERR,ERROR,*999)
-                          CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"Data projected!!!",ERR,ERROR,*999)
-                          CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"*****************************************",ERR,ERROR,*999)
-                          CALL INTERFACE_CONDITION_ASSEMBLE(INTERFACE_CONDITION,ERR,ERROR,*999)
+!                          CALL INTERFACE_CONDITION_DATA_REPROJECTION(INTERFACE_CONDITION,ERR,ERROR,*999)
+!                          CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"*****************************************",ERR,ERROR,*999)
+!                          CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"Data projected!!!",ERR,ERROR,*999)
+!                          CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"*****************************************",ERR,ERROR,*999)
+!                          CALL INTERFACE_CONDITION_ASSEMBLE(INTERFACE_CONDITION,ERR,ERROR,*999)
 !                        ENDIF
                         !Output newton step solution
                         CALL PROBLEM_SOLVER_NEWTION_FIELDS_OUTPUT(SOLVER,ITS,ERR,ERROR,*999)
