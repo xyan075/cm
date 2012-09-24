@@ -1103,6 +1103,7 @@ CONTAINS
     INTEGER(INTG) :: DEPENDENT_BASES_EP(3) !,GEOMETRIC_BASES_EP(:)
     REAL(DP) :: JRWG,C(6,6),JRWG_DIAG_C(3,3),JRWG_OFF_DIAG_C(2,3)
     REAL(DP):: SF(64*3)
+    REAL(DP) :: nodalDof
 
     !LOGICAL :: SAME_BASIS
     TYPE(EQUATIONS_TYPE), POINTER :: EQUATIONS
@@ -1317,11 +1318,6 @@ CONTAINS
             ENDIF
           ENDIF
 
-          !!TODO:: Is this RHS Vector update required? find out/check - RHS not used - BC are prescribed during assembling eg update RHS only when BC change - stiffness matrix should be the same
-          IF(RHS_VECTOR%UPDATE_VECTOR) THEN
-            RHS_VECTOR%ELEMENT_VECTOR%VECTOR=0.0_DP
-          ENDIF
-
           !Scale factor adjustment, Application of Scale factors is symmetric
           IF(DEPENDENT_FIELD%SCALINGS%SCALING_TYPE/=FIELD_NO_SCALING) THEN
             DEPENDENT_INTERPOLATION_PARAMETERS=>EQUATIONS%INTERPOLATION%DEPENDENT_INTERP_PARAMETERS(FIELD_VAR_TYPE)%PTR
@@ -1351,6 +1347,23 @@ CONTAINS
               ENDDO !nhs
             ENDDO !mhs
           ENDIF
+          
+          !!TODO:: Is this RHS Vector update required? find out/check - RHS not used - BC are prescribed during assembling eg update RHS only when BC change - stiffness matrix should be the same
+          IF(RHS_VECTOR%UPDATE_VECTOR) THEN
+            RHS_VECTOR%ELEMENT_VECTOR%VECTOR=0.0_DP
+          ENDIF
+          
+          IF(RHS_VECTOR%UPDATE_VECTOR) THEN
+            !Add undeformed geometry to the RHS so that the final solution will give absolute position
+            DO mhs=1,TOTAL_DEPENDENT_BASIS_EP
+              DO nhs=1,TOTAL_DEPENDENT_BASIS_EP
+                nodalDof=EQUATIONS_SET%DEPENDENT%DEPENDENT_FIELD%VARIABLES(FIELD_U_VARIABLE_TYPE)%PARAMETER_SETS% &
+                  & PARAMETER_SETS(FIELD_VALUES_SET_TYPE)%PTR%PARAMETERS%CMISS%DATA_DP(nhs)
+                RHS_VECTOR%ELEMENT_VECTOR%VECTOR(mhs)=RHS_VECTOR%ELEMENT_VECTOR%VECTOR(mhs)+ &
+                  & EQUATIONS_MATRIX%ELEMENT_MATRIX%MATRIX(mhs,nhs)*nodalDof
+              ENDDO !nhs
+            ENDDO !mhs
+          ENDIF 
 
         CASE(EQUATIONS_SET_PLATE_SUBTYPE)
           CALL FLAG_ERROR("Not implemented.",ERR,ERROR,*999)

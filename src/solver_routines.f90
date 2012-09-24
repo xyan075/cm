@@ -11962,7 +11962,10 @@ CONTAINS
                                             ENDDO !variable_idx
                                           ENDIF
                                         CASE(BOUNDARY_CONDITION_DOF_FIXED)
-                                          RHS_VALUE=RHS_PARAMETERS(rhs_variable_dof)
+                                          !Add in equations RHS values
+                                          CALL DISTRIBUTED_VECTOR_VALUES_GET(EQUATIONS_RHS_VECTOR,equations_row_number, &
+                                            & RHS_VALUE,ERR,ERROR,*999)
+                                          RHS_VALUE=RHS_VALUE+RHS_PARAMETERS(rhs_variable_dof)
                                           ! Add any integrated RHS values calculated from point Neumann conditions, b = f + N q
                                           IF(HAS_INTEGRATED_VALUES) THEN
                                             CALL FIELD_PARAMETER_SET_GET_LOCAL_DOF(RHS_VARIABLE%FIELD,RHS_VARIABLE_TYPE, &
@@ -11983,8 +11986,11 @@ CONTAINS
                                               !For nonlinear problems, f(x) - b = 0, and for linear, K x = b, so we always add the
                                               !right hand side field value to the solver right hand side vector
                                               VALUE=RHS_VALUE*row_coupling_coefficient
+                                              CALL DISTRIBUTED_VECTOR_VALUES_GET(SOLVER_RHS_VECTOR,solver_row_number,matrix_VALUE, &
+                                                & ERR,ERROR,*999)
                                               CALL DISTRIBUTED_VECTOR_VALUES_ADD(SOLVER_RHS_VECTOR,solver_row_number,VALUE, &
                                                 & ERR,ERROR,*999)
+                                              
                                             ENDDO !solver_row_idx
                                           ENDIF
                                         CASE(BOUNDARY_CONDITION_DOF_MIXED)
