@@ -1921,7 +1921,8 @@ MODULE OPENCMISS
 
   !>Sets the projection xi for a data point identified by a given user number.
   INTERFACE CMISSDataProjection_ResultXiSet
-    MODULE PROCEDURE CMISSDataProjection_ResultXiSetNumber
+    MODULE PROCEDURE CMISSDataProjection_ResultXiSetInterfaceNumber
+    MODULE PROCEDURE CMISSDataProjection_ResultXiSetRegionNumber
     MODULE PROCEDURE CMISSDataProjection_ResultXiSetObj
   END INTERFACE !CMISSDataProjection_ResultXiSet
 
@@ -20517,13 +20518,71 @@ CONTAINS
     RETURN
 
   END SUBROUTINE CMISSDataProjection_ResultXiGetObj
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Sets/changes the starting xi of data projection identified by a region user number.
+  SUBROUTINE CMISSDataProjection_ResultXiSetInterfaceNumber(dataProjectionUserNumber,parentRegionUserNumber,interfaceUserNumber, &
+      & dataPointUserNumber,ProjectionXi,err)
+
+    !Argument variables
+    INTEGER(INTG), INTENT(IN) :: dataProjectionUserNumber !<The data projection user number of the data projection to get starting xi for.
+    INTEGER(INTG), INTENT(IN) :: parentRegionUserNumber !<The user number of the parent region.
+    INTEGER(INTG), INTENT(IN) :: interfaceUserNumber !<The user number of the interface.
+    INTEGER(INTG), INTENT(IN) :: dataPointUserNumber !<The data point number to set xi position for
+    REAL(DP), INTENT(IN) :: ProjectionXi(:) !<the xi position to set
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code.
+    !Local variables
+    TYPE(REGION_TYPE), POINTER :: PARENT_REGION
+    TYPE(INTERFACE_TYPE), POINTER :: INTERFACE
+    TYPE(DATA_POINTS_TYPE), POINTER :: DATA_POINTS
+    TYPE(DATA_PROJECTION_TYPE), POINTER :: DATA_PROJECTION
+    TYPE(VARYING_STRING) :: LOCAL_ERROR
+    INTEGER(INTG) :: GLOBAL_NUMBER !<data projection global number
+
+    CALL ENTERS("CMISSDataProjection_ResultXiSetInterfaceNumber",ERR,error,*999)
+
+    NULLIFY(PARENT_REGION)
+    NULLIFY(INTERFACE)
+    NULLIFY(DATA_POINTS)
+    NULLIFY(DATA_PROJECTION)
+    CALL REGION_USER_NUMBER_FIND(parentRegionUserNumber,PARENT_REGION,Err,ERROR,*999)
+    IF(ASSOCIATED(PARENT_REGION)) THEN
+      CALL INTERFACE_USER_NUMBER_FIND(interfaceUserNumber,PARENT_REGION,INTERFACE,Err,ERROR,*999)
+      IF(ASSOCIATED(INTERFACE)) THEN
+        CALL INTERFACE_DATA_POINTS_GET(INTERFACE,DATA_POINTS,err,error,*999)
+        CALL DATA_POINTS_DATA_PROJECTION_GLOBAL_NUMBER_GET(DATA_POINTS,DataProjectionUserNumber,GLOBAL_NUMBER,Err,ERROR,*999)
+        CALL DATA_POINTS_DATA_PROJECTION_GET(DATA_POINTS,GLOBAL_NUMBER,DATA_PROJECTION,Err,ERROR,*999)
+        CALL DATA_PROJECTION_RESULT_XI_SET(DATA_PROJECTION,dataPointUserNumber,ProjectionXi,err,error,*999)
+      ELSE
+        LOCAL_ERROR="An interface with an user number of "//TRIM(NUMBER_TO_VSTRING(interfaceUserNumber,"*",Err,ERROR))// &
+          & " does not exist."
+        CALL FLAG_ERROR(LOCAL_ERROR,Err,ERROR,*999)
+      ENDIF
+    ELSE
+      LOCAL_ERROR="A region with an user number of "//TRIM(NUMBER_TO_VSTRING(parentregionUserNumber,"*",Err,ERROR))// &
+        & " does not exist."
+      CALL FLAG_ERROR(LOCAL_ERROR,Err,ERROR,*999)
+    ENDIF
+
+    CALL EXITS("CMISSDataProjection_ResultXiSetInterfaceNumber")
+    RETURN
+999 CALL ERRORS("CMISSDataProjection_ResultXiSetInterfaceNumber",err,error)
+    CALL EXITS("CMISSDataProjection_ResultXiSetInterfaceNumber")
+    CALL CMISS_HANDLE_ERROR(err,error)
+    RETURN
+
+  END SUBROUTINE CMISSDataProjection_ResultXiSetInterfaceNumber
 
   !
   !================================================================================================================================
   !
 
   !>Sets the projection xi for a data point in a set of data points identified by user number.
-  SUBROUTINE CMISSDataProjection_ResultXiSetNumber(regionUserNumber,dataProjectionUserNumber,dataPointUserNumber,ProjectionXi,err)
+  SUBROUTINE CMISSDataProjection_ResultXiSetRegionNumber(regionUserNumber,dataProjectionUserNumber,dataPointUserNumber, &
+      & ProjectionXi,err)
 
     !Argument variables
     INTEGER(INTG), INTENT(IN) :: regionUserNumber !<The user number of the region containing the data points to set attributes for.
@@ -20538,7 +20597,7 @@ CONTAINS
     TYPE(REGION_TYPE), POINTER :: REGION
     TYPE(VARYING_STRING) :: LOCAL_ERROR
 
-    CALL ENTERS("CMISSDataProjection_ResultXiSetNumber",err,error,*999)
+    CALL ENTERS("CMISSDataProjection_ResultXiSetRegionNumber",err,error,*999)
 
     NULLIFY(REGION)
     NULLIFY(DATA_POINTS)    
@@ -20562,14 +20621,14 @@ CONTAINS
       CALL FLAG_ERROR(LOCAL_ERROR,err,error,*999)
     ENDIF
 
-    CALL EXITS("CMISSDataProjection_ResultXiSetNumber")
+    CALL EXITS("CMISSDataProjection_ResultXiSetRegionNumber")
     RETURN
-999 CALL ERRORS("CMISSDataProjection_ResultXiSetNumber",err,error)
-    CALL EXITS("CMISSDataProjection_ResultXiSetNumber")
+999 CALL ERRORS("CMISSDataProjection_ResultXiSetRegionNumber",err,error)
+    CALL EXITS("CMISSDataProjection_ResultXiSetRegionNumber")
     CALL CMISS_HANDLE_ERROR(err,error)
     RETURN
 
-  END SUBROUTINE CMISSDataProjection_ResultXiSetNumber
+  END SUBROUTINE CMISSDataProjection_ResultXiSetRegionNumber
 
   !
   !================================================================================================================================
