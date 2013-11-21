@@ -56,6 +56,7 @@ MODULE INTERFACE_OPERATORS_ROUTINES
   USE ISO_VARYING_STRING
   USE KINDS
   USE MATRIX_VECTOR
+  USE MATHS
   USE STRINGS
   USE TIMER
   USE TYPES
@@ -71,6 +72,10 @@ MODULE INTERFACE_OPERATORS_ROUTINES
   PUBLIC FieldContinuity_FiniteElementCalculate
   
   PUBLIC FrictionlessContact_FiniteElementCalculate
+  
+  PUBLIC FrictionlessContact_contactMetricsCalculate
+  
+  PUBLIC InterfaceContactMetrics_Initialise, InterfaceContactMetrics_Finalise
 
 CONTAINS
 
@@ -835,6 +840,350 @@ CONTAINS
     RETURN 1
     
   END SUBROUTINE FrictionlessContact_FiniteElementCalculate
+  
+  !
+  !================================================================================================================================
+  !
+  
+  !>Finalise contact point metrics 
+  SUBROUTINE InterfaceContactMetrics_ContactPointFinalise(contactMetrics,err,error,*)
+
+    !Argument variables
+    TYPE(InterfaceContactPointMetricsType) :: contactMetrics !<A pointer to the interface contact metrics
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code 
+    TYPE(VARYING_STRING), INTENT(OUT) :: error !<The error string
+    !Local Variables
+    
+    CALL ENTERS("InterfaceContactMetrics_ContactPointFinalise",err,error,*999)
+    
+    contactMetrics%signedGapNormal=0.0_DP
+    IF(ALLOCATED(contactMetrics%normal)) DEALLOCATE(contactMetrics%normal)
+    IF(ALLOCATED(contactMetrics%tangents)) DEALLOCATE(contactMetrics%tangents)
+    IF(ALLOCATED(contactMetrics%tangentDerivatives)) DEALLOCATE(contactMetrics%tangentDerivatives)
+    IF(ALLOCATED(contactMetrics%covariantMetricTensor)) DEALLOCATE(contactMetrics%covariantMetricTensor)
+    IF(ALLOCATED(contactMetrics%contravariantMetricTensor)) DEALLOCATE(contactMetrics%contravariantMetricTensor)
+    IF(ALLOCATED(contactMetrics%A)) DEALLOCATE(contactMetrics%A)
+    
+    CALL EXITS("InterfaceContactMetrics_ContactPointFinalise")
+    RETURN
+999 CALL ERRORS("InterfaceContactMetrics_ContactPointFinalise",err,error)
+    CALL EXITS("InterfaceContactMetrics_ContactPointFinalise")
+    RETURN 1
+    
+  END SUBROUTINE InterfaceContactMetrics_ContactPointFinalise
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Initilise contact point metrics individually
+  SUBROUTINE InterfaceContactMetrics_ContactPointInitialise(contactPointMetrics,numberOfGeometricComp,numberOfDimensions, &
+       & err,error,*)
+
+    !Argument variables
+    TYPE(InterfaceContactPointMetricsType) :: contactPointMetrics !<A pointer to the individual contact point metrics
+    INTEGER(INTG), INTENT(IN) :: numberOfGeometricComp, numberOfDimensions
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code 
+    TYPE(VARYING_STRING), INTENT(OUT) :: error !<The error string
+    !Local Variables
+    
+    INTEGER(INTG) :: dummyErr !<The error code
+    TYPE(VARYING_STRING)  :: dummyError !<The error string
+    
+    CALL ENTERS("InterfaceContactMetrics_ContactPointInitialise",err,error,*998)
+    
+    ! Allocate memory for each interface contact metric
+    ALLOCATE(contactPointMetrics%normal(numberOfGeometricComp),STAT=err)
+    IF(err/=0) CALL FLAG_ERROR("Could not allocate interface contact metrics - normal.",err,error,*998)
+    ALLOCATE(contactPointMetrics%tangents(numberOfDimensions,numberOfGeometricComp),STAT=err)
+    IF(err/=0) CALL FLAG_ERROR("Could not allocate interface contact metrics - tangents.",err,error,*999)
+    contactPointMetrics%signedGapNormal=0.0_DP
+    ALLOCATE(contactPointMetrics%tangentDerivatives(numberOfDimensions,numberOfDimensions, &
+      & numberOfGeometricComp),STAT=err)
+    IF(err/=0) CALL FLAG_ERROR("Could not allocate interface contact metrics - tangent derivatives.",err,error,*999)
+    ALLOCATE(contactPointMetrics%covariantMetricTensor(numberOfDimensions,numberOfDimensions), &
+      & STAT=err)
+    IF(err/=0) CALL FLAG_ERROR("Could not allocate interface contact metrics - covariants.",err,error,*999)
+    ALLOCATE(contactPointMetrics%contravariantMetricTensor(numberOfDimensions,numberOfDimensions), &
+      & STAT=err)
+    IF(err/=0) CALL FLAG_ERROR("Could not allocate interface contact metrics - contravariants.",err,error,*999)
+    ALLOCATE(contactPointMetrics%A(numberOfDimensions,numberOfDimensions),STAT=err)
+    IF(err/=0) CALL FLAG_ERROR("Could not allocate interface contact metrics - A.",err,error,*999)
+
+    
+    CALL EXITS("InterfaceContactMetrics_ContactPointInitialise")
+    RETURN
+999 CALL InterfaceContactMetrics_ContactPointFinalise(contactPointMetrics,dummyErr,dummyError,*998) 
+998 CALL ERRORS("InterfaceContactMetrics_ContactPointInitialise",err,error)
+    CALL EXITS("InterfaceContactMetrics_ContactPointInitialise")
+    RETURN 1
+    
+  END SUBROUTINE InterfaceContactMetrics_ContactPointInitialise
+  
+  !
+  !================================================================================================================================
+  !
+  
+  !>Finalise contact points metrics 
+  SUBROUTINE InterfaceContactMetrics_Finalise(contactMetrics,err,error,*)
+
+    !Argument variables
+    TYPE(InterfaceContactMetricsType), POINTER :: contactMetrics !<A pointer to the interface contact metrics
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code 
+    TYPE(VARYING_STRING), INTENT(OUT) :: error !<The error string
+    !Local Variables
+    INTEGER(INTG) :: contactPtIdx
+    
+    IF(ASSOCIATED(contactMetrics)) THEN
+      contactMetrics%numberOfContactPts=0
+      IF(ALLOCATED(contactMetrics%orthogonallyProjected)) DEALLOCATE(contactMetrics%orthogonallyProjected)
+      IF(ALLOCATED(contactMetrics%contactPointMetrics)) THEN
+        DO contactPtIdx=1,SIZE(contactMetrics%contactPointMetrics,1)
+          CALL InterfaceContactMetrics_ContactPointFinalise(contactMetrics%contactPointMetrics(contactPtIdx),err,error,*999)
+        ENDDO
+        DEALLOCATE(contactMetrics%contactPointMetrics)
+      ENDIF
+      DEALLOCATE(contactMetrics)
+    ENDIF
+    
+    CALL EXITS("InterfaceContactMetrics_Finalise")
+    RETURN
+999 CALL ERRORS("InterfaceContactMetrics_Finalise",err,error)
+    CALL EXITS("InterfaceContactMetrics_Finalise")
+    RETURN 1
+    
+  END SUBROUTINE InterfaceContactMetrics_Finalise
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Initilise contact point metrics 
+  SUBROUTINE InterfaceContactMetrics_Initialise(interfaceCondition,err,error,*)
+
+    !Argument variables
+    TYPE(INTERFACE_CONDITION_TYPE), POINTER :: interfaceCondition !<A pointer to the interface condition
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code 
+    TYPE(VARYING_STRING), INTENT(OUT) :: error !<The error string
+    !Local Variables
+    TYPE(INTERFACE_TYPE), POINTER :: interface 
+    TYPE(InterfacePointsConnectivityType), POINTER :: pointsConnectivity
+    TYPE(INTERFACE_GEOMETRY_TYPE), POINTER :: geometry
+    TYPE(FIELD_TYPE), POINTER :: geometricField
+    TYPE(InterfaceContactMetricsType), POINTER :: contactMetrics 
+    INTEGER(INTG) :: numberOfGeometricComp, numberOfDimensions, pointIdx
+    
+    INTEGER(INTG) :: dummyErr !<The error code
+    TYPE(VARYING_STRING)  :: dummyError !<The error string
+    
+    CALL ENTERS("InterfaceContactMetrics_Initialise",err,error,*998)
+    
+    IF(ASSOCIATED(interfaceCondition)) THEN
+      interface=>interfaceCondition%INTERFACE
+      IF(ASSOCIATED(interface)) THEN
+        pointsConnectivity=>interface%pointsConnectivity
+        IF(ASSOCIATED(pointsConnectivity)) THEN
+          IF(ASSOCIATED(interfaceCondition%interfaceContactMetrics)) THEN
+            CALL FLAG_ERROR("Contact metrics are already associated.",err,error,*998)
+          ELSE
+            geometry=>interfaceCondition%GEOMETRY
+            IF(ASSOCIATED(geometry)) THEN
+              geometricField=>geometry%GEOMETRIC_FIELD
+              IF(ASSOCIATED(geometricField)) THEN
+                IF(ALLOCATED(geometricField%VARIABLES)) THEN
+                  ! Initialise interface contact metrices information
+                  ALLOCATE(interfaceCondition%interfaceContactMetrics,STAT=err)
+                  IF(err/=0) CALL FLAG_ERROR("Could not allocate interface contact metrics.",err,error,*998)
+                  contactMetrics=>interfaceCondition%interfaceContactMetrics
+                  contactMetrics%numberOfContactPts=SIZE(pointsConnectivity%pointsConnectivity,1)
+                  ! Get number of geometric components and number of mesh dimensions
+                  numberOfGeometricComp=geometricField%VARIABLES(1)%NUMBER_OF_COMPONENTS
+                  numberOfDimensions=geometricField%VARIABLES(1)%DIMENSION
+                  ALLOCATE(contactMetrics%contactPointMetrics(contactMetrics%numberOfContactPts),STAT=err)
+                  IF(err/=0) CALL FLAG_ERROR("Could not allocate interface contact metrics.",err,error,*999)
+                  ALLOCATE(contactMetrics%orthogonallyProjected(contactMetrics%numberOfContactPts),STAT=err)
+                  IF(err/=0) CALL FLAG_ERROR("Could not allocate orthogonally projected logical.",err,error,*999)
+                  DO pointIdx=1,contactMetrics%numberOfContactPts
+                    CALL InterfaceContactMetrics_ContactPointInitialise(contactMetrics%contactPointMetrics(pointIdx), &
+                      & numberOfGeometricComp, numberOfDimensions,err,error,*999)
+                  ENDDO !pointIdx
+                ELSE
+                  CALL FLAG_ERROR("Interface geometric field variables are not associated.",err,error,*999)
+                ENDIF
+              ELSE
+                CALL FLAG_ERROR("Interface geometric field is not associated.",err,error,*999)
+              ENDIF
+            ELSE
+              CALL FLAG_ERROR("Interface geometry is not associated.",err,error,*999)
+            ENDIF
+          ENDIF !contact matrices not associated
+        ELSE
+          CALL FLAG_ERROR("Interface points connectivity is not associated.",err,error,*999)
+        ENDIF
+      ELSE
+        CALL FLAG_ERROR("Interface is not associated.",err,error,*999)
+      ENDIF
+    ELSE
+      CALL FLAG_ERROR("Interface condition is not associated.",err,error,*999)
+    ENDIF
+    
+    CALL EXITS("InterfaceContactMetrics_Initialise")
+    RETURN
+999 CALL InterfaceContactMetrics_Finalise(interfaceCondition%interfaceContactMetrics,dummyErr,dummyError,*998) 
+998 CALL ERRORS("InterfaceContactMetrics_Initialise",err,error)
+    CALL EXITS("InterfaceContactMetrics_Initialise")
+    RETURN 1
+    
+  END SUBROUTINE InterfaceContactMetrics_Initialise
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Calculates the metrics of contact points for linearisation 
+  SUBROUTINE FrictionlessContact_ContactMetricsCalculate(interfaceCondition,err,error,*)
+
+    !Argument variables
+    TYPE(INTERFACE_CONDITION_TYPE), POINTER :: interfaceCondition !<A pointer to the interface condition
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code 
+    TYPE(VARYING_STRING), INTENT(OUT) :: error !<The error string
+    !Local Variables
+    TYPE(INTERFACE_EQUATIONS_TYPE), POINTER :: interfaceEquations !<A pointer to the interface equations
+    TYPE(INTERFACE_TYPE), POINTER :: interface !<A pointer to the interface 
+    TYPE(DATA_POINTS_TYPE), POINTER :: dataPoints
+    TYPE(InterfacePointsConnectivityType), POINTER :: pointsConnectivity !<A pointer to the interface points connectivity
+    TYPE(InterfaceContactMetricsType), POINTER :: contactMetrics 
+    
+    
+    TYPE(FIELD_TYPE), POINTER :: projectedDependentField
+    
+    TYPE(FIELD_INTERPOLATION_PARAMETERS_PTR_TYPE), POINTER :: interpolationParameters(:)
+    TYPE(FIELD_INTERPOLATED_POINT_PTR_TYPE), POINTER :: interpolatedPoints(:)
+    TYPE(FIELD_INTERPOLATED_POINT_METRICS_PTR_TYPE), POINTER :: interpolatedPointsMetrics(:)
+    TYPE(FIELD_INTERPOLATED_POINT_TYPE), POINTER :: interpolatedPoint
+    
+    INTEGER(INTG) :: projectedMeshIdx,noGeoComp,localElementNumber,localFaceLineNumber
+    INTEGER(INTG) :: contactPtIdx,xiIdx
+    REAL(DP) :: gapsComponents(3),junkPosition(3),tangents(3,2)
+    LOGICAL :: reverseNormal
+    
+    
+    CALL ENTERS("FrictionlessContact_FiniteElementCalculate",err,error,*999)
+    
+    IF(ASSOCIATED(interfaceCondition)) THEN
+      interfaceEquations=>interfaceCondition%INTERFACE_EQUATIONS
+      IF(ASSOCIATED(interfaceEquations)) THEN
+        interface=>interfaceCondition%INTERFACE
+        IF(ASSOCIATED(interface)) THEN
+          dataPoints=>interface%DATA_POINTS
+          IF(ASSOCIATED(dataPoints)) THEN
+            pointsConnectivity=>interface%pointsConnectivity
+            IF(ASSOCIATED(pointsConnectivity)) THEN
+              contactMetrics=>interfaceCondition%interfaceContactMetrics
+              IF(ASSOCIATED(contactMetrics)) THEN
+                DO contactPtIdx=1,contactMetrics%numberOfContactPts !contactPtIdx is a global contact point index
+                
+                  !#################################################################################################################
+                  
+                  ! Determine if a contact point has been orthogonally projected for this Newton step
+                  projectedMeshIdx=2; ! The mesh where contact points are projected to, i.e. master mesh
+                  contactMetrics%orthogonallyProjected=.TRUE. !Initialise orthogonal projected logicals
+                  DO xiIdx=1,SIZE(pointsConnectivity%pointsConnectivity(contactPtIdx,projectedMeshIdx)%reducedXi,1)
+                    IF(ABS(pointsConnectivity%pointsConnectivity(contactPtIdx,projectedMeshIdx)%reducedXi(xiIdx)) &
+                        & < ZERO_TOLERANCE) THEN
+                      contactMetrics%orthogonallyProjected(contactPtIdx)=.FALSE.
+                    ENDIF
+                  ENDDO !xiIdx
+                
+                
+	        IF(contactMetrics%orthogonallyProjected(contactPtIdx)) THEN
+	        
+	          !###################################################################################################################
+	          
+	          ! Calculate gap vector
+	          ! Get the dependent field for the master body
+	          projectedDependentField=>interfaceCondition%DEPENDENT%FIELD_VARIABLES(projectedMeshIdx)%PTR%FIELD !master
+	          noGeoComp=projectedDependentField%VARIABLES(FIELD_U_VARIABLE_TYPE)%NUMBER_OF_COMPONENTS
+	          NULLIFY(interpolationParameters)
+	          NULLIFY(interpolatedPoints)
+	          CALL FIELD_INTERPOLATION_PARAMETERS_INITIALISE(projectedDependentField,interpolationParameters,err,error, &
+	            & *999,FIELD_GEOMETRIC_COMPONENTS_TYPE)
+	          CALL FIELD_INTERPOLATED_POINTS_INITIALISE(interpolationParameters,interpolatedPoints,err,error,*999, &
+	            & FIELD_GEOMETRIC_COMPONENTS_TYPE)
+	          interpolatedPoint=>interpolatedPoints(FIELD_U_VARIABLE_TYPE)%PTR
+	          ! Evaluate the projected data points on the master surface
+	          CALL FIELD_INTERPOLATE_XI(FIRST_PART_DERIV,pointsConnectivity%pointsConnectivity(contactPtIdx, &
+	            & projectedMeshIdx)%reducedXi(:),interpolatedPoint,err,error,*999,FIELD_GEOMETRIC_COMPONENTS_TYPE)
+	          gapsComponents(1:noGeoComp)=dataPoints%DATA_POINTS(contactPtIdx)%position(1:noGeoComp)- &
+	            & interpolatedPoint%VALUES(1:noGeoComp,NO_PART_DERIV)
+	          
+	          !#################################################################################################################
+	          
+	          ! Calculate normal and tangent vectors defined on the master surface, assumed 3D mesh in contact
+	          ! Get the local element of the master where this point is projected on
+	          localElementNumber=pointsConnectivity%pointsConnectivity(contactPtIdx,projectedMeshIdx)%coupledMeshElementNumber
+	          ! Get the local face number of the master
+	          localFaceLineNumber=projectedDependentField%DECOMPOSITION%TOPOLOGY%ELEMENTS%ELEMENTS(localElementNumber)% &
+	            & ELEMENT_FACES(pointsConnectivity%pointsConnectivity(contactPtIdx,projectedMeshIdx)%elementLineFaceNumber)
+	          CALL FIELD_INTERPOLATION_PARAMETERS_FACE_GET(FIELD_VALUES_SET_TYPE,localFaceLineNumber, &
+	            & interpolationParameters(FIELD_U_VARIABLE_TYPE)%PTR,err,error,*999,FIELD_GEOMETRIC_COMPONENTS_TYPE)
+	            
+	          ! Determine the sign of normal inward/outward
+	          SELECT CASE(pointsConnectivity%pointsConnectivity(contactPtIdx,projectedMeshIdx)%elementLineFaceNumber)
+	          CASE(1,3,5)
+	            reverseNormal=.FALSE.
+	          CASE(2,4,6)
+	            reverseNormal=.TRUE.
+	          END SELECT
+	          CALL FIELD_INTERPOLATED_POINTS_METRICS_INITIALISE(interpolatedPoints,interpolatedPointsMetrics, &
+	            & err,error,*999)
+	          CALL FIELD_INTERPOLATED_POINT_METRICS_CALCULATE(noGeoComp,interpolatedPointsMetrics &
+	            & (FIELD_U_VARIABLE_TYPE)%PTR,err,error,*999)
+	          CALL FIELD_POSITION_NORMAL_TANGENTS_CALCULATE_INT_PT_METRIC(interpolatedPointsMetrics &
+	            & (FIELD_U_VARIABLE_TYPE)%PTR,reverseNormal,junkPosition, &
+	            & contactMetrics%contactPointMetrics(contactPtIdx)%normal,tangents,err,error,*999)
+	          ! Re-populate tangent vectors into the appropriate format
+	          CALL MATRIX_TRANSPOSE(tangents,contactMetrics%contactPointMetrics(contactPtIdx)%tangents,ERR,ERROR,*999)
+	          CALL FIELD_INTERPOLATED_POINTS_METRICS_FINALISE(interpolatedPointsMetrics,err,error,*999)
+	          ! Calculate signed gap
+	          contactMetrics%contactPointMetrics(contactPtIdx)%signedGapNormal= &
+	            & DOT_PRODUCT(gapsComponents,contactMetrics%contactPointMetrics(contactPtIdx)%normal)
+	            
+	          !###################################################################################################################
+	            
+	            
+	            
+	        ENDIF !orthogonally projected
+              ENDDO !contactPtIdx
+                
+              
+              
+              ELSE
+                CALL FLAG_ERROR("Interface contact metrices is not associated.",err,error,*999)
+              ENDIF
+            ELSE
+              CALL FLAG_ERROR("Interface points connectivity is not associated.",err,error,*999)
+            ENDIF
+          ELSE
+            CALL FLAG_ERROR("Interface data points is not associated.",err,error,*999)
+          ENDIF
+        ELSE
+          CALL FLAG_ERROR("Interface is not associated.",err,error,*999)
+        ENDIF
+      ELSE
+        CALL FLAG_ERROR("Interface equations is not associated.",err,error,*999)
+      ENDIF
+    ELSE
+      CALL FLAG_ERROR("Interface condition is not associated.",err,error,*999)
+    ENDIF
+    
+    CALL EXITS("FrictionlessContact_contactMetricsCalculate")
+    RETURN
+999 CALL ERRORS("FrictionlessContact_contactMetricsCalculate",err,error)
+    CALL EXITS("FrictionlessContact_contactMetricsCalculate")
+    RETURN 1
+    
+  END SUBROUTINE FrictionlessContact_contactMetricsCalculate
   
   !
   !================================================================================================================================

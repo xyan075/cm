@@ -2134,6 +2134,24 @@ END TYPE GENERATED_MESH_ELLIPSOID_TYPE
     TYPE(FIELD_VARIABLE_PTR_TYPE), POINTER :: FIELD_VARIABLES(:) !<FIELD_VARIABLES(variable_idx). The pointer to the variable_idx'th dependent variable in the interface condition.
     INTEGER(INTG), POINTER :: VARIABLE_MESH_INDICES(:) !<VARIABLE_MESH_INDICES(variable_idx). The mesh index of the variable_idx'th dependent variable in the interface condition.
   END TYPE INTERFACE_DEPENDENT_TYPE
+  
+  !>Contains metrics information for contact points
+  TYPE InterfaceContactPointMetricsType
+    REAL(DP), ALLOCATABLE :: normal(:) !<normals(CoordinateIdx). Normal vector at each contact point 
+    REAL(DP), ALLOCATABLE :: tangents(:,:) !<tangents(xiIdx,CoordinateIdx). Tangent vectors 1 and 2 at each contact point 
+    REAL(DP) :: signedGapNormal !<signedGapNormal. signed scalar gap in the normal direction at each contact point
+    REAL(DP), ALLOCATABLE :: tangentDerivatives(:,:,:) !<tangentDerivatives(xiIdxTangent,xiIdxDerivative,CoordinateIdx). del(tau)/del(xi) at each contact point
+    REAL(DP), ALLOCATABLE :: covariantMetricTensor(:,:) !<covariantMetricTensor(xiIdx1,xiIdx2). Covariant metric tensor at each contact point
+    REAL(DP), ALLOCATABLE :: contravariantMetricTensor(:,:) !<contravariantMetricTensor(xiIdx1,xiIdx2). Contravariant metric tensor at each contact point
+    REAL(DP), ALLOCATABLE :: A(:,:) !< A matrix superscript(xiIdx1,xiIdx2). A matrix at each contact point
+  END TYPE InterfaceContactPointMetricsType
+  
+  !>Contains metrics information for contact points
+  TYPE InterfaceContactMetricsType
+    INTEGER(INTG) :: numberOfContactPts !<The number of contact points at the interface
+    TYPE(InterfaceContactPointMetricsType), ALLOCATABLE :: contactPointMetrics(:) !contactPointMetrics(contactPointIdx)
+    LOGICAL, ALLOCATABLE :: orthogonallyProjected(:) !orthogonallyProjected(contactPointIdx). If a contact point has been orthogonally projected
+  END TYPE InterfaceContactMetricsType
 
   !>Contains information for the interface condition data.
   TYPE INTERFACE_CONDITION_TYPE
@@ -2142,6 +2160,7 @@ END TYPE GENERATED_MESH_ELLIPSOID_TYPE
     LOGICAL :: INTERFACE_CONDITION_FINISHED !<Is .TRUE. ifand where  the interfaand where and where ce condition has finished being created, .FALSE. if not.
     TYPE(INTERFACE_CONDITIONS_TYPE), POINTER :: INTERFACE_CONDITIONS !<A pointer back to the interface conditions.
     TYPE(INTERFACE_TYPE), POINTER :: INTERFACE !<A pointer back to the interface.
+    TYPE(InterfaceContactMetricsType), POINTER :: interfaceContactMetrics !<A pointer to the contact mechanics metrics for linearisation
     INTEGER(INTG) :: METHOD !<An integer which denotes the interface condition method. \see INTERFACE_CONDITIONS_Methods,INTERFACE_CONDITIONS
     INTEGER(INTG) :: OPERATOR !<An integer which denotes the type of interface operator. \see INTERFACE_CONDITIONS_Operator,INTERFACE_CONDITIONS
     INTEGER(INTG) :: integrationType !<An integer which denotes the integration type. \see INTERFACE_CONDITIONS_IntegrationType,INTERFACE_CONDITIONS

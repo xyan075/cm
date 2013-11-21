@@ -1518,8 +1518,8 @@ CONTAINS
     
     NULLIFY(interpolatedPoints)
     NULLIFY(interpolationParameters)
-    fixedBodyIdx=2 !\todo: need to generalise
-    projectionBodyIdx=1
+    fixedBodyIdx=1 !\todo: need to generalise, slave
+    projectionBodyIdx=2 !master
 
     IF(ASSOCIATED(interface)) THEN
       IF(ASSOCIATED(interfaceCondition)) THEN
@@ -1557,7 +1557,7 @@ CONTAINS
             ENDIF
             
             !Data reprojection and update points connectivity information with the projection results
-            dataProjection=>dataPoints%DATA_PROJECTIONS(projectionBodyIdx+1)%PTR 
+            dataProjection=>dataPoints%DATA_PROJECTIONS(projectionBodyIdx+1)%PTR !projectionBodyIdx+1 since the first projection is for interface
             CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"ProjectedBodyDataProjectionLabel",ERR,ERROR,*999)
             CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,dataProjection%label,ERR,ERROR,*999)
             IF(ASSOCIATED(dataProjection)) THEN
@@ -2008,13 +2008,13 @@ CONTAINS
     INTEGER(INTG) :: dummyErr !<The error code
     TYPE(VARYING_STRING)  :: dummyError !<The error string
      
-    CALL ENTERS("InterfacePointsConnectivity_PointInitialise",err,error,*999)
+    CALL ENTERS("InterfacePointsConnectivity_PointInitialise",err,error,*998)
 
     interfacePointConnectivity%coupledMeshElementNumber=0
     interfacePointConnectivity%elementLineFaceNumber=0
     !Allocate memory for coupled mesh full and reduced xi location
     ALLOCATE(interfacePointConnectivity%xi(coupledMeshDimension),STAT=ERR)
-    IF(ERR/=0) CALL FLAG_ERROR("Could not allocate interface point connectivity full xi.",err,error,*999)
+    IF(ERR/=0) CALL FLAG_ERROR("Could not allocate interface point connectivity full xi.",err,error,*998)
     interfacePointConnectivity%xi=0.0_DP
     ALLOCATE(interfacePointConnectivity%reducedXi(interfaceMeshDimension),STAT=ERR)
     IF(ERR/=0) CALL FLAG_ERROR("Could not allocate interface point connectivity reduced xi.",err,error,*999)

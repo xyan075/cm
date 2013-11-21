@@ -416,6 +416,8 @@ CONTAINS
                 ELSE
                   CALL FLAG_ERROR("Interface field variable is not associated.",ERR,ERROR,*999)
                 ENDIF
+                !Allocate memory for interface contact metrics
+                CALL InterfaceContactMetrics_Initialise(INTERFACE_CONDITION,err,error,*999)
               CASE(INTERFACE_CONDITION_FIELD_NORMAL_CONTINUITY_OPERATOR)
                 CALL FLAG_ERROR("Not implemented.",ERR,ERROR,*999)
               CASE(INTERFACE_CONDITION_SOLID_FLUID_OPERATOR)

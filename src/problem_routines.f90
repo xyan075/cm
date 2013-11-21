@@ -60,6 +60,7 @@ MODULE PROBLEM_ROUTINES
   USE INPUT_OUTPUT
   USE INTERFACE_CONDITIONS_CONSTANTS
   USE INTERFACE_CONDITIONS_ROUTINES
+  USE INTERFACE_OPERATORS_ROUTINES
   USE INTERFACE_ROUTINES
   USE ISO_VARYING_STRING
   USE KINDS
@@ -3366,6 +3367,7 @@ CONTAINS
                               IF(ASSOCIATED(interface)) THEN
                                 CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"**************** Reproject! ****************",ERR,ERROR,*999)
                                 CALL InterfacePointsConnectivity_DataReprojection(interface,interfaceCondition,err,error,*999)
+                                CALL FrictionlessContact_contactMetricsCalculate(interfaceCondition,err,error,*999)
                                 CALL INTERFACE_CONDITION_ASSEMBLE(interfaceCondition,err,error,*999)
                               ELSE
                                 CALL FLAG_ERROR("Interface is not associated for nonlinear solver equations mapping.", &
