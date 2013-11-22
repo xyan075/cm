@@ -1332,6 +1332,7 @@ CONTAINS
                   EQUATIONS_SET=>SOLVER_MAPPING%EQUATIONS_SETS(equations_set_idx)%PTR
                   !Assemble the equations for linear problems
                   CALL EQUATIONS_SET_JACOBIAN_EVALUATE(EQUATIONS_SET,ERR,ERROR,*999)
+                  CALL EQUATIONS_SET_JACOBIAN_CONTACT_UPDATE_STATIC_FEM(EQUATIONS_SET,ERR,ERROR,*999)
                 ENDDO !equations_set_idx
                 !Update interface matrices
 !                DO interfaceConditionIdx=1,SOLVER_MAPPING%NUMBER_OF_INTERFACE_CONDITIONS
@@ -1365,7 +1366,61 @@ CONTAINS
     CALL EXITS("PROBLEM_SOLVER_JACOBIAN_EVALUATE")
     RETURN 1
   END SUBROUTINE PROBLEM_SOLVER_JACOBIAN_EVALUATE
+
+  !
+  !================================================================================================================================
+  !
+
+  !>Evaluates the Jacobian for a static equations set with contact using the finite element method
+  SUBROUTINE EQUATIONS_SET_JACOBIAN_CONTACT_UPDATE_STATIC_FEM(EQUATIONS_SET,ERR,ERROR,*)
+
+    !Argument variables
+    TYPE(EQUATIONS_SET_TYPE), POINTER :: EQUATIONS_SET !<A pointer to the equations set to evaluate the Jacobian for
+    INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
+    !Local Variables
+    INTEGER(INTG) :: element_idx,ne
+    TYPE(DOMAIN_MAPPING_TYPE), POINTER :: ELEMENTS_MAPPING
+    TYPE(EQUATIONS_TYPE), POINTER :: EQUATIONS
+    TYPE(EQUATIONS_MATRICES_TYPE), POINTER :: EQUATIONS_MATRICES
+    TYPE(FIELD_TYPE), POINTER :: DEPENDENT_FIELD
   
+    CALL ENTERS("EQUATIONS_SET_JACOBIAN_CONTACT_UPDATE_STATIC_FEM",ERR,ERROR,*999)
+
+    IF(ASSOCIATED(EQUATIONS_SET)) THEN
+      DEPENDENT_FIELD=>EQUATIONS_SET%DEPENDENT%DEPENDENT_FIELD
+      IF(ASSOCIATED(DEPENDENT_FIELD)) THEN
+        EQUATIONS=>EQUATIONS_SET%EQUATIONS
+        IF(ASSOCIATED(EQUATIONS)) THEN
+          EQUATIONS_MATRICES=>EQUATIONS%EQUATIONS_MATRICES
+          IF(ASSOCIATED(EQUATIONS_MATRICES)) THEN
+
+
+            !Output equations matrices and RHS vector if required
+            !\todo Uncomment below after EQUATIONS_SET_JACOBIAN_CONTACT_UPDATE_STATIC_FEM is moved to equations_set_routines.
+            !IF(EQUATIONS%OUTPUT_TYPE>=EQUATIONS_MATRIX_OUTPUT) THEN
+            !  CALL EQUATIONS_MATRICES_JACOBIAN_OUTPUT(GENERAL_OUTPUT_TYPE,EQUATIONS_MATRICES,ERR,ERROR,*999)
+            !ENDIF
+          ELSE
+            CALL FLAG_ERROR("Equations matrices is not associated",ERR,ERROR,*999)
+          ENDIF
+        ELSE
+          CALL FLAG_ERROR("Equations is not associated",ERR,ERROR,*999)
+        ENDIF
+      ELSE
+        CALL FLAG_ERROR("Dependent field is not associated",ERR,ERROR,*999)
+      ENDIF            
+    ELSE
+      CALL FLAG_ERROR("Equations set is not associated.",ERR,ERROR,*999)
+    ENDIF
+       
+    CALL EXITS("EQUATIONS_SET_JACOBIAN_CONTACT_UPDATE_STATIC_FEM")
+    RETURN
+999 CALL ERRORS("EQUATIONS_SET_JACOBIAN_CONTACT_UPDATE_STATIC_FEM",ERR,ERROR)
+    CALL EXITS("EQUATIONS_SET_JACOBIAN_CONTACT_UPDATE_STATIC_FEM")
+    RETURN 1
+  END SUBROUTINE EQUATIONS_SET_JACOBIAN_CONTACT_UPDATE_STATIC_FEM
+
   !
   !================================================================================================================================
   ! 
@@ -1471,6 +1526,7 @@ CONTAINS
                   CASE(EQUATIONS_NONLINEAR)
                     !Evaluate the residual for nonlinear equations
                     CALL EQUATIONS_SET_RESIDUAL_EVALUATE(EQUATIONS_SET,ERR,ERROR,*999)
+                    CALL EQUATIONS_SET_RESIDUAL_CONTACT_UPDATE_STATIC_FEM(EQUATIONS_SET,ERR,ERROR,*999)
                   END SELECT
                 ENDDO !equations_set_idx
                 !Note that the linear interface matrices are not required to be updated since these matrices do not change
@@ -1508,6 +1564,149 @@ CONTAINS
     RETURN 1
     
   END SUBROUTINE PROBLEM_SOLVER_RESIDUAL_EVALUATE
+
+  !
+  !================================================================================================================================
+  !
+
+  !>Updates the equation set residual for a static equations set which includes contact using the finite element method
+  SUBROUTINE EQUATIONS_SET_RESIDUAL_CONTACT_UPDATE_STATIC_FEM(EQUATIONS_SET,err,error,*)
+
+    !Argument variables
+    TYPE(EQUATIONS_SET_TYPE), POINTER :: EQUATIONS_SET !<A pointer to the equations set to evaluate the residual for
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: error !<The error string
+    !Local Variables
+    TYPE(DOMAIN_MAPPING_TYPE), POINTER :: ELEMENTS_MAPPING
+    TYPE(EQUATIONS_TYPE), POINTER :: EQUATIONS
+    TYPE(EQUATIONS_MATRICES_TYPE), POINTER :: equationsMatrices
+    TYPE(EQUATIONS_MATRICES_NONLINEAR_TYPE), POINTER :: nonlinearMatrices
+    TYPE(EQUATIONS_MAPPING_NONLINEAR_TYPE), POINTER :: nonlinearMapping
+    TYPE(INTERFACE_TYPE), POINTER :: interface !<A pointer to the interface 
+    TYPE(INTERFACE_CONDITION_TYPE), POINTER :: interfaceCondition  !<A pointer to the equations set to evaluate the element Jacobian for
+    TYPE(InterfacePointsConnectivityType), POINTER :: pointsConnectivity !<A pointer to the interface points connectivity
+    TYPE(FIELD_TYPE), POINTER :: coupledMeshDependentField
+    TYPE(BASIS_TYPE), POINTER :: coupledMeshDependentBasis
+    TYPE(DOMAIN_FACE_TYPE), POINTER :: coupledMeshDomainFace
+    TYPE(EQUATIONS_SET_TYPE), POINTER :: multipleRegionEquationsSet
+    TYPE(FIELD_VARIABLE_TYPE), POINTER :: residualVariable
+    TYPE(FIELD_PARAMETER_SET_TYPE), POINTER :: residualParameterSet
+    TYPE(VARYING_STRING) :: localError
+    INTEGER(INTG) :: coupledBodyIdx,equationSetNumber,interfaceGlobalNumber,interfaceConditionGlobalNumber
+    INTEGER(INTG) :: globalDataPointNumber,coupledMeshElementNumber,connectedFace,fieldComponent,meshComponentNumber, &
+      & decompositionFaceNumber,localFaceNodeIdx,localElementNode,globalNode,derivativeIdx,derivative,versionNumber, &
+      & residualVariableIdx,dofIdx
+    REAL(DP) :: residualValue
+
+    CALL ENTERS("EQUATIONS_SET_RESIDUAL_CONTACT_UPDATE_STATIC_FEM",ERR,ERROR,*999)
+
+    IF(ASSOCIATED(EQUATIONS_SET)) THEN
+      coupledMeshDependentField=>EQUATIONS_SET%DEPENDENT%DEPENDENT_FIELD
+      IF(ASSOCIATED(coupledMeshDependentField)) THEN
+        EQUATIONS=>EQUATIONS_SET%EQUATIONS
+        IF(ASSOCIATED(EQUATIONS)) THEN
+          equationsMatrices=>EQUATIONS%EQUATIONS_MATRICES
+          IF(ASSOCIATED(equationsMatrices)) THEN
+            nonlinearMatrices=>equationsMatrices%NONLINEAR_MATRICES
+            !nonlinearResidual=>nonlinearMatrices%RESIDUAL
+            nonlinearMapping=>equations%EQUATIONS_MAPPING%NONLINEAR_MAPPING
+
+            interfaceGlobalNumber=1
+            interfaceConditionGlobalNumber=1
+            interface=>EQUATIONS_SET%REGION%PARENT_REGION%INTERFACES%INTERFACES(interfaceGlobalNumber)%PTR
+            interfaceCondition=>interface%INTERFACE_CONDITIONS%INTERFACE_CONDITIONS(interfaceConditionGlobalNumber)%PTR
+            pointsConnectivity=>interface%pointsConnectivity
+
+            residualVariableIdx=1
+            residualVariable=>nonlinearMapping%RESIDUAL_VARIABLES(residualVariableIdx)%PTR
+            IF(ASSOCIATED(residualVariable)) THEN
+
+              !Loop over each coupled body and add the contact contribution associated with each contact point
+              DO coupledBodyIdx=1,2
+                !Setup pointer to the equation set of the coupled bodies which are setup in thier own separate regions
+                !(note that these regions has not been added to the solver equations and are merely here for convinence if needed)
+                equationSetNumber=1
+                multipleRegionEquationsSet=>EQUATIONS_SET%REGION%PARENT_REGION%SUB_REGIONS(coupledBodyIdx)%PTR%EQUATIONS_SETS% &
+                  & EQUATIONS_SETS(equationSetNumber)%PTR
+
+                !Since we are computing the contact term in a single region, we do not need to determine the dependent field
+                !through the interface condition. We can simply use the coupledMeshDependentField pointer defined above
+                !coupledMeshDependentField=>interfaceCondition%DEPENDENT%EQUATIONS_SETS(interfaceMatrixIdx)%PTR% &
+                ! & DEPENDENT%DEPENDENT_FIELD
+
+                !Loop over each data point and find the connected element and their dofs
+                DO globalDataPointNumber=1,SIZE(pointsConnectivity%pointsConnectivity,1)
+                  coupledMeshElementNumber=pointsConnectivity%pointsConnectivity(globalDataPointNumber,coupledBodyIdx)% &
+                    & coupledMeshElementNumber
+                  connectedFace = pointsConnectivity%pointsConnectivity(globalDataPointNumber,coupledBodyIdx)% &
+                    & elementLineFaceNumber
+                  DO fieldComponent=1,3
+                    meshComponentNumber=coupledMeshDependentField%VARIABLE_TYPE_MAP(FIELD_U_VARIABLE_TYPE)%PTR% &
+                      & COMPONENTS(fieldComponent)%MESH_COMPONENT_NUMBER
+                    coupledMeshDependentBasis=>coupledMeshDependentField%DECOMPOSITION%DOMAIN(meshComponentNumber)%PTR% &
+                      & TOPOLOGY%ELEMENTS%ELEMENTS(coupledMeshElementNumber)%BASIS
+                    decompositionFaceNumber=coupledMeshDependentField%DECOMPOSITION%TOPOLOGY% &
+                      & ELEMENTS%ELEMENTS(coupledMeshElementNumber)%ELEMENT_FACES(connectedFace)
+                    coupledMeshDomainFace=>coupledMeshDependentField%DECOMPOSITION%DOMAIN(meshComponentNumber)%PTR%TOPOLOGY% &
+                      & FACES%FACES(decompositionFaceNumber)
+                    DO localFaceNodeIdx=1,coupledMeshDependentBasis%NUMBER_OF_NODES_IN_LOCAL_FACE(connectedFace)
+                      localElementNode=coupledMeshDependentBasis%NODE_NUMBERS_IN_LOCAL_FACE(localFaceNodeIdx,connectedFace)
+                      globalNode=coupledMeshDependentField%DECOMPOSITION%DOMAIN(meshComponentNumber)%PTR%TOPOLOGY% &
+                        & ELEMENTS%ELEMENTS(coupledMeshElementNumber)%ELEMENT_NODES(localElementNode)
+                      DO derivativeIdx=1,coupledMeshDomainFace%BASIS%NUMBER_OF_DERIVATIVES(localFaceNodeIdx)
+                        derivative=coupledMeshDependentBasis% &
+                          & DERIVATIVE_NUMBERS_IN_LOCAL_FACE(derivativeIdx,localFaceNodeIdx,connectedFace)
+                        versionNumber=coupledMeshDependentField%DECOMPOSITION%DOMAIN(meshComponentNumber)%PTR%TOPOLOGY% &
+                          & ELEMENTS%ELEMENTS(coupledMeshElementNumber)%elementVersions(derivative,localElementNode)
+                        !Find dof associated with this particular field, component, node, derivative and version.
+                        dofIdx=residualVariable%components(fieldComponent)%PARAM_TO_DOF_MAP%NODE_PARAM2DOF_MAP%NODES(globalNode)% &
+                          & DERIVATIVES(derivative)%VERSIONS(versionNumber)
+                        residualValue=0.0_DP
+                        CALL DISTRIBUTED_VECTOR_VALUES_ADD(nonlinearMatrices%RESIDUAL,dofIdx,residualValue,err,error,*999)
+                      ENDDO !derivativeIdx
+                    ENDDO !localFaceNodeIdx
+                  ENDDO !fieldComponent
+                ENDDO !globalDataPointNumber
+              ENDDO !coupledBodyIdx
+
+              !Update the residual parameter set
+              residualParameterSet=>residualVariable%PARAMETER_SETS%SET_TYPE(FIELD_RESIDUAL_SET_TYPE)%PTR
+              IF(ASSOCIATED(residualParameterSet)) THEN
+                !Residual parameter set exists
+                !Copy the residual vector to the residuals parameter set.
+                CALL DISTRIBUTED_VECTOR_COPY(nonlinearMatrices%RESIDUAL,residualParameterSet%PARAMETERS,1.0_DP, &
+                  & err,error,*999)
+              ENDIF
+            ELSE
+              localError="Nonlinear mapping residual variable for residual variable index "// &
+                & TRIM(NUMBER_TO_VSTRING(residualVariableIdx,"*",err,error))//" is not associated."
+              CALL FLAG_ERROR(localError,err,error,*999)
+            ENDIF
+
+            !Output equations matrices and RHS vector if required
+            !\todo Uncomment below after EQUATIONS_SET_RESIDUAL_CONTACT_UPDATE_STATIC_FEM is moved to equations_set_routines.
+            !IF(EQUATIONS%OUTPUT_TYPE>=EQUATIONS_MATRIX_OUTPUT) THEN
+            ! CALL EQUATIONS_MATRICES_OUTPUT(GENERAL_OUTPUT_TYPE,EQUATIONS_MATRICES,ERR,ERROR,*999)
+            !ENDIF
+          ELSE
+            CALL FLAG_ERROR("Equations matrices is not associated",err,error,*999)
+          ENDIF
+        ELSE
+          CALL FLAG_ERROR("Equations is not associated",err,error,*999)
+        ENDIF
+      ELSE
+        CALL FLAG_ERROR("Dependent field is not associated",err,error,*999)
+      ENDIF
+    ELSE
+      CALL FLAG_ERROR("Equations set is not associated.",err,error,*999)
+    ENDIF
+       
+    CALL EXITS("EQUATIONS_SET_RESIDUAL_CONTACT_UPDATE_STATIC_FEM")
+    RETURN
+999 CALL ERRORS("EQUATIONS_SET_RESIDUAL_CONTACT_UPDATE_STATIC_FEM",err,error)
+    CALL EXITS("EQUATIONS_SET_RESIDUAL_CONTACT_UPDATE_STATIC_FEM")
+    RETURN 1
+  END SUBROUTINE EQUATIONS_SET_RESIDUAL_CONTACT_UPDATE_STATIC_FEM
 
   !
   !================================================================================================================================
