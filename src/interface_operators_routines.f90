@@ -862,7 +862,7 @@ CONTAINS
     IF(ALLOCATED(contactMetrics%tangentDerivatives)) DEALLOCATE(contactMetrics%tangentDerivatives)
     IF(ALLOCATED(contactMetrics%covariantMetricTensor)) DEALLOCATE(contactMetrics%covariantMetricTensor)
     IF(ALLOCATED(contactMetrics%contravariantMetricTensor)) DEALLOCATE(contactMetrics%contravariantMetricTensor)
-    IF(ALLOCATED(contactMetrics%A)) DEALLOCATE(contactMetrics%A)
+    IF(ALLOCATED(contactMetrics%inverseA)) DEALLOCATE(contactMetrics%inverseA)
     
     CALL EXITS("InterfaceContactMetrics_ContactPointFinalise")
     RETURN
@@ -907,8 +907,8 @@ CONTAINS
     ALLOCATE(contactPointMetrics%contravariantMetricTensor(numberOfDimensions,numberOfDimensions), &
       & STAT=err)
     IF(err/=0) CALL FLAG_ERROR("Could not allocate interface contact metrics - contravariants.",err,error,*999)
-    ALLOCATE(contactPointMetrics%A(numberOfDimensions,numberOfDimensions),STAT=err)
-    IF(err/=0) CALL FLAG_ERROR("Could not allocate interface contact metrics - A.",err,error,*999)
+    ALLOCATE(contactPointMetrics%inverseA(numberOfDimensions,numberOfDimensions),STAT=err)
+    IF(err/=0) CALL FLAG_ERROR("Could not allocate interface contact metrics - inverseA.",err,error,*999)
 
     
     CALL EXITS("InterfaceContactMetrics_ContactPointInitialise")
@@ -1053,6 +1053,7 @@ CONTAINS
     TYPE(DATA_POINTS_TYPE), POINTER :: dataPoints
     TYPE(InterfacePointsConnectivityType), POINTER :: pointsConnectivity !<A pointer to the interface points connectivity
     TYPE(InterfaceContactMetricsType), POINTER :: contactMetrics 
+    TYPE(InterfaceContactPointMetricsType), POINTER :: contactPointMetrics
     
     
     TYPE(FIELD_TYPE), POINTER :: projectedDependentField
@@ -1062,9 +1063,9 @@ CONTAINS
     TYPE(FIELD_INTERPOLATED_POINT_METRICS_PTR_TYPE), POINTER :: interpolatedPointsMetrics(:)
     TYPE(FIELD_INTERPOLATED_POINT_TYPE), POINTER :: interpolatedPoint
     
-    INTEGER(INTG) :: projectedMeshIdx,noGeoComp,localElementNumber,localFaceLineNumber
-    INTEGER(INTG) :: contactPtIdx,xiIdx
-    REAL(DP) :: gapsComponents(3),junkPosition(3),tangents(3,2)
+    INTEGER(INTG) :: projectedMeshIdx,noGeoComp,noXi,localElementNumber,localFaceLineNumber
+    INTEGER(INTG) :: contactPtIdx,xiIdx,i,j
+    REAL(DP) :: gapsComponents(3),junkPosition(3),tangents(3,2), A(2,2), detA
     LOGICAL :: reverseNormal
     
     
@@ -1085,8 +1086,28 @@ CONTAINS
                 
                   !#################################################################################################################
                   
-                  ! Determine if a contact point has been orthogonally projected for this Newton step
+                  ! Get master dependent field and initalise interpolation points, parameters and metrics
                   projectedMeshIdx=2; ! The mesh where contact points are projected to, i.e. master mesh
+                  ! Get the metric structure for this contact point
+                  contactPointMetrics=>contactMetrics%contactPointMetrics(contactPtIdx)
+                  ! Get the dependent field for the master body
+                  projectedDependentField=>interfaceCondition%DEPENDENT%FIELD_VARIABLES(projectedMeshIdx)%PTR%FIELD !master
+                  noGeoComp=projectedDependentField%GEOMETRIC_FIELD%VARIABLE_TYPE_MAP(FIELD_U_VARIABLE_TYPE)% &
+                    & PTR%NUMBER_OF_COMPONENTS
+                  noXi=2
+                  NULLIFY(interpolationParameters)
+                  NULLIFY(interpolatedPoints)
+                  CALL FIELD_INTERPOLATION_PARAMETERS_INITIALISE(projectedDependentField,interpolationParameters,err,error, &
+                    & *999,FIELD_GEOMETRIC_COMPONENTS_TYPE)
+                  CALL FIELD_INTERPOLATED_POINTS_INITIALISE(interpolationParameters,interpolatedPoints,err,error,*999, &
+                    & FIELD_GEOMETRIC_COMPONENTS_TYPE)
+                  CALL FIELD_INTERPOLATED_POINTS_METRICS_INITIALISE(interpolatedPoints,interpolatedPointsMetrics,err,error,*999)
+                  interpolatedPoint=>interpolatedPoints(FIELD_U_VARIABLE_TYPE)%PTR
+                
+                  !#################################################################################################################
+                  
+                  ! Determine if a contact point has been orthogonally projected for this Newton step
+                 
                   contactMetrics%orthogonallyProjected=.TRUE. !Initialise orthogonal projected logicals
                   DO xiIdx=1,SIZE(pointsConnectivity%pointsConnectivity(contactPtIdx,projectedMeshIdx)%reducedXi,1)
                     IF(ABS(pointsConnectivity%pointsConnectivity(contactPtIdx,projectedMeshIdx)%reducedXi(xiIdx)) &
@@ -1095,69 +1116,74 @@ CONTAINS
                     ENDIF
                   ENDDO !xiIdx
                 
-                
-	        IF(contactMetrics%orthogonallyProjected(contactPtIdx)) THEN
-	        
-	          !###################################################################################################################
-	          
-	          ! Calculate gap vector
-	          ! Get the dependent field for the master body
-	          projectedDependentField=>interfaceCondition%DEPENDENT%FIELD_VARIABLES(projectedMeshIdx)%PTR%FIELD !master
-	          noGeoComp=projectedDependentField%VARIABLES(FIELD_U_VARIABLE_TYPE)%NUMBER_OF_COMPONENTS
-	          NULLIFY(interpolationParameters)
-	          NULLIFY(interpolatedPoints)
-	          CALL FIELD_INTERPOLATION_PARAMETERS_INITIALISE(projectedDependentField,interpolationParameters,err,error, &
-	            & *999,FIELD_GEOMETRIC_COMPONENTS_TYPE)
-	          CALL FIELD_INTERPOLATED_POINTS_INITIALISE(interpolationParameters,interpolatedPoints,err,error,*999, &
-	            & FIELD_GEOMETRIC_COMPONENTS_TYPE)
-	          interpolatedPoint=>interpolatedPoints(FIELD_U_VARIABLE_TYPE)%PTR
-	          ! Evaluate the projected data points on the master surface
-	          CALL FIELD_INTERPOLATE_XI(FIRST_PART_DERIV,pointsConnectivity%pointsConnectivity(contactPtIdx, &
-	            & projectedMeshIdx)%reducedXi(:),interpolatedPoint,err,error,*999,FIELD_GEOMETRIC_COMPONENTS_TYPE)
-	          gapsComponents(1:noGeoComp)=dataPoints%DATA_POINTS(contactPtIdx)%position(1:noGeoComp)- &
-	            & interpolatedPoint%VALUES(1:noGeoComp,NO_PART_DERIV)
-	          
-	          !#################################################################################################################
-	          
-	          ! Calculate normal and tangent vectors defined on the master surface, assumed 3D mesh in contact
-	          ! Get the local element of the master where this point is projected on
-	          localElementNumber=pointsConnectivity%pointsConnectivity(contactPtIdx,projectedMeshIdx)%coupledMeshElementNumber
-	          ! Get the local face number of the master
-	          localFaceLineNumber=projectedDependentField%DECOMPOSITION%TOPOLOGY%ELEMENTS%ELEMENTS(localElementNumber)% &
-	            & ELEMENT_FACES(pointsConnectivity%pointsConnectivity(contactPtIdx,projectedMeshIdx)%elementLineFaceNumber)
-	          CALL FIELD_INTERPOLATION_PARAMETERS_FACE_GET(FIELD_VALUES_SET_TYPE,localFaceLineNumber, &
-	            & interpolationParameters(FIELD_U_VARIABLE_TYPE)%PTR,err,error,*999,FIELD_GEOMETRIC_COMPONENTS_TYPE)
-	            
-	          ! Determine the sign of normal inward/outward
-	          SELECT CASE(pointsConnectivity%pointsConnectivity(contactPtIdx,projectedMeshIdx)%elementLineFaceNumber)
-	          CASE(1,3,5)
-	            reverseNormal=.FALSE.
-	          CASE(2,4,6)
-	            reverseNormal=.TRUE.
-	          END SELECT
-	          CALL FIELD_INTERPOLATED_POINTS_METRICS_INITIALISE(interpolatedPoints,interpolatedPointsMetrics, &
-	            & err,error,*999)
-	          CALL FIELD_INTERPOLATED_POINT_METRICS_CALCULATE(noGeoComp,interpolatedPointsMetrics &
-	            & (FIELD_U_VARIABLE_TYPE)%PTR,err,error,*999)
-	          CALL FIELD_POSITION_NORMAL_TANGENTS_CALCULATE_INT_PT_METRIC(interpolatedPointsMetrics &
-	            & (FIELD_U_VARIABLE_TYPE)%PTR,reverseNormal,junkPosition, &
-	            & contactMetrics%contactPointMetrics(contactPtIdx)%normal,tangents,err,error,*999)
-	          ! Re-populate tangent vectors into the appropriate format
-	          CALL MATRIX_TRANSPOSE(tangents,contactMetrics%contactPointMetrics(contactPtIdx)%tangents,ERR,ERROR,*999)
-	          CALL FIELD_INTERPOLATED_POINTS_METRICS_FINALISE(interpolatedPointsMetrics,err,error,*999)
-	          ! Calculate signed gap
-	          contactMetrics%contactPointMetrics(contactPtIdx)%signedGapNormal= &
-	            & DOT_PRODUCT(gapsComponents,contactMetrics%contactPointMetrics(contactPtIdx)%normal)
-	            
-	          !###################################################################################################################
-	            
-	            
-	            
-	        ENDIF !orthogonally projected
-              ENDDO !contactPtIdx
-                
-              
-              
+                  IF(contactMetrics%orthogonallyProjected(contactPtIdx)) THEN !Only calculate metrics if orthogonally projected
+                  
+                    !###################################################################################################################
+                    
+                    ! Get the local element of the master where this point is projected on
+                    localElementNumber=pointsConnectivity%pointsConnectivity(contactPtIdx,projectedMeshIdx)%coupledMeshElementNumber
+                    ! Get the local face number of the master
+                    localFaceLineNumber=projectedDependentField%DECOMPOSITION%TOPOLOGY%ELEMENTS%ELEMENTS(localElementNumber)% &
+                      & ELEMENT_FACES(pointsConnectivity%pointsConnectivity(contactPtIdx,projectedMeshIdx)%elementLineFaceNumber)
+                    ! Get the interpolation parameter for evaluation of projected contact points on the master
+                    CALL FIELD_INTERPOLATION_PARAMETERS_FACE_GET(FIELD_VALUES_SET_TYPE,localFaceLineNumber, &
+                      & interpolationParameters(FIELD_U_VARIABLE_TYPE)%PTR,err,error,*999,FIELD_GEOMETRIC_COMPONENTS_TYPE)
+                    ! Evaluate the projected data points on the master surface
+                    CALL FIELD_INTERPOLATE_XI(SECOND_PART_DERIV,pointsConnectivity%pointsConnectivity(contactPtIdx, &
+                      & projectedMeshIdx)%reducedXi(:),interpolatedPoint,err,error,*999,FIELD_GEOMETRIC_COMPONENTS_TYPE)
+                    ! Calculate gap vector
+                    gapsComponents(1:noGeoComp)=dataPoints%DATA_POINTS(contactPtIdx)%position(1:noGeoComp)- &
+                      & interpolatedPoint%VALUES(1:noGeoComp,NO_PART_DERIV)
+                      
+                    ! Store the second derivative information
+                    contactPointMetrics%tangentDerivatives(1,1,:)=interpolatedPoint%VALUES(1:noGeoComp,PART_DERIV_S1_S1)
+                    contactPointMetrics%tangentDerivatives(1,2,:)=interpolatedPoint%VALUES(1:noGeoComp,PART_DERIV_S1_S2)
+                    contactPointMetrics%tangentDerivatives(2,1,:)=contactPointMetrics%tangentDerivatives(1,2,:)
+                    contactPointMetrics%tangentDerivatives(2,2,:)=interpolatedPoint%VALUES(1:noGeoComp,PART_DERIV_S2_S2)
+                    
+                    !#################################################################################################################
+                    
+                    ! Calculate normal and tangent vectors defined on the master surface, assumed 3D mesh in contact
+                    ! Determine the sign of normal inward/outward
+                    SELECT CASE(pointsConnectivity%pointsConnectivity(contactPtIdx,projectedMeshIdx)%elementLineFaceNumber)
+                    CASE(1,3,5)
+                      reverseNormal=.FALSE.
+                    CASE(2,4,6)
+                      reverseNormal=.TRUE.
+                    END SELECT
+                    CALL FIELD_INTERPOLATED_POINT_METRICS_CALCULATE(noGeoComp,interpolatedPointsMetrics &
+                      & (FIELD_U_VARIABLE_TYPE)%PTR,err,error,*999)
+                    CALL FIELD_POSITION_NORMAL_TANGENTS_CALCULATE_INT_PT_METRIC(interpolatedPointsMetrics &
+                      & (FIELD_U_VARIABLE_TYPE)%PTR,reverseNormal,junkPosition, &
+                      & contactPointMetrics%normal,tangents,err,error,*999)
+                    ! Re-populate tangent vectors into the appropriate format
+                    contactPointMetrics%tangents(1,1:noGeoComp)=tangents(1:noGeoComp,1)
+                    contactPointMetrics%tangents(2,1:noGeoComp)=tangents(1:noGeoComp,2)
+                    ! Store the covariant and contravariant information
+                    contactPointMetrics%covariantMetricTensor=interpolatedPointsMetrics(FIELD_U_VARIABLE_TYPE)%PTR% &
+                      & GL(1:noXi,1:noXi)
+                    contactPointMetrics%contravariantMetricTensor=interpolatedPointsMetrics(FIELD_U_VARIABLE_TYPE)%PTR% &
+                      & GU(1:noXi,1:noXi)
+                    CALL FIELD_INTERPOLATED_POINTS_METRICS_FINALISE(interpolatedPointsMetrics,err,error,*999)
+                    ! Calculate signed gap
+                    contactPointMetrics%signedGapNormal=DOT_PRODUCT(gapsComponents,contactPointMetrics%normal)
+                      
+                    !###################################################################################################################
+                    
+                    ! Calculate inverse A
+                    ! Calculate A first
+                    A=0.0_DP !Initialise to be 0.0
+                    DO i=1,noXi
+                      DO j=1,noXi
+                        A(i,j)=contactPointMetrics%covariantMetricTensor(i,j)+ DOT_PRODUCT(contactPointMetrics%normal, &
+                          & contactPointMetrics%tangentDerivatives(i,j,:))*contactPointMetrics%signedGapNormal
+                      ENDDO
+                    ENDDO
+                    CALL INVERT(A,contactPointMetrics%inverseA,detA,ERR,ERROR,*999)
+                    
+                    !###################################################################################################################
+                  ENDIF !orthogonally projected
+                ENDDO !contactPtIdx
               ELSE
                 CALL FLAG_ERROR("Interface contact metrices is not associated.",err,error,*999)
               ENDIF
