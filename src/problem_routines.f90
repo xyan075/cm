@@ -1379,39 +1379,193 @@ CONTAINS
     INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
     TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
     !Local Variables
-    INTEGER(INTG) :: element_idx,ne
     TYPE(DOMAIN_MAPPING_TYPE), POINTER :: ELEMENTS_MAPPING
+    !TYPE(EQUATIONS_SET_TYPE), POINTER :: coupledRegionEquationsSet(2) !<A pointer to the equations set to evaluate the Jacobian for
     TYPE(EQUATIONS_TYPE), POINTER :: EQUATIONS
-    TYPE(EQUATIONS_MATRICES_TYPE), POINTER :: EQUATIONS_MATRICES
-    TYPE(FIELD_TYPE), POINTER :: DEPENDENT_FIELD
+    TYPE(EQUATIONS_MATRICES_TYPE), POINTER :: equationsMatrices
+    TYPE(EQUATIONS_MATRICES_NONLINEAR_TYPE), POINTER :: nonlinearMatrices
+    TYPE(EQUATIONS_MAPPING_NONLINEAR_TYPE), POINTER :: nonlinearMapping
+    TYPE(INTERFACE_TYPE), POINTER :: interface !<A pointer to the interface 
+    TYPE(INTERFACE_CONDITION_TYPE), POINTER :: interfaceCondition  !<A pointer to the equations set to evaluate the element Jacobian for
+    TYPE(InterfacePointsConnectivityType), POINTER :: pointsConnectivity !<A pointer to the interface points connectivity
+    TYPE(FIELD_TYPE), POINTER :: dependentField
+    TYPE(FIELD_VARIABLE_TYPE), POINTER :: dependentVariable
+    TYPE(BASIS_TYPE), POINTER :: rowDependentBasis,colDependentBasis,rowDomainFaceBasis,colDomainFaceBasis
+    TYPE(DOMAIN_FACE_TYPE), POINTER :: rowDomainFace,colDomainFace
+    TYPE(EQUATIONS_SET_TYPE), POINTER :: multipleRegionEquationsSet
+    TYPE(DISTRIBUTED_MATRIX_TYPE), POINTER :: jacobian
+    !TYPE(FIELD_VARIABLE_TYPE), POINTER :: residualVariable
+    !TYPE(FIELD_PARAMETER_SET_TYPE), POINTER :: residualParameterSet
+    TYPE(VARYING_STRING) :: localError
+    INTEGER(INTG) :: jacobianNumber,bodyIdx,equationSetNumber,interfaceGlobalNumber,interfaceConditionGlobalNumber
+    INTEGER(INTG) :: globalDataPointNum,rowElementNum,colElementNum, &
+      & rowConnectedFace,colConnectedFace,fieldComponent, &
+      & rowMeshComp,colMeshComp,rowDecompositionFaceNumber,colDecompositionFaceNumber, &
+      & rowLocalFaceNodeIdx,colLocalFaceNodeIdx,rowFaceLocalElemNode,colFaceLocalElemNode,rowGlobalNode,colGlobalNode, &
+      & rowFaceDerivative,colFaceDerivative,rowDerivative,colDerivative,rowVersion,colVersion,rowIdx,colIdx, &
+      & subMatrix,rowBodyIdx,colBodyIdx
+    REAL(DP) :: matrixValue,rowPhi,colPhi
+    REAL(DP) :: rowXi(2),colXi(2) !\todo generalise xi allocations for 1D,2D and 3D points connectivity
   
     CALL ENTERS("EQUATIONS_SET_JACOBIAN_CONTACT_UPDATE_STATIC_FEM",ERR,ERROR,*999)
 
     IF(ASSOCIATED(EQUATIONS_SET)) THEN
-      DEPENDENT_FIELD=>EQUATIONS_SET%DEPENDENT%DEPENDENT_FIELD
-      IF(ASSOCIATED(DEPENDENT_FIELD)) THEN
+      dependentField=>EQUATIONS_SET%DEPENDENT%DEPENDENT_FIELD
+      IF(ASSOCIATED(dependentField)) THEN
         EQUATIONS=>EQUATIONS_SET%EQUATIONS
         IF(ASSOCIATED(EQUATIONS)) THEN
-          EQUATIONS_MATRICES=>EQUATIONS%EQUATIONS_MATRICES
-          IF(ASSOCIATED(EQUATIONS_MATRICES)) THEN
+          equationsMatrices=>EQUATIONS%EQUATIONS_MATRICES
+          IF(ASSOCIATED(equationsMatrices)) THEN
+            nonlinearMatrices=>equationsMatrices%NONLINEAR_MATRICES
+            nonlinearMapping=>equations%EQUATIONS_MAPPING%NONLINEAR_MAPPING
 
+            interfaceGlobalNumber=1
+            interfaceConditionGlobalNumber=1
+            interface=>EQUATIONS_SET%REGION%PARENT_REGION%INTERFACES%INTERFACES(interfaceGlobalNumber)%PTR
+            interfaceCondition=>interface%INTERFACE_CONDITIONS%INTERFACE_CONDITIONS(interfaceConditionGlobalNumber)%PTR
+            pointsConnectivity=>interface%pointsConnectivity
+
+            dependentVariable=>dependentField%VARIABLES(FIELD_U_VARIABLE_TYPE)
+            jacobianNumber=1
+            jacobian=>nonlinearMatrices%JACOBIANS(jacobianNumber)%PTR%JACOBIAN
+            dependentVariable=>nonlinearMapping%JACOBIAN_TO_VAR_MAP(jacobianNumber)%VARIABLE
+            !Setup pointer to the equation set of the coupled bodies which are setup in thier own separate regions
+            !(note that these regions has not been added to the solver equations and are merely here for convinence if needed)
+            !equationSetNumber=1
+            !DO bodyIdx=1,2
+            !  coupledRegionEquationsSet(bodyIdx)=>EQUATIONS_SET%REGION%PARENT_REGION%SUB_REGIONS(bodyIdx)%PTR% &
+            !    & EQUATIONS_SETS%EQUATIONS_SETS(equationSetNumber)%PTR
+            !ENDDO
+            !Since we are computing the contact term in a single region, we do not need to determine the dependent field
+            !through the interface condition. We can use the dependentField pointer defined for this single region
+            !dependentField=>interfaceCondition%DEPENDENT%EQUATIONS_SETS(interfaceMatrixIdx)%PTR% &
+            ! & DEPENDENT%DEPENDENT_FIELD
+
+            DO subMatrix=1,4
+              SELECT CASE(subMatrix)
+              CASE(1) !Contact subMatrix11
+                rowBodyIdx=1
+                colBodyIdx=1
+              CASE(2) !Contact subMatrix12
+                rowBodyIdx=1
+                colBodyIdx=2
+              CASE(3) !Contact subMatrix21
+                rowBodyIdx=2
+                colBodyIdx=1
+              CASE(4) !Contact subMatrix22
+                rowBodyIdx=2
+                colBodyIdx=2
+              END SELECT
+              !Loop over each data point and find the connected element and their dofs
+              DO globalDataPointNum=1,SIZE(pointsConnectivity%pointsConnectivity,1)
+                rowElementNum=pointsConnectivity%pointsConnectivity(globalDataPointNum,rowBodyIdx)%coupledMeshElementNumber
+                rowConnectedFace=pointsConnectivity%pointsConnectivity(globalDataPointNum,rowBodyIdx)%elementLineFaceNumber
+                rowXi=pointsConnectivity%pointsConnectivity(globalDataPointNum,rowBodyIdx)%reducedXi
+                colElementNum=pointsConnectivity%pointsConnectivity(globalDataPointNum,colBodyIdx)%coupledMeshElementNumber
+                colConnectedFace=pointsConnectivity%pointsConnectivity(globalDataPointNum,colBodyIdx)%elementLineFaceNumber
+                colXi=pointsConnectivity%pointsConnectivity(globalDataPointNum,colBodyIdx)%reducedXi
+                !Find the row dof 
+                DO fieldComponent=1,3
+                  rowMeshComp=dependentField%VARIABLE_TYPE_MAP(FIELD_U_VARIABLE_TYPE)%PTR% &
+                    & COMPONENTS(fieldComponent)%MESH_COMPONENT_NUMBER
+                  rowDependentBasis=>dependentField%DECOMPOSITION%DOMAIN(rowMeshComp)%PTR% &
+                    & TOPOLOGY%ELEMENTS%ELEMENTS(rowElementNum)%BASIS
+                  rowDecompositionFaceNumber=dependentField%DECOMPOSITION%TOPOLOGY% &
+                    & ELEMENTS%ELEMENTS(rowElementNum)%ELEMENT_FACES(rowConnectedFace)
+                  rowDomainFace=>dependentField%DECOMPOSITION%DOMAIN(rowMeshComp)%PTR%TOPOLOGY% &
+                    & FACES%FACES(rowDecompositionFaceNumber)
+                  rowDomainFaceBasis=>rowDomainFace%BASIS
+                  DO rowLocalFaceNodeIdx=1,rowDependentBasis%NUMBER_OF_NODES_IN_LOCAL_FACE(rowConnectedFace)
+                    rowFaceLocalElemNode=rowDependentBasis%NODE_NUMBERS_IN_LOCAL_FACE(rowLocalFaceNodeIdx,rowConnectedFace)
+                    rowGlobalNode=dependentField%DECOMPOSITION%DOMAIN(rowMeshComp)%PTR%TOPOLOGY% &
+                      & ELEMENTS%ELEMENTS(rowElementNum)%ELEMENT_NODES(rowFaceLocalElemNode)
+                    DO rowFaceDerivative=1,rowDomainFace%BASIS%NUMBER_OF_DERIVATIVES(rowLocalFaceNodeIdx)
+                      rowDerivative=rowDependentBasis% &
+                        & DERIVATIVE_NUMBERS_IN_LOCAL_FACE(rowFaceDerivative,rowLocalFaceNodeIdx,rowConnectedFace)
+                      rowVersion=dependentField%DECOMPOSITION%DOMAIN(rowMeshComp)%PTR%TOPOLOGY% &
+                        & ELEMENTS%ELEMENTS(rowElementNum)%elementVersions(rowDerivative,rowFaceLocalElemNode)
+
+                      !Evaluate the basis at the projected/connected xi
+                      rowPhi=BASIS_EVALUATE_XI(rowDomainFaceBasis,rowDomainFaceBasis% &
+                        & ELEMENT_PARAMETER_INDEX(rowFaceDerivative,rowLocalFaceNodeIdx),NO_PART_DERIV,rowXi,err,error)
+
+                      !Find dof associated with this particular field, component, node, derivative and version.
+                      rowIdx=dependentVariable%components(fieldComponent)%PARAM_TO_DOF_MAP%NODE_PARAM2DOF_MAP%NODES( &
+                        & rowGlobalNode)%DERIVATIVES(rowDerivative)%VERSIONS(rowVersion)
+
+                      !Find the col 
+                      colMeshComp=dependentField%VARIABLE_TYPE_MAP(FIELD_U_VARIABLE_TYPE)%PTR% &
+                        & COMPONENTS(fieldComponent)%MESH_COMPONENT_NUMBER
+                      colDependentBasis=>dependentField%DECOMPOSITION%DOMAIN(colMeshComp)%PTR% &
+                        & TOPOLOGY%ELEMENTS%ELEMENTS(colElementNum)%BASIS
+                      colDecompositionFaceNumber=dependentField%DECOMPOSITION%TOPOLOGY% &
+                        & ELEMENTS%ELEMENTS(colElementNum)%ELEMENT_FACES(colConnectedFace)
+                      colDomainFace=>dependentField%DECOMPOSITION%DOMAIN(colMeshComp)%PTR%TOPOLOGY% &
+                        & FACES%FACES(colDecompositionFaceNumber)
+                      colDomainFaceBasis=>colDomainFace%BASIS
+                      DO colLocalFaceNodeIdx=1,colDependentBasis%NUMBER_OF_NODES_IN_LOCAL_FACE(colConnectedFace)
+                        colFaceLocalElemNode=colDependentBasis%NODE_NUMBERS_IN_LOCAL_FACE(colLocalFaceNodeIdx,colConnectedFace)
+                        colGlobalNode=dependentField%DECOMPOSITION%DOMAIN(colMeshComp)%PTR%TOPOLOGY% &
+                          & ELEMENTS%ELEMENTS(colElementNum)%ELEMENT_NODES(colFaceLocalElemNode)
+                        DO colFaceDerivative=1,colDomainFace%BASIS%NUMBER_OF_DERIVATIVES(colLocalFaceNodeIdx)
+                          colDerivative=colDependentBasis% &
+                            & DERIVATIVE_NUMBERS_IN_LOCAL_FACE(colFaceDerivative,colLocalFaceNodeIdx,colConnectedFace)
+                          colVersion=dependentField%DECOMPOSITION%DOMAIN(colMeshComp)%PTR%TOPOLOGY% &
+                            & ELEMENTS%ELEMENTS(colElementNum)%elementVersions(colDerivative,colFaceLocalElemNode)
+
+                          !Evaluate the basis at the projected/connected xi
+                          colPhi=BASIS_EVALUATE_XI(colDomainFaceBasis,colDomainFaceBasis% &
+                            & ELEMENT_PARAMETER_INDEX(colFaceDerivative,colLocalFaceNodeIdx),NO_PART_DERIV,colXi,err,error)
+
+                          !Find dof associated with this particular field, component, node, derivative and version.
+                          colIdx=dependentVariable%components(fieldComponent)%PARAM_TO_DOF_MAP%NODE_PARAM2DOF_MAP%NODES( &
+                            & colGlobalNode)%DERIVATIVES(colDerivative)%VERSIONS(colVersion)
+
+                          SELECT CASE(subMatrix)
+                          CASE(1) !Contact subMatrix11
+                            matrixValue=0.0_DP !rowPhi*colPhi
+                          CASE(2) !Contact subMatrix12
+                            matrixValue=0.0_DP !rowPhi*colPhi
+                          CASE(3) !Contact subMatrix21
+                            matrixValue=0.0_DP !rowPhi*colPhi
+                          CASE(4) !Contact subMatrix22
+                            matrixValue=0.0_DP !rowPhi*colPhi
+                          END SELECT
+
+                          CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,rowIdx,colIdx,matrixValue,err,error,*999)
+
+                        ENDDO !colFaceDerivative
+                      ENDDO !colLocalFaceNodeIdx
+
+                    ENDDO !rowFaceDerivative
+                  ENDDO !rowLocalFaceNodeIdx
+                ENDDO !fieldComponent
+              ENDDO !globalDataPointNum
+
+            ENDDO !subMatrix
+
+            !Set all jacobian values to 0.0. Only for testing
+            !CALL DISTRIBUTED_MATRIX_ALL_VALUES_SET(jacobian,0.0_DP,err,error,*999)
+
+            CALL DISTRIBUTED_MATRIX_UPDATE_START(jacobian,err,error,*999)
+            CALL DISTRIBUTED_MATRIX_UPDATE_FINISH(jacobian,err,error,*999)
 
             !Output equations matrices and RHS vector if required
-            !\todo Uncomment below after EQUATIONS_SET_JACOBIAN_CONTACT_UPDATE_STATIC_FEM is moved to equations_set_routines.
+            !\todo Uncomment below after EQUATIONS_SET_RESIDUAL_CONTACT_UPDATE_STATIC_FEM is moved to equations_set_routines.
             !IF(EQUATIONS%OUTPUT_TYPE>=EQUATIONS_MATRIX_OUTPUT) THEN
-            !  CALL EQUATIONS_MATRICES_JACOBIAN_OUTPUT(GENERAL_OUTPUT_TYPE,EQUATIONS_MATRICES,ERR,ERROR,*999)
+            ! CALL EQUATIONS_MATRICES_OUTPUT(GENERAL_OUTPUT_TYPE,EQUATIONS_MATRICES,ERR,ERROR,*999)
             !ENDIF
           ELSE
-            CALL FLAG_ERROR("Equations matrices is not associated",ERR,ERROR,*999)
+            CALL FLAG_ERROR("Equations matrices is not associated",err,error,*999)
           ENDIF
         ELSE
-          CALL FLAG_ERROR("Equations is not associated",ERR,ERROR,*999)
+          CALL FLAG_ERROR("Equations is not associated",err,error,*999)
         ENDIF
       ELSE
-        CALL FLAG_ERROR("Dependent field is not associated",ERR,ERROR,*999)
-      ENDIF            
+        CALL FLAG_ERROR("Dependent field is not associated",err,error,*999)
+      ENDIF
     ELSE
-      CALL FLAG_ERROR("Equations set is not associated.",ERR,ERROR,*999)
+      CALL FLAG_ERROR("Equations set is not associated.",err,error,*999)
     ENDIF
        
     CALL EXITS("EQUATIONS_SET_JACOBIAN_CONTACT_UPDATE_STATIC_FEM")
@@ -1585,24 +1739,25 @@ CONTAINS
     TYPE(INTERFACE_TYPE), POINTER :: interface !<A pointer to the interface 
     TYPE(INTERFACE_CONDITION_TYPE), POINTER :: interfaceCondition  !<A pointer to the equations set to evaluate the element Jacobian for
     TYPE(InterfacePointsConnectivityType), POINTER :: pointsConnectivity !<A pointer to the interface points connectivity
-    TYPE(FIELD_TYPE), POINTER :: coupledMeshDependentField
-    TYPE(BASIS_TYPE), POINTER :: coupledMeshDependentBasis
-    TYPE(DOMAIN_FACE_TYPE), POINTER :: coupledMeshDomainFace
+    TYPE(FIELD_TYPE), POINTER :: dependentField
+    TYPE(BASIS_TYPE), POINTER :: dependentBasis,domainFaceBasis
+    TYPE(DOMAIN_FACE_TYPE), POINTER :: domainFace
     TYPE(EQUATIONS_SET_TYPE), POINTER :: multipleRegionEquationsSet
     TYPE(FIELD_VARIABLE_TYPE), POINTER :: residualVariable
     TYPE(FIELD_PARAMETER_SET_TYPE), POINTER :: residualParameterSet
     TYPE(VARYING_STRING) :: localError
-    INTEGER(INTG) :: coupledBodyIdx,equationSetNumber,interfaceGlobalNumber,interfaceConditionGlobalNumber
-    INTEGER(INTG) :: globalDataPointNumber,coupledMeshElementNumber,connectedFace,fieldComponent,meshComponentNumber, &
-      & decompositionFaceNumber,localFaceNodeIdx,localElementNode,globalNode,derivativeIdx,derivative,versionNumber, &
+    INTEGER(INTG) :: bodyIdx,equationSetNumber,interfaceGlobalNumber,interfaceConditionGlobalNumber
+    INTEGER(INTG) :: globalDataPointNum,elementNum,connectedFace,fieldComponent,meshComp, &
+      & decompositionFaceNumber,localFaceNodeIdx,faceLocalElemNode,globalNode,faceDerivative,derivative,versionNumber, &
       & residualVariableIdx,dofIdx
-    REAL(DP) :: residualValue
+    REAL(DP) :: residualValue,phi
+    REAL(DP) :: xi(2) !\todo generalise xi allocations for 1D,2D and 3D points connectivity
 
     CALL ENTERS("EQUATIONS_SET_RESIDUAL_CONTACT_UPDATE_STATIC_FEM",ERR,ERROR,*999)
 
     IF(ASSOCIATED(EQUATIONS_SET)) THEN
-      coupledMeshDependentField=>EQUATIONS_SET%DEPENDENT%DEPENDENT_FIELD
-      IF(ASSOCIATED(coupledMeshDependentField)) THEN
+      dependentField=>EQUATIONS_SET%DEPENDENT%DEPENDENT_FIELD
+      IF(ASSOCIATED(dependentField)) THEN
         EQUATIONS=>EQUATIONS_SET%EQUATIONS
         IF(ASSOCIATED(EQUATIONS)) THEN
           equationsMatrices=>EQUATIONS%EQUATIONS_MATRICES
@@ -1622,52 +1777,56 @@ CONTAINS
             IF(ASSOCIATED(residualVariable)) THEN
 
               !Loop over each coupled body and add the contact contribution associated with each contact point
-              DO coupledBodyIdx=1,2
+              DO bodyIdx=1,2
                 !Setup pointer to the equation set of the coupled bodies which are setup in thier own separate regions
                 !(note that these regions has not been added to the solver equations and are merely here for convinence if needed)
                 equationSetNumber=1
-                multipleRegionEquationsSet=>EQUATIONS_SET%REGION%PARENT_REGION%SUB_REGIONS(coupledBodyIdx)%PTR%EQUATIONS_SETS% &
+                multipleRegionEquationsSet=>EQUATIONS_SET%REGION%PARENT_REGION%SUB_REGIONS(bodyIdx)%PTR%EQUATIONS_SETS% &
                   & EQUATIONS_SETS(equationSetNumber)%PTR
 
                 !Since we are computing the contact term in a single region, we do not need to determine the dependent field
-                !through the interface condition. We can simply use the coupledMeshDependentField pointer defined above
-                !coupledMeshDependentField=>interfaceCondition%DEPENDENT%EQUATIONS_SETS(interfaceMatrixIdx)%PTR% &
+                !through the interface condition. We can simply use the dependentField pointer defined above
+                !dependentField=>interfaceCondition%DEPENDENT%EQUATIONS_SETS(interfaceMatrixIdx)%PTR% &
                 ! & DEPENDENT%DEPENDENT_FIELD
 
                 !Loop over each data point and find the connected element and their dofs
-                DO globalDataPointNumber=1,SIZE(pointsConnectivity%pointsConnectivity,1)
-                  coupledMeshElementNumber=pointsConnectivity%pointsConnectivity(globalDataPointNumber,coupledBodyIdx)% &
-                    & coupledMeshElementNumber
-                  connectedFace = pointsConnectivity%pointsConnectivity(globalDataPointNumber,coupledBodyIdx)% &
-                    & elementLineFaceNumber
+                DO globalDataPointNum=1,SIZE(pointsConnectivity%pointsConnectivity,1)
+                  elementNum=pointsConnectivity%pointsConnectivity(globalDataPointNum,bodyIdx)%coupledMeshElementNumber
+                  connectedFace=pointsConnectivity%pointsConnectivity(globalDataPointNum,bodyIdx)%elementLineFaceNumber
+                  xi=pointsConnectivity%pointsConnectivity(globalDataPointNum,bodyIdx)%reducedXi
                   DO fieldComponent=1,3
-                    meshComponentNumber=coupledMeshDependentField%VARIABLE_TYPE_MAP(FIELD_U_VARIABLE_TYPE)%PTR% &
+                    meshComp=dependentField%VARIABLE_TYPE_MAP(FIELD_U_VARIABLE_TYPE)%PTR% &
                       & COMPONENTS(fieldComponent)%MESH_COMPONENT_NUMBER
-                    coupledMeshDependentBasis=>coupledMeshDependentField%DECOMPOSITION%DOMAIN(meshComponentNumber)%PTR% &
-                      & TOPOLOGY%ELEMENTS%ELEMENTS(coupledMeshElementNumber)%BASIS
-                    decompositionFaceNumber=coupledMeshDependentField%DECOMPOSITION%TOPOLOGY% &
-                      & ELEMENTS%ELEMENTS(coupledMeshElementNumber)%ELEMENT_FACES(connectedFace)
-                    coupledMeshDomainFace=>coupledMeshDependentField%DECOMPOSITION%DOMAIN(meshComponentNumber)%PTR%TOPOLOGY% &
-                      & FACES%FACES(decompositionFaceNumber)
-                    DO localFaceNodeIdx=1,coupledMeshDependentBasis%NUMBER_OF_NODES_IN_LOCAL_FACE(connectedFace)
-                      localElementNode=coupledMeshDependentBasis%NODE_NUMBERS_IN_LOCAL_FACE(localFaceNodeIdx,connectedFace)
-                      globalNode=coupledMeshDependentField%DECOMPOSITION%DOMAIN(meshComponentNumber)%PTR%TOPOLOGY% &
-                        & ELEMENTS%ELEMENTS(coupledMeshElementNumber)%ELEMENT_NODES(localElementNode)
-                      DO derivativeIdx=1,coupledMeshDomainFace%BASIS%NUMBER_OF_DERIVATIVES(localFaceNodeIdx)
-                        derivative=coupledMeshDependentBasis% &
-                          & DERIVATIVE_NUMBERS_IN_LOCAL_FACE(derivativeIdx,localFaceNodeIdx,connectedFace)
-                        versionNumber=coupledMeshDependentField%DECOMPOSITION%DOMAIN(meshComponentNumber)%PTR%TOPOLOGY% &
-                          & ELEMENTS%ELEMENTS(coupledMeshElementNumber)%elementVersions(derivative,localElementNode)
+                    dependentBasis=>dependentField%DECOMPOSITION%DOMAIN(meshComp)%PTR%TOPOLOGY%ELEMENTS%ELEMENTS(elementNum)%BASIS
+                    decompositionFaceNumber=dependentField%DECOMPOSITION%TOPOLOGY% &
+                      & ELEMENTS%ELEMENTS(elementNum)%ELEMENT_FACES(connectedFace)
+                    domainFace=>dependentField%DECOMPOSITION%DOMAIN(meshComp)%PTR%TOPOLOGY%FACES%FACES(decompositionFaceNumber)
+                    domainFaceBasis=>domainFace%BASIS
+                    DO localFaceNodeIdx=1,dependentBasis%NUMBER_OF_NODES_IN_LOCAL_FACE(connectedFace)
+                      faceLocalElemNode=dependentBasis%NODE_NUMBERS_IN_LOCAL_FACE(localFaceNodeIdx,connectedFace)
+                      globalNode=dependentField%DECOMPOSITION%DOMAIN(meshComp)%PTR%TOPOLOGY% &
+                        & ELEMENTS%ELEMENTS(elementNum)%ELEMENT_NODES(faceLocalElemNode)
+                      DO faceDerivative=1,domainFace%BASIS%NUMBER_OF_DERIVATIVES(localFaceNodeIdx)
+                        derivative=dependentBasis%DERIVATIVE_NUMBERS_IN_LOCAL_FACE(faceDerivative,localFaceNodeIdx,connectedFace)
+                        versionNumber=dependentField%DECOMPOSITION%DOMAIN(meshComp)%PTR%TOPOLOGY% &
+                          & ELEMENTS%ELEMENTS(elementNum)%elementVersions(derivative,faceLocalElemNode)
+
+                        !Evaluate the basis at the projected/connected xi
+                        phi=BASIS_EVALUATE_XI(domainFaceBasis,domainFaceBasis% &
+                          & ELEMENT_PARAMETER_INDEX(faceDerivative,localFaceNodeIdx),NO_PART_DERIV,xi,err,error)
+
                         !Find dof associated with this particular field, component, node, derivative and version.
                         dofIdx=residualVariable%components(fieldComponent)%PARAM_TO_DOF_MAP%NODE_PARAM2DOF_MAP%NODES(globalNode)% &
                           & DERIVATIVES(derivative)%VERSIONS(versionNumber)
-                        residualValue=0.0_DP
+
+                        residualValue=0.0_DP !phi
                         CALL DISTRIBUTED_VECTOR_VALUES_ADD(nonlinearMatrices%RESIDUAL,dofIdx,residualValue,err,error,*999)
-                      ENDDO !derivativeIdx
+
+                      ENDDO !faceDerivative
                     ENDDO !localFaceNodeIdx
                   ENDDO !fieldComponent
-                ENDDO !globalDataPointNumber
-              ENDDO !coupledBodyIdx
+                ENDDO !globalDataPointNum
+              ENDDO !bodyIdx
 
               !Update the residual parameter set
               residualParameterSet=>residualVariable%PARAMETER_SETS%SET_TYPE(FIELD_RESIDUAL_SET_TYPE)%PTR
@@ -3658,12 +3817,12 @@ CONTAINS
     TYPE(FIELDS_TYPE), POINTER :: fields
     TYPE(VARYING_STRING) :: fileName,method,directory
     
-    INTEGER(INTG) :: interfaceConditionIdx, interfaceElementNumber, dataPointIdx, globalDataPointNumber, coupledMeshElementNumber, &
+    INTEGER(INTG) :: interfaceConditionIdx, interfaceElementNumber, dataPointIdx, globalDataPointNum, elementNum, &
       & coupledMeshFaceLineNumber, coupledMeshIdx,component
     TYPE(INTERFACE_TYPE), POINTER :: interface !<A pointer to the interface 
     TYPE(INTERFACE_CONDITION_TYPE), POINTER :: interfaceCondition
     TYPE(InterfacePointsConnectivityType), POINTER :: pointsConnectivity !<A pointer to the interface points connectivity
-    TYPE(FIELD_TYPE), POINTER :: coupledMeshDependentField
+    TYPE(FIELD_TYPE), POINTER :: dependentField
     TYPE(FIELD_INTERPOLATION_PARAMETERS_PTR_TYPE), POINTER :: interpolationParameters(:)
     TYPE(FIELD_INTERPOLATED_POINT_PTR_TYPE), POINTER :: interpolatedPoints(:)
     TYPE(FIELD_INTERPOLATED_POINT_TYPE), POINTER :: interpolatedPoint
@@ -3796,10 +3955,10 @@ CONTAINS
                   WRITE(IUNIT,'(1X,''  z.  Value index= 9, #Derivatives=0'')')
                   WRITE(IUNIT,'(1X,''4) exitTag, field, rectangular cartesian, #Components=1'')')
                   WRITE(IUNIT,'(1X,''  tag.  Value index= 10, #Derivatives=0'')')
-                  coupledMeshDependentField=>interfaceCondition%DEPENDENT%EQUATIONS_SETS(coupledMeshIdx)%PTR% &
+                  dependentField=>interfaceCondition%DEPENDENT%EQUATIONS_SETS(coupledMeshIdx)%PTR% &
                     & DEPENDENT%DEPENDENT_FIELD
                   NULLIFY(interpolationParameters)
-                  CALL FIELD_INTERPOLATION_PARAMETERS_INITIALISE(coupledMeshDependentField,interpolationParameters,err,error, &
+                  CALL FIELD_INTERPOLATION_PARAMETERS_INITIALISE(dependentField,interpolationParameters,err,error, &
                     & *999,FIELD_GEOMETRIC_COMPONENTS_TYPE)
                   NULLIFY(interpolatedPoints)
                   CALL FIELD_INTERPOLATED_POINTS_INITIALISE(interpolationParameters,interpolatedPoints,err,error,*999, &
@@ -3810,29 +3969,29 @@ CONTAINS
                     decompositionElementData=>interfaceCondition%LAGRANGE%LAGRANGE_FIELD%DECOMPOSITION%TOPOLOGY%dataPoints% &
                       & elementDataPoint(interfaceElementNumber)
                     DO dataPointIdx=1,decompositionElementData%numberOfProjectedData
-                      globalDataPointNumber=decompositionElementData%dataIndices(dataPointIdx)%globalNumber
-                      WRITE(IUNIT,'(1X,''Node:'',I4)') globalDataPointNumber
+                      globalDataPointNum=decompositionElementData%dataIndices(dataPointIdx)%globalNumber
+                      WRITE(IUNIT,'(1X,''Node:'',I4)') globalDataPointNum
                       DO component=1,3
-                        WRITE(IUNIT,'(1X,3E25.15)') interfaceDatapoints%DATA_POINTS(globalDataPointNumber)%position(component)
+                        WRITE(IUNIT,'(1X,3E25.15)') interfaceDatapoints%DATA_POINTS(globalDataPointNum)%position(component)
                       ENDDO !component
-                      coupledMeshElementNumber=pointsConnectivity%pointsConnectivity(globalDataPointNumber,coupledMeshIdx)% &
+                      elementNum=pointsConnectivity%pointsConnectivity(globalDataPointNum,coupledMeshIdx)% &
                         & coupledMeshElementNumber
-                      coupledMeshFaceLineNumber=coupledMeshDependentField%DECOMPOSITION%TOPOLOGY%ELEMENTS% &
-                        & ELEMENTS(coupledMeshElementNumber)% &
-                        & ELEMENT_FACES(pointsConnectivity%pointsConnectivity(globalDataPointNumber,coupledMeshIdx)% &
+                      coupledMeshFaceLineNumber=dependentField%DECOMPOSITION%TOPOLOGY%ELEMENTS% &
+                        & ELEMENTS(elementNum)% &
+                        & ELEMENT_FACES(pointsConnectivity%pointsConnectivity(globalDataPointNum,coupledMeshIdx)% &
                         & elementLineFaceNumber)
                       CALL FIELD_INTERPOLATION_PARAMETERS_FACE_GET(FIELD_VALUES_SET_TYPE,coupledMeshFaceLineNumber, &
                         & interpolationParameters(FIELD_U_VARIABLE_TYPE)%PTR,err,error,*999,FIELD_GEOMETRIC_COMPONENTS_TYPE)
-                      CALL FIELD_INTERPOLATE_XI(NO_PART_DERIV,pointsConnectivity%pointsConnectivity(globalDataPointNumber, &
+                      CALL FIELD_INTERPOLATE_XI(NO_PART_DERIV,pointsConnectivity%pointsConnectivity(globalDataPointNum, &
                         & coupledMeshIdx)%reducedXi(:),interpolatedPoint,err,error,*999,FIELD_GEOMETRIC_COMPONENTS_TYPE) !Interpolate contact data points on each surface
                       DO component=1,3
                         WRITE(IUNIT,'(1X,3E25.15)') interpolatedPoint%VALUES(component,NO_PART_DERIV) - &
-                          & interfaceDatapoints%DATA_POINTS(globalDataPointNumber)%position(component)
+                          & interfaceDatapoints%DATA_POINTS(globalDataPointNum)%position(component)
                       ENDDO !component
                       DO component=1,3
                         WRITE(IUNIT,'(1X,3E25.15)') interpolatedPoint%VALUES(component,NO_PART_DERIV)
                       ENDDO !component
-                      WRITE(IUNIT,'(1X,I2)') dataProjection%DATA_PROJECTION_RESULTS(globalDataPointNumber)%EXIT_TAG
+                      WRITE(IUNIT,'(1X,I2)') dataProjection%DATA_PROJECTION_RESULTS(globalDataPointNum)%EXIT_TAG
                     ENDDO !dataPointIdx
                   ENDDO !interfaceElementNumber
                   CALL FIELD_INTERPOLATION_PARAMETERS_FINALISE(interpolationParameters,err,error,*999)
