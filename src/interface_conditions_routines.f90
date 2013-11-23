@@ -417,7 +417,7 @@ CONTAINS
                   CALL FLAG_ERROR("Interface field variable is not associated.",ERR,ERROR,*999)
                 ENDIF
                 !Allocate memory for interface contact metrics
-                CALL InterfaceContactMetrics_Initialise(INTERFACE_CONDITION,err,error,*999)
+                !CALL InterfaceContactMetrics_Initialise(INTERFACE_CONDITION,err,error,*999)
               CASE(INTERFACE_CONDITION_FIELD_NORMAL_CONTINUITY_OPERATOR)
                 CALL FLAG_ERROR("Not implemented.",ERR,ERROR,*999)
               CASE(INTERFACE_CONDITION_SOLID_FLUID_OPERATOR)
@@ -733,11 +733,12 @@ CONTAINS
                     NULLIFY(INTERFACE_VARIABLE)
                     DO WHILE(variable_idx<=INTERFACE_DEPENDENT%NUMBER_OF_DEPENDENT_VARIABLES.AND. &
                       & .NOT.ASSOCIATED(INTERFACE_VARIABLE))
-                      IF(ASSOCIATED(FIELD_VARIABLE,INTERFACE_DEPENDENT%FIELD_VARIABLES(variable_idx)%PTR)) THEN
-                        INTERFACE_VARIABLE=>INTERFACE_DEPENDENT%FIELD_VARIABLES(variable_idx)%PTR
-                      ELSE
+                      !\todo temporarily commented to false to get single region contact working
+                      !IF(ASSOCIATED(FIELD_VARIABLE,INTERFACE_DEPENDENT%FIELD_VARIABLES(variable_idx)%PTR)) THEN
+                      !  INTERFACE_VARIABLE=>INTERFACE_DEPENDENT%FIELD_VARIABLES(variable_idx)%PTR
+                      !ELSE
                         variable_idx=variable_idx+1
-                      ENDIF
+                      !ENDIF
                     ENDDO
                     IF(ASSOCIATED(INTERFACE_VARIABLE)) THEN
                       !Check if we are dealing with the same mesh index.
