@@ -2143,7 +2143,7 @@ END TYPE GENERATED_MESH_ELLIPSOID_TYPE
     REAL(DP), ALLOCATABLE :: tangentDerivatives(:,:,:) !<tangentDerivatives(xiIdxTangent,xiIdxDerivative,CoordinateIdx). del(tau)/del(xi) at each contact point
     REAL(DP), ALLOCATABLE :: covariantMetricTensor(:,:) !<covariantMetricTensor(xiIdx1,xiIdx2). Covariant metric tensor at each contact point
     REAL(DP), ALLOCATABLE :: contravariantMetricTensor(:,:) !<contravariantMetricTensor(xiIdx1,xiIdx2). Contravariant metric tensor at each contact point
-    REAL(DP), ALLOCATABLE :: A(:,:) !< A matrix superscript(xiIdx1,xiIdx2). A matrix at each contact point
+    REAL(DP), ALLOCATABLE :: inverseA(:,:) !< A matrix superscript(xiIdx1,xiIdx2). A matrix at each contact point
   END TYPE InterfaceContactPointMetricsType
   
   !>Contains metrics information for contact points
