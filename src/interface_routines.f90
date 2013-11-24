@@ -162,8 +162,8 @@ CONTAINS
                       IF(ASSOCIATED(COUPLED_MESH_REGION)) THEN
                         IF(MESH_REGION%USER_NUMBER==COUPLED_MESH_REGION%USER_NUMBER) THEN
                           IF(MESH%USER_NUMBER==COUPLED_MESH%USER_NUMBER) THEN
-                            MESH_ALREADY_COUPLED=.TRUE.
-                            EXIT
+                            MESH_ALREADY_COUPLED=.FALSE. !\todo temporarily set to false to get single region contact working
+                            !EXIT !\todo temporarily commented to false to get single region contact working
                           ENDIF
                         ENDIF
                       ELSE

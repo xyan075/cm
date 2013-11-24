@@ -3832,7 +3832,9 @@ CONTAINS
     TYPE(INTERFACE_TYPE), POINTER :: interface
     LOGICAL :: reproject
     TYPE(VARYING_STRING) :: localError
-    
+    !\todo Temporarily added the variables below to allow the interface condition to be used in the single region contact problem
+    !to be manually specified. Need to Generalise.
+    INTEGER(INTG) :: equationsSetGlobalNumber,interfaceGlobalNumber,interfaceConditionGlobalNumber 
     CALL ENTERS("Problem_SolverNonlinearMonitor",err,error,*998)
     
     IF(ASSOCIATED(solver)) THEN
@@ -3874,8 +3876,16 @@ CONTAINS
                   IF(ASSOCIATED(solverEquations)) THEN
                     solverMapping=>solverEquations%SOLVER_MAPPING
                     IF(ASSOCIATED(solverMapping)) THEN
-                      DO interfaceConditionIdx=1,solverMapping%NUMBER_OF_INTERFACE_CONDITIONS
-                        interfaceCondition=>solverMapping%INTERFACE_CONDITIONS(interfaceConditionIdx)%PTR
+                      !\todo Temporarily comment out the looping through of interface conditions added to the solver as these are not
+                      !present in the single region contact problem. Needs to generalised.
+                      !DO interfaceConditionIdx=1,solverMapping%NUMBER_OF_INTERFACE_CONDITIONS
+                        !interfaceCondition=>solverMapping%INTERFACE_CONDITIONS(interfaceConditionIdx)%PTR
+                        equationsSetGlobalNumber=1
+                        interfaceGlobalNumber=1
+                        interfaceConditionGlobalNumber=1
+                        interfaceCondition=>solverMapping%EQUATIONS_SETS(equationsSetGlobalNumber)%PTR%REGION%PARENT_REGION% &
+                          & INTERFACES%INTERFACES(interfaceGlobalNumber)%PTR%INTERFACE_CONDITIONS% &
+                          & INTERFACE_CONDITIONS(interfaceConditionGlobalNumber)%PTR
                         IF(ASSOCIATED(interfaceCondition)) THEN
                           IF(interfaceCondition%OPERATOR==INTERFACE_CONDITION_FLS_CONTACT_REPROJECT_OPERATOR .OR. &
                               & interfaceCondition%OPERATOR==INTERFACE_CONDITION_FLS_CONTACT_OPERATOR) THEN !Only reproject for contact operator
@@ -3885,10 +3895,12 @@ CONTAINS
                                 CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"**************** Reproject! ****************",ERR,ERROR,*999)
                                 CALL InterfacePointsConnectivity_DataReprojection(interface,interfaceCondition,err,error,*999)
                                 CALL FrictionlessContact_contactMetricsCalculate(interfaceCondition,err,error,*999)
-!                                CALL INTERFACE_CONDITION_ASSEMBLE(interfaceCondition,err,error,*999)
                                 CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"************** Contact residual! ***********",ERR,ERROR,*999)
                                 CALL EQUATIONS_SET_RESIDUAL_CONTACT_UPDATE_STATIC_FEM(solverMapping%EQUATIONS_SETS(1)%PTR,&
                                   & ERR,ERROR,*999)
+                                !\todo Temporarily commented out INTERFACE_CONDITION_ASSEMBLE as the interface matrices are not
+                                ! required for the single region contact problem. Needs to generalised.
+                                !CALL INTERFACE_CONDITION_ASSEMBLE(interfaceCondition,err,error,*999)
                               ELSE
                                 CALL FLAG_ERROR("Interface is not associated for nonlinear solver equations mapping.", &
                                   & err,error,*999)
@@ -3899,7 +3911,7 @@ CONTAINS
                           CALL FLAG_ERROR("Interface condition is not associated for nonlinear solver equations mapping.", &
                             & err,error,*999)
                         ENDIF
-                      ENDDO !interfaceConditionIdx
+                      !ENDDO !interfaceConditionIdx
                     ELSE
                       CALL FLAG_ERROR("Nonlinear solver equations mapping is not associated.",err,error,*999)
                     ENDIF
