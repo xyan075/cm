@@ -1893,7 +1893,7 @@ CONTAINS
             residualVariableIdx=1
             residualVariable=>nonlinearMapping%RESIDUAL_VARIABLES(residualVariableIdx)%PTR
             IF(ASSOCIATED(residualVariable)) THEN
-
+              residualValue=0.0_DP
               !Loop over each coupled body and add the contact contribution associated with each contact point
               DO bodyIdx=1,2
                 !Setup pointer to the equation set of the coupled bodies which are setup in thier own separate regions
@@ -1923,6 +1923,7 @@ CONTAINS
                   connectedFace=pointsConnectivity%pointsConnectivity(globalDataPointNum,bodyIdx)%elementLineFaceNumber
                   xi=pointsConnectivity%pointsConnectivity(globalDataPointNum,bodyIdx)%reducedXi
                   contactPointMetrics=>contactMetrics%contactPointMetrics(globalDataPointNum)
+                  
                   DO fieldComponent=1,3
                     meshComp=dependentField%VARIABLE_TYPE_MAP(FIELD_U_VARIABLE_TYPE)%PTR% &
                       & COMPONENTS(fieldComponent)%MESH_COMPONENT_NUMBER
@@ -1931,6 +1932,9 @@ CONTAINS
                       & ELEMENTS%ELEMENTS(elementNum)%ELEMENT_FACES(connectedFace)
                     domainFace=>dependentField%DECOMPOSITION%DOMAIN(meshComp)%PTR%TOPOLOGY%FACES%FACES(decompositionFaceNumber)
                     domainFaceBasis=>domainFace%BASIS
+                    !Get local face number 
+                    CALL FIELD_INTERPOLATION_PARAMETERS_SCALE_FACTORS_FACE_GET(decompositionFaceNumber, &
+                      & ,ERR,ERROR,*999)
                     DO localFaceNodeIdx=1,dependentBasis%NUMBER_OF_NODES_IN_LOCAL_FACE(connectedFace)
                       faceLocalElemNode=dependentBasis%NODE_NUMBERS_IN_LOCAL_FACE(localFaceNodeIdx,connectedFace)
                       globalNode=dependentField%DECOMPOSITION%DOMAIN(meshComp)%PTR%TOPOLOGY% &
@@ -1949,8 +1953,10 @@ CONTAINS
                           & DERIVATIVES(derivative)%VERSIONS(versionNumber)
                         ! \todo: 1 is for the frictionless contact, normal contact stiffness 
                         contactPointMetrics%contactForce=contactPointMetrics%signedGapNormal*contactPointMetrics%contactStiffness(1)
-                        residualValue=0.0_DP
-!                        residualValue=coefficient*phi*contactPointMetrics%normal(fieldComponent)*contactPointMetrics%contactForce
+!                        residualValue=0.0_DP
+                        residualValue=coefficient*phi*contactPointMetrics%normal(fieldComponent)*contactPointMetrics%contactForce
+                        !Multiply the contribution by scale factor
+                        
                         CALL DISTRIBUTED_VECTOR_VALUES_ADD(nonlinearMatrices%RESIDUAL,dofIdx,residualValue,err,error,*999)
                       ENDDO !faceDerivative
                     ENDDO !localFaceNodeIdx
@@ -3098,7 +3104,7 @@ CONTAINS
             WRITE (CVAR,'(a8,i2)') 'Assemble',equations_set_idx
             CALL TAU_PHASE_CREATE_DYNAMIC(PHASE,CVAR)
             CALL TAU_PHASE_START(PHASE)
-#endif
+#endifja
             EQUATIONS_SET=>SOLVER_MAPPING%EQUATIONS_SETS(equations_set_idx)%PTR
             !CALL EQUATIONS_SET_FIXED_CONDITIONS_APPLY(EQUATIONS_SET,ERR,ERROR,*999)
             !Assemble the equations for linear problems
