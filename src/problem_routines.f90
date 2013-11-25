@@ -64,6 +64,7 @@ MODULE PROBLEM_ROUTINES
   USE INTERFACE_ROUTINES
   USE ISO_VARYING_STRING
   USE KINDS
+  USE MESH_ROUTINES
   USE MULTI_PHYSICS_ROUTINES
   USE PROBLEM_CONSTANTS
   USE SOLVER_ROUTINES
@@ -3558,12 +3559,12 @@ CONTAINS
     TYPE(CONTROL_LOOP_SIMPLE_TYPE), POINTER :: simpleLoop
     TYPE(CONTROL_LOOP_FIXED_TYPE), POINTER :: fixedLoop
     TYPE(CONTROL_LOOP_WHILE_TYPE), POINTER :: whileLoop
-    INTEGER(INTG) :: componentIdx,versionIdx,derivativeIdx,nodeIdx,noGeomComp
-    INTEGER(INTG) :: localNodeNumber,userNodeNumber,incrementIdx,iterationNumber
+    INTEGER(INTG) :: componentIdx,versionIdx,derivativeIdx,nodeIdx,domainNodeIdx,noGeomComp
+    INTEGER(INTG) :: localNodeNumber,userNodeNumber,incrementIdx,iterationNumber,noNodes
     REAL(DP) :: nodalParameters(3),nodalParametersTrans(3),transformationMatrix(4,4)
     TYPE(DOMAIN_TYPE), POINTER :: domain
     TYPE(DOMAIN_NODES_TYPE), POINTER :: domainNodes
-    LOGICAL :: transformBC=.FALSE.,sameBases=.TRUE.
+    LOGICAL :: transformBC=.FALSE.,sameBases=.TRUE.,transformAllNodes=.TRUE.,nodeExist,ghostNode
     
     CALL ENTERS("Problem_SolverGeometricTransformationSolve",err,error,*999) 
     
@@ -3662,44 +3663,62 @@ CONTAINS
         ENDDO
         IF(sameBases) THEN
           domain=>fieldVariable%COMPONENTS(1)%DOMAIN !Use the 1st component domain since they are the same for all components
+          domainNodes=>domain%TOPOLOGY%NODES
           IF(ASSOCIATED(domain)) THEN
-            domainNodes=>domain%TOPOLOGY%NODES
-            DO nodeIdx=1,domainNodes%NUMBER_OF_NODES
-              localNodeNumber=domainNodes%NODES(nodeIdx)%LOCAL_NUMBER
-              userNodeNumber=domainNodes%NODES(nodeIdx)%USER_NUMBER
-              DO derivativeIdx=1,domainNodes%NODES(nodeIdx)%NUMBER_OF_DERIVATIVES
-                DO versionIdx=1,domainNodes%NODES(nodeIdx)%DERIVATIVES(derivativeIdx)%numberOfVersions
-                  DO componentIdx=1,noGeomComp !Get all component for a nodal derivative
-                    CALL FIELD_PARAMETER_SET_GET_NODE(geometricTransformationSolver%field,geometricTransformationSolver% &
-                      & fieldVariableType,FIELD_VALUES_SET_TYPE,versionIdx,derivativeIdx,userNodeNumber,componentIdx, &
-                      & nodalParameters(componentIdx),err,error,*999)
-                  ENDDO !componentIdx
-                  !Rotate the nodal parameters
-                  userNodeNumber=domainNodes%NODES(nodeIdx)%USER_NUMBER
-                  nodalParametersTrans(1:noGeomComp)=MATMUL(transformationMatrix(1:noGeomComp,1:noGeomComp), &
-                    & nodalParameters(1:noGeomComp))
-                  DO componentIdx=1,noGeomComp !Update all component for a nodal derivative
-                    CALL FIELD_PARAMETER_SET_UPDATE_NODE(geometricTransformationSolver%field,geometricTransformationSolver% &
-                      & fieldVariableType,FIELD_VALUES_SET_TYPE,versionIdx,derivativeIdx,userNodeNumber,componentIdx, &
-                      & nodalParametersTrans(componentIdx),err,error,*999)
-                    IF(derivativeIdx==1) THEN ! Translate nodal coordinate
-                      CALL FIELD_PARAMETER_SET_ADD_NODE(geometricTransformationSolver%field,geometricTransformationSolver% &
+            !Determine how many nodes are to be transformed
+            IF(ALLOCATED(geometricTransformationSolver%nodeUserNumbers)) THEN
+              noNodes=SIZE(geometricTransformationSolver%nodeUserNumbers)
+              transformAllNodes=.FALSE.
+            ELSE
+              noNodes=domainNodes%NUMBER_OF_NODES !Not including ghost nodes
+            ENDIF
+            DO nodeIdx=1,noNodes
+              !Get user number for the nodes to be transformed
+              IF(transformAllNodes) THEN
+                domainNodeIdx=nodeIdx
+                localNodeNumber=domainNodes%NODES(domainNodeIdx)%LOCAL_NUMBER !localNodeNumber is the same as domainNodeIdx
+                userNodeNumber=domainNodes%NODES(domainNodeIdx)%USER_NUMBER
+                nodeExist=.TRUE. ! Transform all local nodes on the domain, ghost nodes are already excluded
+                ghostNode=.FALSE.
+              ELSE
+                userNodeNumber=geometricTransformationSolver%nodeUserNumbers(nodeIdx)
+                CALL DOMAIN_TOPOLOGY_NODE_CHECK_EXISTS(domain%TOPOLOGY,userNodeNumber,nodeExist,domainNodeIdx, &
+                  & ghostNode,err,error,*999)
+              ENDIF
+              IF((nodeExist) .AND. (.NOT.ghostNode)) THEN !only transform local nodes, not ghost nodes
+                DO derivativeIdx=1,domainNodes%NODES(domainNodeIdx)%NUMBER_OF_DERIVATIVES
+                  DO versionIdx=1,domainNodes%NODES(domainNodeIdx)%DERIVATIVES(derivativeIdx)%numberOfVersions
+                    DO componentIdx=1,noGeomComp !Get all component for a nodal derivative
+                      CALL FIELD_PARAMETER_SET_GET_NODE(geometricTransformationSolver%field,geometricTransformationSolver% &
                         & fieldVariableType,FIELD_VALUES_SET_TYPE,versionIdx,derivativeIdx,userNodeNumber,componentIdx, &
-                        & transformationMatrix(componentIdx,1+noGeomComp),err,error,*999)
-                    ENDIF !derivativeIdx==1
-                    IF(transformBC) THEN
+                        & nodalParameters(componentIdx),err,error,*999)
+                    ENDDO !componentIdx
+                    !Rotate the nodal parameters
+                    nodalParametersTrans(1:noGeomComp)=MATMUL(transformationMatrix(1:noGeomComp,1:noGeomComp), &
+                      & nodalParameters(1:noGeomComp))
+                    DO componentIdx=1,noGeomComp !Update all component for a nodal derivative
                       CALL FIELD_PARAMETER_SET_UPDATE_NODE(geometricTransformationSolver%field,geometricTransformationSolver% &
-                        & fieldVariableType,FIELD_BOUNDARY_CONDITIONS_SET_TYPE,versionIdx,derivativeIdx,userNodeNumber, &
-                        & componentIdx,nodalParametersTrans(componentIdx),err,error,*999)
-                      IF(derivativeIdx==1) THEN ! Translate nodal coordinate for BC
+                        & fieldVariableType,FIELD_VALUES_SET_TYPE,versionIdx,derivativeIdx,userNodeNumber,componentIdx, &
+                        & nodalParametersTrans(componentIdx),err,error,*999)
+                      IF(derivativeIdx==1) THEN ! Translate nodal coordinate
                         CALL FIELD_PARAMETER_SET_ADD_NODE(geometricTransformationSolver%field,geometricTransformationSolver% &
-                          & fieldVariableType,FIELD_BOUNDARY_CONDITIONS_SET_TYPE,versionIdx,derivativeIdx,userNodeNumber, &
-                          & componentIdx,transformationMatrix(componentIdx,1+noGeomComp),err,error,*999)
+                          & fieldVariableType,FIELD_VALUES_SET_TYPE,versionIdx,derivativeIdx,userNodeNumber,componentIdx, &
+                          & transformationMatrix(componentIdx,1+noGeomComp),err,error,*999)
                       ENDIF !derivativeIdx==1
-                    ENDIF !transformBC
-                  ENDDO !componentIdx
-                ENDDO !versionIdx
-              ENDDO !derivativeIdx
+                      IF(transformBC) THEN
+                        CALL FIELD_PARAMETER_SET_UPDATE_NODE(geometricTransformationSolver%field,geometricTransformationSolver% &
+                          & fieldVariableType,FIELD_BOUNDARY_CONDITIONS_SET_TYPE,versionIdx,derivativeIdx,userNodeNumber, &
+                          & componentIdx,nodalParametersTrans(componentIdx),err,error,*999)
+                        IF(derivativeIdx==1) THEN ! Translate nodal coordinate for BC
+                          CALL FIELD_PARAMETER_SET_ADD_NODE(geometricTransformationSolver%field,geometricTransformationSolver% &
+                            & fieldVariableType,FIELD_BOUNDARY_CONDITIONS_SET_TYPE,versionIdx,derivativeIdx,userNodeNumber, &
+                            & componentIdx,transformationMatrix(componentIdx,1+noGeomComp),err,error,*999)
+                        ENDIF !derivativeIdx==1
+                      ENDIF !transformBC
+                    ENDDO !componentIdx
+                  ENDDO !versionIdx
+                ENDDO !derivativeIdx
+              ENDIF !only transform local nodes, not ghost nodes
             ENDDO !nodeIdx
           ELSE
             CALL FLAG_ERROR("Domain is not associated.",err,error,*999)

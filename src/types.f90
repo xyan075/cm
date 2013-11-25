@@ -2709,6 +2709,7 @@ END TYPE GENERATED_MESH_ELLIPSOID_TYPE
     REAL(DP), ALLOCATABLE :: transformationMatrices(:,:,:) !<transformationMatrices(spatialCoord+1,spatialCoord+1,incrementIdx). 4x4 matrices for 3D transformation, 3x3 for 2D transformation
     TYPE(FIELD_TYPE), POINTER :: field !<fields to which the geometric transformations are applied 
     INTEGER(INTG) :: fieldVariableType !<The field variable type index to transform
+    INTEGER(INTG), ALLOCATABLE :: nodeUserNumbers(:) !<The nodes in the field to be transformed, if not allocated, then all nodes will be transformed, user node numbers are stored here since it's easier to access nodes from user numbers
   END TYPE GeometricTransformationSolverType
 
    !>A buffer type to allow for an array of pointers to a SOLVER_TYPE \see TYPES::SOLVER_TYPE

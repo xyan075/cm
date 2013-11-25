@@ -549,6 +549,8 @@ MODULE SOLVER_ROUTINES
   
   PUBLIC Solver_GeometricTransformationMatrixSet
   
+  PUBLIC Solver_GeometricTransformationNodesSet
+  
   PUBLIC Solver_GeometricTransformationRotationSet,Solver_GeometricTransformationTranslationSet
 
   PUBLIC SOLVER_MATRICES_DYNAMIC_ASSEMBLE,SOLVER_MATRICES_STATIC_ASSEMBLE
@@ -7436,6 +7438,45 @@ CONTAINS
   !================================================================================================================================
   !
 
+  !> Sets the node numbers for a geometric transformation solver
+  SUBROUTINE Solver_GeometricTransformationNodesSet(solver,userNodeNumbers,err,error,*)
+
+    !Argument variables
+    TYPE(SOLVER_TYPE), POINTER :: solver !<A pointer the solver to set the nodes for
+    INTEGER(INTG), INTENT(IN) :: userNodeNumbers(:) !<The user node numbers totransform
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: error !<The error string
+    !Local Variables
+    INTEGER(INTG) :: noNodes
+
+    CALL ENTERS("Solver_GeometricTransformationNodesSet",err,error,*999)
+    
+    IF(ASSOCIATED(solver)) THEN
+      IF(ASSOCIATED(solver%geometricTransformationSolver)) THEN
+        noNodes=SIZE(userNodeNumbers)
+        ALLOCATE(solver%geometricTransformationSolver%nodeUserNumbers(noNodes),STAT=err)
+        IF(err/=0) CALL FLAG_ERROR("Could not allocate user nodes numbers to be stored.",err,error,*999)
+        solver%geometricTransformationSolver%nodeUserNumbers=userNodeNumbers
+      ELSE
+        CALL FLAG_ERROR("Geometric transformation solver is not associated for this solver.",err,error,*999)
+      ENDIF
+    ELSE
+      CALL FLAG_ERROR("Solver is not associated.",err,error,*999)
+    ENDIF
+        
+    CALL EXITS("Solver_GeometricTransformationNodesSet")
+    RETURN
+    
+999 CALL ERRORS("Solver_GeometricTransformationNodesSet",err,error)
+    CALL EXITS("Solver_GeometricTransformationNodesSet")
+    RETURN 1
+   
+  END SUBROUTINE Solver_GeometricTransformationNodesSet
+  
+  !
+  !================================================================================================================================
+  !
+
   !>Set the number of load increments for geometric transformation solver 
   SUBROUTINE Solver_GeometricTransformationNumberOfLoadIncrementsSet(solver,numberOfIncrements,err,error,*)
 
@@ -7696,6 +7737,7 @@ CONTAINS
         & DEALLOCATE(geometricTransformationSolver%transformationMatrices)
       geometricTransformationSolver%numberOfIncrements=0
       geometricTransformationSolver%fieldVariableType=0
+      IF(ALLOCATED(geometricTransformationSolver%nodeUserNumbers)) DEALLOCATE(geometricTransformationSolver%nodeUserNumbers)
       DEALLOCATE(geometricTransformationSolver)
     ENDIF
         

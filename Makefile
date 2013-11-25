@@ -1594,6 +1594,7 @@ $(OBJECT_DIR)/problem_routines.o	:	$(SOURCE_DIR)/problem_routines.f90 \
 	$(OBJECT_DIR)/interface_routines.o \
 	$(OBJECT_DIR)/iso_varying_string.o \
 	$(OBJECT_DIR)/kinds.o \
+	$(OBJECT_DIR)/mesh_routines.o \
 	$(OBJECT_DIR)/multi_physics_routines.o \
 	$(OBJECT_DIR)/problem_constants.o \
 	$(OBJECT_DIR)/solver_matrices_routines.o \

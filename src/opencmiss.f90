@@ -6019,6 +6019,13 @@ MODULE OPENCMISS
     MODULE PROCEDURE CMISSSolver_GeometricTransformationMatrixSetObj1
   END INTERFACE CMISSSolver_GeometricTransformationMatrixSet
   
+  INTERFACE CMISSSolver_GeometricTransformationNodesSet
+    MODULE PROCEDURE CMISSSolver_GeometricTransformationNodesSetNumber0
+    MODULE PROCEDURE CMISSSolver_GeometricTransformationNodesSetNumber1
+    MODULE PROCEDURE CMISSSolver_GeometricTransformationNodesSetObj0
+    MODULE PROCEDURE CMISSSolver_GeometricTransformationNodesSetObj1
+  END INTERFACE CMISSSolver_GeometricTransformationNodesSet
+  
   !Sets number of load increments for the transformation
   INTERFACE CMISSSolver_GeometricTransformationNumberOfLoadIncrementsSet
     MODULE PROCEDURE CMISSSolver_GeometricTransformationNoLoadIncrementsSetNumber
@@ -6422,6 +6429,8 @@ MODULE OPENCMISS
   PUBLIC CMISSSolver_DynamicTimesSet
   
   PUBLIC CMISSSolver_GeometricTransformationArbitraryPathSet,CMISSSolver_GeometricTransformationClear
+  
+  PUBLIC CMISSSolver_GeometricTransformationNodesSet
   
   PUBLIC CMISSSolver_GeometricTransformationNumberOfLoadIncrementsSet
   
@@ -49545,6 +49554,162 @@ CONTAINS
     RETURN
 
   END SUBROUTINE CMISSSolver_GeometricTransformationMatrixSetObj1
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Sets the node number for a geometric transformation identified by an user number.
+  SUBROUTINE CMISSSolver_GeometricTransformationNodesSetNumber0(problemUserNumber,controlLoopIdentifier,solverIndex, &
+      & NodesUserNumber,err)
+
+    !Argument variables
+    INTEGER(INTG), INTENT(IN) :: problemUserNumber !<The user number of the problem number with the solver to set the field for.
+    INTEGER(INTG), INTENT(IN) :: controlLoopIdentifier !<The control loop identifier with the solver to set the field for.
+    INTEGER(INTG), INTENT(IN) :: solverIndex !<The solver index for the geometric transformation solver.
+    INTEGER(INTG), INTENT(IN) :: NodesUserNumber !<The user node number to transform
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code.
+    !Local variables
+    TYPE(PROBLEM_TYPE), POINTER :: problem
+    TYPE(SOLVER_TYPE), POINTER :: solver
+    TYPE(FIELD_TYPE), POINTER :: field
+    TYPE(REGION_TYPE), POINTER :: region
+    TYPE(VARYING_STRING) :: localError
+
+    CALL ENTERS("CMISSSolver_GeometricTransformationNodesSetNumber0",err,error,*999)
+
+    NULLIFY(problem)
+    NULLIFY(solver)
+    NULLIFY(field)
+    NULLIFY(region)
+    CALL PROBLEM_USER_NUMBER_FIND(problemUserNumber,problem,err,error,*999)
+    IF(ASSOCIATED(problem)) THEN
+      CALL PROBLEM_SOLVER_GET(problem,controlLoopIdentifier,solverIndex,solver,err,error,*999)
+      IF(ASSOCIATED(solver)) THEN
+        CALL Solver_GeometricTransformationNodesSet(solver,[NodesUserNumber],err,error,*999)
+      ELSE
+        localError="A solver with index of "//TRIM(NUMBER_TO_VSTRING(solverIndex,"*",err,error))// &
+          & " does not exist."
+        CALL FLAG_ERROR(localError,err,error,*999)
+      ENDIF
+    ELSE
+      localError="A problem with an user number of "//TRIM(NUMBER_TO_VSTRING(problemUserNumber,"*",err,error))// &
+        & " does not exist."
+      CALL FLAG_ERROR(localError,err,error,*999)
+    ENDIF
+
+    CALL EXITS("CMISSSolver_GeometricTransformationNodesSetNumber0")
+    RETURN
+999 CALL ERRORS("CMISSSolver_GeometricTransformationNodesSetNumber0",err,error)
+    CALL EXITS("CMISSSolver_GeometricTransformationNodesSetNumber0")
+    CALL CMISS_HANDLE_ERROR(err,error)
+    RETURN
+
+  END SUBROUTINE CMISSSolver_GeometricTransformationNodesSetNumber0
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Sets the node numbers for a geometric transformation identified by an user number.
+  SUBROUTINE CMISSSolver_GeometricTransformationNodesSetNumber1(problemUserNumber,controlLoopIdentifier,solverIndex, &
+      & NodesUserNumbers,err)
+
+    !Argument variables
+    INTEGER(INTG), INTENT(IN) :: problemUserNumber !<The user number of the problem number with the solver to set the field for.
+    INTEGER(INTG), INTENT(IN) :: controlLoopIdentifier !<The control loop identifier with the solver to set the field for.
+    INTEGER(INTG), INTENT(IN) :: solverIndex !<The solver index for the geometric transformation solver.
+    INTEGER(INTG), INTENT(IN) :: NodesUserNumbers(:) !<The user node numbers to transform
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code.
+    !Local variables
+    TYPE(PROBLEM_TYPE), POINTER :: problem
+    TYPE(SOLVER_TYPE), POINTER :: solver
+    TYPE(FIELD_TYPE), POINTER :: field
+    TYPE(REGION_TYPE), POINTER :: region
+    TYPE(VARYING_STRING) :: localError
+
+    CALL ENTERS("CMISSSolver_GeometricTransformationNodesSetNumber1",err,error,*999)
+
+    NULLIFY(problem)
+    NULLIFY(solver)
+    NULLIFY(field)
+    NULLIFY(region)
+    CALL PROBLEM_USER_NUMBER_FIND(problemUserNumber,problem,err,error,*999)
+    IF(ASSOCIATED(problem)) THEN
+      CALL PROBLEM_SOLVER_GET(problem,controlLoopIdentifier,solverIndex,solver,err,error,*999)
+      IF(ASSOCIATED(solver)) THEN
+        CALL Solver_GeometricTransformationNodesSet(solver,NodesUserNumbers,err,error,*999)
+      ELSE
+        localError="A solver with index of "//TRIM(NUMBER_TO_VSTRING(solverIndex,"*",err,error))// &
+          & " does not exist."
+        CALL FLAG_ERROR(localError,err,error,*999)
+      ENDIF
+    ELSE
+      localError="A problem with an user number of "//TRIM(NUMBER_TO_VSTRING(problemUserNumber,"*",err,error))// &
+        & " does not exist."
+      CALL FLAG_ERROR(localError,err,error,*999)
+    ENDIF
+
+    CALL EXITS("CMISSSolver_GeometricTransformationNodesSetNumber1")
+    RETURN
+999 CALL ERRORS("CMISSSolver_GeometricTransformationNodesSetNumber1",err,error)
+    CALL EXITS("CMISSSolver_GeometricTransformationNodesSetNumber1")
+    CALL CMISS_HANDLE_ERROR(err,error)
+    RETURN
+
+  END SUBROUTINE CMISSSolver_GeometricTransformationNodesSetNumber1
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Sets the node number for a geometric transformation solver identified by an object.
+  SUBROUTINE CMISSSolver_GeometricTransformationNodesSetObj0(solver,NodesUserNumber,err)
+
+    !Argument variables
+    TYPE(CMISSSolverType), INTENT(IN) :: solver !<The geometric transformation solver to set the field for.
+    INTEGER(INTG), INTENT(IN) :: NodesUserNumber !<The user node number to transform
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code.
+    !Local variables
+
+    CALL ENTERS("CMISSSolver_GeometricTransformationNodesSetObj0",err,error,*999)
+    
+    CALL Solver_GeometricTransformationNodesSet(solver%solver,[NodesUserNumber],err,error,*999)
+    
+    CALL EXITS("CMISSSolver_GeometricTransformationNodesSetObj0")
+    RETURN
+999 CALL ERRORS("CMISSSolver_GeometricTransformationNodesSetObj0",err,error)
+    CALL EXITS("CMISSSolver_GeometricTransformationNodesSetObj0")
+    CALL CMISS_HANDLE_ERROR(err,error)
+    RETURN
+
+  END SUBROUTINE CMISSSolver_GeometricTransformationNodesSetObj0
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Sets the node numbers for a geometric transformation solver identified by an object.
+  SUBROUTINE CMISSSolver_GeometricTransformationNodesSetObj1(solver,NodesUserNumbers,err)
+
+    !Argument variables
+    TYPE(CMISSSolverType), INTENT(IN) :: solver !<The geometric transformation solver to set the field for.
+    INTEGER(INTG), INTENT(IN) :: NodesUserNumbers(:) !<The user node numbers to transform
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code.
+    !Local variables
+
+    CALL ENTERS("CMISSSolver_GeometricTransformationNodesSetObj1",err,error,*999)
+    
+    CALL Solver_GeometricTransformationNodesSet(solver%solver,NodesUserNumbers,err,error,*999)
+    
+    CALL EXITS("CMISSSolver_GeometricTransformationNodesSetObj1")
+    RETURN
+999 CALL ERRORS("CMISSSolver_GeometricTransformationNodesSetObj1",err,error)
+    CALL EXITS("CMISSSolver_GeometricTransformationNodesSetObj1")
+    CALL CMISS_HANDLE_ERROR(err,error)
+    RETURN
+
+  END SUBROUTINE CMISSSolver_GeometricTransformationNodesSetObj1
   
   !
   !================================================================================================================================
