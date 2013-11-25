@@ -1328,10 +1328,12 @@ CONTAINS
                 !Copy the current solution vector to the dependent field
                 CALL SOLVER_VARIABLES_FIELD_UPDATE(SOLVER,ERR,ERROR,*999)
                 !Calculate the Jacobian
-                DO equations_set_idx=1,SOLVER_MAPPING%NUMBER_OF_EQUATIONS_SETS
+                DO equations_set_idx=1,1!SOLVER_MAPPING%NUMBER_OF_EQUATIONS_SETS
                   EQUATIONS_SET=>SOLVER_MAPPING%EQUATIONS_SETS(equations_set_idx)%PTR
                   !Assemble the equations for linear problems
                   CALL EQUATIONS_SET_JACOBIAN_EVALUATE(EQUATIONS_SET,ERR,ERROR,*999)
+!                  CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"********************Jacobian evaluation******************",ERR,ERROR,*999)
+                  ! Xiani  commented out
                   CALL EQUATIONS_SET_JACOBIAN_CONTACT_UPDATE_STATIC_FEM(EQUATIONS_SET,ERR,ERROR,*999)
                 ENDDO !equations_set_idx
                 !Update interface matrices
@@ -1388,6 +1390,8 @@ CONTAINS
     TYPE(INTERFACE_TYPE), POINTER :: interface !<A pointer to the interface 
     TYPE(INTERFACE_CONDITION_TYPE), POINTER :: interfaceCondition  !<A pointer to the equations set to evaluate the element Jacobian for
     TYPE(InterfacePointsConnectivityType), POINTER :: pointsConnectivity !<A pointer to the interface points connectivity
+    TYPE(InterfaceContactMetricsType), POINTER :: contactMetrics 
+    TYPE(InterfaceContactPointMetricsType), POINTER :: contactPointMetrics
     TYPE(FIELD_TYPE), POINTER :: dependentField
     TYPE(FIELD_VARIABLE_TYPE), POINTER :: dependentVariable
     TYPE(BASIS_TYPE), POINTER :: rowDependentBasis,colDependentBasis,rowDomainFaceBasis,colDomainFaceBasis
@@ -1399,13 +1403,16 @@ CONTAINS
     TYPE(VARYING_STRING) :: localError
     INTEGER(INTG) :: jacobianNumber,bodyIdx,equationSetNumber,interfaceGlobalNumber,interfaceConditionGlobalNumber
     INTEGER(INTG) :: globalDataPointNum,rowElementNum,colElementNum, &
-      & rowConnectedFace,colConnectedFace,fieldComponent, &
+      & rowConnectedFace,colConnectedFace,rowFieldComp, colFieldComp, &
       & rowMeshComp,colMeshComp,rowDecompositionFaceNumber,colDecompositionFaceNumber, &
       & rowLocalFaceNodeIdx,colLocalFaceNodeIdx,rowFaceLocalElemNode,colFaceLocalElemNode,rowGlobalNode,colGlobalNode, &
       & rowFaceDerivative,colFaceDerivative,rowDerivative,colDerivative,rowVersion,colVersion,rowIdx,colIdx, &
       & subMatrix,rowBodyIdx,colBodyIdx
+    INTEGER(INTG) :: xiIdxAlpha,xiIdxBeta,xiIdxGamma
     REAL(DP) :: matrixValue,rowPhi,colPhi
+    REAL(DP) :: coefficient,forceTerm,geometricTerm,tempA,tempB
     REAL(DP) :: rowXi(2),colXi(2) !\todo generalise xi allocations for 1D,2D and 3D points connectivity
+    REAL(DP) :: kappa(2,2),phiDeriRow(2),phiDeriCol(2),TRow(2),TCol(2),NRow(2),NCol(2),DRow(2),DCol(2)
   
     CALL ENTERS("EQUATIONS_SET_JACOBIAN_CONTACT_UPDATE_STATIC_FEM",ERR,ERROR,*999)
 
@@ -1424,6 +1431,7 @@ CONTAINS
             interface=>EQUATIONS_SET%REGION%PARENT_REGION%INTERFACES%INTERFACES(interfaceGlobalNumber)%PTR
             interfaceCondition=>interface%INTERFACE_CONDITIONS%INTERFACE_CONDITIONS(interfaceConditionGlobalNumber)%PTR
             pointsConnectivity=>interface%pointsConnectivity
+            contactMetrics=>interfaceCondition%interfaceContactMetrics
 
             dependentVariable=>dependentField%VARIABLES(FIELD_U_VARIABLE_TYPE)
             jacobianNumber=1
@@ -1446,28 +1454,48 @@ CONTAINS
               CASE(1) !Contact subMatrix11
                 rowBodyIdx=1
                 colBodyIdx=1
+                coefficient=1;
               CASE(2) !Contact subMatrix12
                 rowBodyIdx=1
                 colBodyIdx=2
+                coefficient=-1;
               CASE(3) !Contact subMatrix21
                 rowBodyIdx=2
                 colBodyIdx=1
+                coefficient=-1;
               CASE(4) !Contact subMatrix22
                 rowBodyIdx=2
                 colBodyIdx=2
+                coefficient=1;
               END SELECT
               !Loop over each data point and find the connected element and their dofs
               DO globalDataPointNum=1,SIZE(pointsConnectivity%pointsConnectivity,1)
+                ! Get the metric structure for this contact point
+                contactPointMetrics=>contactMetrics%contactPointMetrics(globalDataPointNum)
                 rowElementNum=pointsConnectivity%pointsConnectivity(globalDataPointNum,rowBodyIdx)%coupledMeshElementNumber
                 rowConnectedFace=pointsConnectivity%pointsConnectivity(globalDataPointNum,rowBodyIdx)%elementLineFaceNumber
                 rowXi=pointsConnectivity%pointsConnectivity(globalDataPointNum,rowBodyIdx)%reducedXi
                 colElementNum=pointsConnectivity%pointsConnectivity(globalDataPointNum,colBodyIdx)%coupledMeshElementNumber
                 colConnectedFace=pointsConnectivity%pointsConnectivity(globalDataPointNum,colBodyIdx)%elementLineFaceNumber
                 colXi=pointsConnectivity%pointsConnectivity(globalDataPointNum,colBodyIdx)%reducedXi
+                
+                !################################################################################################################
+                !Calculate quantities that do not vary w.r.t xyz or node
+                kappa=0.0_DP
+                !Calculate kappa (see Jae's cm implementation)
+                DO xiIdxAlpha=1,2
+                  DO xiIdxBeta=1,2
+                    kappa(xiIdxAlpha,xiIdxBeta)= & 
+                      & DOT_PRODUCT(contactPointMetrics%tangentDerivatives(xiIdxAlpha,xiIdxBeta,:), &
+                      & contactPointMetrics%normal(:))
+                  ENDDO !xiIdxBeta
+                ENDDO !xiIdxAlpha
+                
+                !################################################################################################################
                 !Find the row dof 
-                DO fieldComponent=1,3
+                DO rowFieldComp=1,3
                   rowMeshComp=dependentField%VARIABLE_TYPE_MAP(FIELD_U_VARIABLE_TYPE)%PTR% &
-                    & COMPONENTS(fieldComponent)%MESH_COMPONENT_NUMBER
+                    & COMPONENTS(rowFieldComp)%MESH_COMPONENT_NUMBER
                   rowDependentBasis=>dependentField%DECOMPOSITION%DOMAIN(rowMeshComp)%PTR% &
                     & TOPOLOGY%ELEMENTS%ELEMENTS(rowElementNum)%BASIS
                   rowDecompositionFaceNumber=dependentField%DECOMPOSITION%TOPOLOGY% &
@@ -1484,62 +1512,145 @@ CONTAINS
                         & DERIVATIVE_NUMBERS_IN_LOCAL_FACE(rowFaceDerivative,rowLocalFaceNodeIdx,rowConnectedFace)
                       rowVersion=dependentField%DECOMPOSITION%DOMAIN(rowMeshComp)%PTR%TOPOLOGY% &
                         & ELEMENTS%ELEMENTS(rowElementNum)%elementVersions(rowDerivative,rowFaceLocalElemNode)
+                      !Find dof associated with this particular field, component, node, derivative and version.
+                      rowIdx=dependentVariable%components(rowFieldComp)%PARAM_TO_DOF_MAP%NODE_PARAM2DOF_MAP%NODES( &
+                        & rowGlobalNode)%DERIVATIVES(rowDerivative)%VERSIONS(rowVersion)
 
+                      !###########################################################################################################
+                      !Calculate row metrics
+                      
                       !Evaluate the basis at the projected/connected xi
                       rowPhi=BASIS_EVALUATE_XI(rowDomainFaceBasis,rowDomainFaceBasis% &
                         & ELEMENT_PARAMETER_INDEX(rowFaceDerivative,rowLocalFaceNodeIdx),NO_PART_DERIV,rowXi,err,error)
+                      !\todo: generalise contact xi direction, at the moment assume in xi1 and xi2
+                      phiDeriRow(1)=BASIS_EVALUATE_XI(rowDomainFaceBasis,rowDomainFaceBasis% &
+                        & ELEMENT_PARAMETER_INDEX(rowFaceDerivative,rowLocalFaceNodeIdx),PART_DERIV_S1,rowXi,err,error)
+                      phiDeriRow(2)=BASIS_EVALUATE_XI(rowDomainFaceBasis,rowDomainFaceBasis% &
+                        & ELEMENT_PARAMETER_INDEX(rowFaceDerivative,rowLocalFaceNodeIdx),PART_DERIV_S2,rowXi,err,error)  
+                        
+                      !NRow TRow changes at every row dof
+                      DO xiIdxAlpha=1,2
+                        IF (rowBodyIdx==1) THEN
+                          NRow(xiIdxAlpha)=0.0_DP
+                          TRow(xiIdxAlpha)=rowPhi*contactPointMetrics%tangents(xiIdxAlpha,rowFieldComp)
+                        ELSE
+                          NRow(xiIdxAlpha)=-phiDeriRow(xiIdxAlpha)*contactPointMetrics%normal(rowFieldComp) 
+                          TRow(xiIdxAlpha)=-rowPhi*contactPointMetrics%tangents(xiIdxAlpha,rowFieldComp)
+                        ENDIF !rowBodyIdx
+                      ENDDO !xiIdxAlpha    
+                      
+                      !DRow varies at every row dof
+                      DRow=0.0_DP
+                      DO xiIdxAlpha=1,2
+                        DO xiIdxBeta=1,2
+                          DRow(xiIdxAlpha)=DRow(xiIdxAlpha)+contactPointMetrics%inverseA(xiIdxAlpha,xiIdxBeta)* &
+                            & (TRow(xiIdxBeta)+contactPointMetrics%signedGapNormal*NRow(xiIdxBeta))
+                        ENDDO !xiIdxBeta
+                      ENDDO !xiIdxAlpha   
+                      
+                      !###########################################################################################################
 
-                      !Find dof associated with this particular field, component, node, derivative and version.
-                      rowIdx=dependentVariable%components(fieldComponent)%PARAM_TO_DOF_MAP%NODE_PARAM2DOF_MAP%NODES( &
-                        & rowGlobalNode)%DERIVATIVES(rowDerivative)%VERSIONS(rowVersion)
+                      DO colFieldComp=1,3
+                        !Find the col 
+                        colMeshComp=dependentField%VARIABLE_TYPE_MAP(FIELD_U_VARIABLE_TYPE)%PTR% &
+                          & COMPONENTS(colFieldComp)%MESH_COMPONENT_NUMBER
+                        colDependentBasis=>dependentField%DECOMPOSITION%DOMAIN(colMeshComp)%PTR% &
+                          & TOPOLOGY%ELEMENTS%ELEMENTS(colElementNum)%BASIS
+                        colDecompositionFaceNumber=dependentField%DECOMPOSITION%TOPOLOGY% &
+                          & ELEMENTS%ELEMENTS(colElementNum)%ELEMENT_FACES(colConnectedFace)
+                        colDomainFace=>dependentField%DECOMPOSITION%DOMAIN(colMeshComp)%PTR%TOPOLOGY% &
+                          & FACES%FACES(colDecompositionFaceNumber)
+                        colDomainFaceBasis=>colDomainFace%BASIS
+                        DO colLocalFaceNodeIdx=1,colDependentBasis%NUMBER_OF_NODES_IN_LOCAL_FACE(colConnectedFace)
+                          colFaceLocalElemNode=colDependentBasis%NODE_NUMBERS_IN_LOCAL_FACE(colLocalFaceNodeIdx,colConnectedFace)
+                          colGlobalNode=dependentField%DECOMPOSITION%DOMAIN(colMeshComp)%PTR%TOPOLOGY% &
+                            & ELEMENTS%ELEMENTS(colElementNum)%ELEMENT_NODES(colFaceLocalElemNode)
+                          DO colFaceDerivative=1,colDomainFace%BASIS%NUMBER_OF_DERIVATIVES(colLocalFaceNodeIdx)
+                            colDerivative=colDependentBasis% &
+                              & DERIVATIVE_NUMBERS_IN_LOCAL_FACE(colFaceDerivative,colLocalFaceNodeIdx,colConnectedFace)
+                            colVersion=dependentField%DECOMPOSITION%DOMAIN(colMeshComp)%PTR%TOPOLOGY% &
+                              & ELEMENTS%ELEMENTS(colElementNum)%elementVersions(colDerivative,colFaceLocalElemNode)
+                            !Find dof associated with this particular field, component, node, derivative and version.
+                            colIdx=dependentVariable%components(colFieldComp)%PARAM_TO_DOF_MAP%NODE_PARAM2DOF_MAP%NODES( &
+                              & colGlobalNode)%DERIVATIVES(colDerivative)%VERSIONS(colVersion)
+                            
+                            !#####################################################################################################
+                            !Calculate col metrics
+                            
+                            !Evaluate the basis at the projected/connected xi
+                            colPhi=BASIS_EVALUATE_XI(colDomainFaceBasis,colDomainFaceBasis% &
+                              & ELEMENT_PARAMETER_INDEX(colFaceDerivative,colLocalFaceNodeIdx),NO_PART_DERIV,colXi,err,error)
+                            phiDeriCol(1)=BASIS_EVALUATE_XI(colDomainFaceBasis,colDomainFaceBasis% &
+                              & ELEMENT_PARAMETER_INDEX(colFaceDerivative,colLocalFaceNodeIdx),PART_DERIV_S1,colXi,err,error)
+                            phiDeriCol(2)=BASIS_EVALUATE_XI(colDomainFaceBasis,colDomainFaceBasis% &
+                              & ELEMENT_PARAMETER_INDEX(colFaceDerivative,colLocalFaceNodeIdx),PART_DERIV_S1,colXi,err,error) 
+                            
+                            !NCol and TCol changes at every col dof
+                            DO xiIdxAlpha=1,2
+                              IF (colBodyIdx==1) THEN
+                                NCol(xiIdxAlpha)=0.0_DP
+                                TCol(xiIdxAlpha)=colPhi*contactPointMetrics%tangents(xiIdxAlpha,colFieldComp)
+                              ELSE
+                                NCol(xiIdxAlpha)=-phiDeriCol(xiIdxAlpha)*contactPointMetrics%normal(colFieldComp) 
+                                TCol(xiIdxAlpha)=-colPhi*contactPointMetrics%tangents(xiIdxAlpha,colFieldComp)
+                              ENDIF
+                            ENDDO      
+                            
+                            !DCol varies at every col dof
+                            DCol=0.0_DP
+                            DO xiIdxAlpha=1,2
+                              DO xiIdxBeta=1,2
+                                DCol(xiIdxAlpha)=DCol(xiIdxAlpha)+contactPointMetrics%inverseA(xiIdxAlpha,xiIdxBeta)* &
+                                  & (TCol(xiIdxBeta)+contactPointMetrics%signedGapNormal*NCol(xiIdxBeta))
+                              ENDDO !xiIdxBeta
+                            ENDDO !xiIdxAlpha  
+                            
+                            !#####################################################################################################  
+                            
+                            !Calculate the force term --idx 1 for frictionless, normal direction
+                            forceTerm=coefficient*rowPhi*contactPointMetrics%normal(rowFieldComp)* & 
+                              & colPhi*contactPointMetrics%normal(colFieldComp)*contactPointMetrics%contactStiffness(1) 
+                            
+                            !Calculate geometric term, see Jae's thesis equation 4.40
+                            geometricTerm=0.0_DP
+                            DO xiIdxGamma=1,2
+                              DO xiIdxBeta=1,2
+                                tempA=0.0_DP
+                                tempB=0.0_DP
+                                DO xiIdxAlpha=1,2
+                                  tempA=tempA+kappa(xiIdxAlpha,xiIdxGamma)*DRow(xiIdxAlpha) !For row variable
+                                  tempB=tempB+kappa(xiIdxAlpha,xiIdxBeta)*DCol(xiIdxAlpha) !For col variable
+                                ENDDO !xiIdxGamma
+                                geometricTerm=geometricTerm+contactPointMetrics%signedGapNormal* &
+                                  & contactPointMetrics%covariantMetricTensor(xiIdxGamma,xiIdxBeta)* &
+                                  & (NRow(xiIdxGamma)-tempA)*(NCol(xiIdxBeta)-tempB) + &
+                                  & kappa(xiIdxBeta,xiIdxGamma)*DRow(xiIdxGamma)*DCol(xiIdxBeta)
+                              ENDDO !xiIdxBeta
+                              geometricTerm=geometricTerm-DRow(xiIdxGamma)*NCol(xiIdxGamma)-NRow(xiIdxGamma)*DCol(xiIdxGamma)
+                            ENDDO !xiIdxAlpha  
+                            
+                            matrixValue=forceTerm+geometricTerm*contactPointMetrics%contactForce
 
-                      !Find the col 
-                      colMeshComp=dependentField%VARIABLE_TYPE_MAP(FIELD_U_VARIABLE_TYPE)%PTR% &
-                        & COMPONENTS(fieldComponent)%MESH_COMPONENT_NUMBER
-                      colDependentBasis=>dependentField%DECOMPOSITION%DOMAIN(colMeshComp)%PTR% &
-                        & TOPOLOGY%ELEMENTS%ELEMENTS(colElementNum)%BASIS
-                      colDecompositionFaceNumber=dependentField%DECOMPOSITION%TOPOLOGY% &
-                        & ELEMENTS%ELEMENTS(colElementNum)%ELEMENT_FACES(colConnectedFace)
-                      colDomainFace=>dependentField%DECOMPOSITION%DOMAIN(colMeshComp)%PTR%TOPOLOGY% &
-                        & FACES%FACES(colDecompositionFaceNumber)
-                      colDomainFaceBasis=>colDomainFace%BASIS
-                      DO colLocalFaceNodeIdx=1,colDependentBasis%NUMBER_OF_NODES_IN_LOCAL_FACE(colConnectedFace)
-                        colFaceLocalElemNode=colDependentBasis%NODE_NUMBERS_IN_LOCAL_FACE(colLocalFaceNodeIdx,colConnectedFace)
-                        colGlobalNode=dependentField%DECOMPOSITION%DOMAIN(colMeshComp)%PTR%TOPOLOGY% &
-                          & ELEMENTS%ELEMENTS(colElementNum)%ELEMENT_NODES(colFaceLocalElemNode)
-                        DO colFaceDerivative=1,colDomainFace%BASIS%NUMBER_OF_DERIVATIVES(colLocalFaceNodeIdx)
-                          colDerivative=colDependentBasis% &
-                            & DERIVATIVE_NUMBERS_IN_LOCAL_FACE(colFaceDerivative,colLocalFaceNodeIdx,colConnectedFace)
-                          colVersion=dependentField%DECOMPOSITION%DOMAIN(colMeshComp)%PTR%TOPOLOGY% &
-                            & ELEMENTS%ELEMENTS(colElementNum)%elementVersions(colDerivative,colFaceLocalElemNode)
+!                            SELECT CASE(subMatrix)
+!                            CASE(1) !Contact subMatrix11
+!                              matrixValue=0.0_DP !rowPhi*colPhi
+!                            CASE(2) !Contact subMatrix12
+!                              matrixValue=0.0_DP !rowPhi*colPhi
+!                            CASE(3) !Contact subMatrix21
+!                              matrixValue=0.0_DP !rowPhi*colPhi
+!                            CASE(4) !Contact subMatrix22
+!                              matrixValue=0.0_DP !rowPhi*colPhi
+!                            END SELECT
 
-                          !Evaluate the basis at the projected/connected xi
-                          colPhi=BASIS_EVALUATE_XI(colDomainFaceBasis,colDomainFaceBasis% &
-                            & ELEMENT_PARAMETER_INDEX(colFaceDerivative,colLocalFaceNodeIdx),NO_PART_DERIV,colXi,err,error)
+                            !Multiply by scale factors
+                            CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,rowIdx,colIdx,matrixValue,err,error,*999)
 
-                          !Find dof associated with this particular field, component, node, derivative and version.
-                          colIdx=dependentVariable%components(fieldComponent)%PARAM_TO_DOF_MAP%NODE_PARAM2DOF_MAP%NODES( &
-                            & colGlobalNode)%DERIVATIVES(colDerivative)%VERSIONS(colVersion)
-
-                          SELECT CASE(subMatrix)
-                          CASE(1) !Contact subMatrix11
-                            matrixValue=0.0_DP !rowPhi*colPhi
-                          CASE(2) !Contact subMatrix12
-                            matrixValue=0.0_DP !rowPhi*colPhi
-                          CASE(3) !Contact subMatrix21
-                            matrixValue=0.0_DP !rowPhi*colPhi
-                          CASE(4) !Contact subMatrix22
-                            matrixValue=0.0_DP !rowPhi*colPhi
-                          END SELECT
-
-                          CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,rowIdx,colIdx,matrixValue,err,error,*999)
-
-                        ENDDO !colFaceDerivative
-                      ENDDO !colLocalFaceNodeIdx
-
+                          ENDDO !colFaceDerivative
+                        ENDDO !colLocalFaceNodeIdx
+                      ENDDO !colFieldComp
                     ENDDO !rowFaceDerivative
                   ENDDO !rowLocalFaceNodeIdx
-                ENDDO !fieldComponent
+                ENDDO !rowFieldComp
               ENDDO !globalDataPointNum
 
             ENDDO !subMatrix
@@ -1680,7 +1791,9 @@ CONTAINS
                   CASE(EQUATIONS_NONLINEAR)
                     !Evaluate the residual for nonlinear equations
                     CALL EQUATIONS_SET_RESIDUAL_EVALUATE(EQUATIONS_SET,ERR,ERROR,*999)
-                    CALL EQUATIONS_SET_RESIDUAL_CONTACT_UPDATE_STATIC_FEM(EQUATIONS_SET,ERR,ERROR,*999)
+!                    CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"********************Residual evaluation****************",ERR,ERROR,*999)
+                    ! Xiani commented out to compile
+!                    CALL EQUATIONS_SET_RESIDUAL_CONTACT_UPDATE_STATIC_FEM(EQUATIONS_SET,ERR,ERROR,*999)
                   END SELECT
                 ENDDO !equations_set_idx
                 !Note that the linear interface matrices are not required to be updated since these matrices do not change
@@ -1739,18 +1852,21 @@ CONTAINS
     TYPE(INTERFACE_TYPE), POINTER :: interface !<A pointer to the interface 
     TYPE(INTERFACE_CONDITION_TYPE), POINTER :: interfaceCondition  !<A pointer to the equations set to evaluate the element Jacobian for
     TYPE(InterfacePointsConnectivityType), POINTER :: pointsConnectivity !<A pointer to the interface points connectivity
-    TYPE(FIELD_TYPE), POINTER :: dependentField
+    TYPE(FIELD_TYPE), POINTER :: dependentField,penaltyField
     TYPE(BASIS_TYPE), POINTER :: dependentBasis,domainFaceBasis
     TYPE(DOMAIN_FACE_TYPE), POINTER :: domainFace
     TYPE(EQUATIONS_SET_TYPE), POINTER :: multipleRegionEquationsSet
     TYPE(FIELD_VARIABLE_TYPE), POINTER :: residualVariable
     TYPE(FIELD_PARAMETER_SET_TYPE), POINTER :: residualParameterSet
+    TYPE(InterfaceContactMetricsType), POINTER :: contactMetrics 
+    TYPE(InterfaceContactPointMetricsType), POINTER :: contactPointMetrics
     TYPE(VARYING_STRING) :: localError
     INTEGER(INTG) :: bodyIdx,equationSetNumber,interfaceGlobalNumber,interfaceConditionGlobalNumber
     INTEGER(INTG) :: globalDataPointNum,elementNum,connectedFace,fieldComponent,meshComp, &
       & decompositionFaceNumber,localFaceNodeIdx,faceLocalElemNode,globalNode,faceDerivative,derivative,versionNumber, &
       & residualVariableIdx,dofIdx
-    REAL(DP) :: residualValue,phi
+    INTEGER(INTG) :: coefficient,contactStiffness,ContPtElementNum,penaltyPtDof
+    REAL(DP) :: residualValue,phi,contactForce
     REAL(DP) :: xi(2) !\todo generalise xi allocations for 1D,2D and 3D points connectivity
 
     CALL ENTERS("EQUATIONS_SET_RESIDUAL_CONTACT_UPDATE_STATIC_FEM",ERR,ERROR,*999)
@@ -1771,6 +1887,8 @@ CONTAINS
             interface=>EQUATIONS_SET%REGION%PARENT_REGION%INTERFACES%INTERFACES(interfaceGlobalNumber)%PTR
             interfaceCondition=>interface%INTERFACE_CONDITIONS%INTERFACE_CONDITIONS(interfaceConditionGlobalNumber)%PTR
             pointsConnectivity=>interface%pointsConnectivity
+            
+            contactMetrics=>interfaceCondition%interfaceContactMetrics
 
             residualVariableIdx=1
             residualVariable=>nonlinearMapping%RESIDUAL_VARIABLES(residualVariableIdx)%PTR
@@ -1783,6 +1901,16 @@ CONTAINS
                 equationSetNumber=1
                 multipleRegionEquationsSet=>EQUATIONS_SET%REGION%PARENT_REGION%SUB_REGIONS(bodyIdx)%PTR%EQUATIONS_SETS% &
                   & EQUATIONS_SETS(equationSetNumber)%PTR
+                
+                ! Residual is +ve for body 1 and -ve for body 2  
+                SELECT CASE(bodyIdx)
+                CASE(1)
+                  coefficient=1;
+                CASE(2)
+                  coefficient=-1;
+                CASE DEFAULT
+                  CALL FLAG_ERROR("Contact for 3 or more bodies is not implemented",err,error,*999)
+                END SELECT 
 
                 !Since we are computing the contact term in a single region, we do not need to determine the dependent field
                 !through the interface condition. We can simply use the dependentField pointer defined above
@@ -1794,6 +1922,7 @@ CONTAINS
                   elementNum=pointsConnectivity%pointsConnectivity(globalDataPointNum,bodyIdx)%coupledMeshElementNumber
                   connectedFace=pointsConnectivity%pointsConnectivity(globalDataPointNum,bodyIdx)%elementLineFaceNumber
                   xi=pointsConnectivity%pointsConnectivity(globalDataPointNum,bodyIdx)%reducedXi
+                  contactPointMetrics=>contactMetrics%contactPointMetrics(globalDataPointNum)
                   DO fieldComponent=1,3
                     meshComp=dependentField%VARIABLE_TYPE_MAP(FIELD_U_VARIABLE_TYPE)%PTR% &
                       & COMPONENTS(fieldComponent)%MESH_COMPONENT_NUMBER
@@ -1818,10 +1947,11 @@ CONTAINS
                         !Find dof associated with this particular field, component, node, derivative and version.
                         dofIdx=residualVariable%components(fieldComponent)%PARAM_TO_DOF_MAP%NODE_PARAM2DOF_MAP%NODES(globalNode)% &
                           & DERIVATIVES(derivative)%VERSIONS(versionNumber)
-
-                        residualValue=0.0_DP !phi
+                        ! \todo: 1 is for the frictionless contact, normal contact stiffness 
+                        contactPointMetrics%contactForce=contactPointMetrics%signedGapNormal*contactPointMetrics%contactStiffness(1)
+                        residualValue=0.0_DP
+!                        residualValue=coefficient*phi*contactPointMetrics%normal(fieldComponent)*contactPointMetrics%contactForce
                         CALL DISTRIBUTED_VECTOR_VALUES_ADD(nonlinearMatrices%RESIDUAL,dofIdx,residualValue,err,error,*999)
-
                       ENDDO !faceDerivative
                     ENDDO !localFaceNodeIdx
                   ENDDO !fieldComponent
@@ -3067,6 +3197,7 @@ CONTAINS
             CALL TAU_PHASE_START(PHASE)
 #endif
             INTERFACE_CONDITION=>SOLVER_MAPPING%INTERFACE_CONDITIONS(interface_condition_idx)%PTR
+            CALL FrictionlessContact_contactMetricsCalculate(INTERFACE_CONDITION,err,error,*999)
             CALL INTERFACE_CONDITION_ASSEMBLE(INTERFACE_CONDITION,ERR,ERROR,*999)
 #ifdef TAUPROF
             CALL TAU_PHASE_STOP(PHASE)
@@ -3152,6 +3283,7 @@ CONTAINS
           !A solver with CellML equations.
           CALL PROBLEM_CELLML_EQUATIONS_SOLVE(SOLVER%CELLML_EQUATIONS,ERR,ERROR,*999)
         ELSEIF(SOLVER%SOLVE_TYPE==SOLVER_GEOMETRIC_TRANSFORMATION_TYPE) THEN
+          CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"********************Geometric transformation******************",ERR,ERROR,*999)
           CALL Problem_SolverGeometricTransformationSolve(SOLVER%geometricTransformationSolver,ERR,ERROR,*999)
         ELSE
           CALL FLAG_ERROR("Solver does not have any equations associated.",ERR,ERROR,*999)

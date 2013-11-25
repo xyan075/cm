@@ -1558,7 +1558,7 @@ CONTAINS
             
             !Data reprojection and update points connectivity information with the projection results
             dataProjection=>dataPoints%DATA_PROJECTIONS(projectionBodyIdx+1)%PTR !projectionBodyIdx+1 since the first projection is for interface
-            CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"ProjectedBodyDataProjectionLabel",ERR,ERROR,*999)
+!            CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"ProjectedBodyDataProjectionLabel",ERR,ERROR,*999)
             CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,dataProjection%label,ERR,ERROR,*999)
             IF(ASSOCIATED(dataProjection)) THEN
               dependentFieldProjection=>interfaceCondition%DEPENDENT%FIELD_VARIABLES(projectionBodyIdx)%PTR%FIELD
@@ -2163,7 +2163,7 @@ CONTAINS
     IF(ASSOCIATED(InterfacePointsConnectivity)) THEN
       IF(ASSOCIATED(dataProjection)) THEN
         IF(dataProjection%DATA_PROJECTION_FINISHED) THEN
-          WRITE(*,*) "InterfacePointsConnectivity_UpdateFromProjection"
+!          WRITE(*,*) "InterfacePointsConnectivity_UpdateFromProjection"
           DO dataPointIdx=1,SIZE(dataProjection%DATA_PROJECTION_RESULTS,1) !Update reduced xi location, projection element number and element face/line number with projection result
             dataProjectionResult=>dataProjection%DATA_PROJECTION_RESULTS(dataPointIdx)
             InterfacePointsConnectivity%pointsConnectivity(dataPointIdx,coupledMeshIndex)%reducedXi(:)= &

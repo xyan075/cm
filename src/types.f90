@@ -2139,7 +2139,9 @@ END TYPE GENERATED_MESH_ELLIPSOID_TYPE
   TYPE InterfaceContactPointMetricsType
     REAL(DP), ALLOCATABLE :: normal(:) !<normals(CoordinateIdx). Normal vector at each contact point 
     REAL(DP), ALLOCATABLE :: tangents(:,:) !<tangents(xiIdx,CoordinateIdx). Tangent vectors 1 and 2 at each contact point 
+    REAL(DP) :: contactStiffness(3) !1-normal contact stiffness, 2-tangent contact stiffness 1, 3-tangent contact stiffness 2
     REAL(DP) :: signedGapNormal !<signedGapNormal. signed scalar gap in the normal direction at each contact point
+    REAL(DP) :: contactForce !< current estimate of contact force = contact stiffness * signedGapNormal
     REAL(DP), ALLOCATABLE :: tangentDerivatives(:,:,:) !<tangentDerivatives(xiIdxTangent,xiIdxDerivative,CoordinateIdx). del(tau)/del(xi) at each contact point
     REAL(DP), ALLOCATABLE :: covariantMetricTensor(:,:) !<covariantMetricTensor(xiIdx1,xiIdx2). Covariant metric tensor at each contact point
     REAL(DP), ALLOCATABLE :: contravariantMetricTensor(:,:) !<contravariantMetricTensor(xiIdx1,xiIdx2). Contravariant metric tensor at each contact point
@@ -2151,6 +2153,7 @@ END TYPE GENERATED_MESH_ELLIPSOID_TYPE
     INTEGER(INTG) :: numberOfContactPts !<The number of contact points at the interface
     TYPE(InterfaceContactPointMetricsType), ALLOCATABLE :: contactPointMetrics(:) !contactPointMetrics(contactPointIdx)
     LOGICAL, ALLOCATABLE :: orthogonallyProjected(:) !orthogonallyProjected(contactPointIdx). If a contact point has been orthogonally projected
+    LOGICAL, ALLOCATABLE :: inContact(:) !inContact(contactPointIdx). If in contact for at a contact point
   END TYPE InterfaceContactMetricsType
 
   !>Contains information for the interface condition data.
