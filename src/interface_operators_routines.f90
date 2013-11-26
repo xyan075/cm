@@ -76,6 +76,8 @@ MODULE INTERFACE_OPERATORS_ROUTINES
   PUBLIC FrictionlessContact_contactMetricsCalculate
   
   PUBLIC InterfaceContactMetrics_Initialise, InterfaceContactMetrics_Finalise
+  
+  PUBLIC InterfaceContactMetrics_IterationAddGeoTermSet
 
 CONTAINS
 
@@ -940,6 +942,8 @@ CONTAINS
     
     IF(ASSOCIATED(contactMetrics)) THEN
       contactMetrics%numberOfContactPts=0
+      contactMetrics%addGeometricTerm=.FALSE.
+      contactMetrics%iterationGeometricTerm=0
       IF(ALLOCATED(contactMetrics%orthogonallyProjected)) DEALLOCATE(contactMetrics%orthogonallyProjected)
       IF(ALLOCATED(contactMetrics%inContact)) DEALLOCATE(contactMetrics%inContact)
       IF(ALLOCATED(contactMetrics%contactPointMetrics)) THEN
@@ -1014,6 +1018,8 @@ CONTAINS
                     CALL InterfaceContactMetrics_ContactPointInitialise(contactMetrics%contactPointMetrics(pointIdx), &
                       & numberOfGeometricComp, numberOfDimensions,err,error,*999)
                   ENDDO !pointIdx
+                  contactMetrics%iterationGeometricTerm=0
+                  contactMetrics%addGeometricTerm=.FALSE.
                 ELSE
                   CALL FLAG_ERROR("Interface geometric field variables are not associated.",err,error,*999)
                 ENDIF
@@ -1047,11 +1053,53 @@ CONTAINS
   !================================================================================================================================
   !
 
-  !>Calculates the metrics of contact points for linearisation 
-  SUBROUTINE FrictionlessContact_ContactMetricsCalculate(interfaceCondition,err,error,*)
+  !>Initilise contact point metrics 
+  SUBROUTINE InterfaceContactMetrics_IterationAddGeoTermSet(interfaceCondition,iterationNumber,err,error,*)
 
     !Argument variables
     TYPE(INTERFACE_CONDITION_TYPE), POINTER :: interfaceCondition !<A pointer to the interface condition
+    INTEGER(INTG), INTENT(IN) :: iterationNumber !<The iteration where geometric term is added
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code 
+    TYPE(VARYING_STRING), INTENT(OUT) :: error !<The error string
+    !Local Variables
+    TYPE(InterfaceContactMetricsType), POINTER :: interfaceContactMetrics
+    
+    CALL ENTERS("InterfaceContactMetrics_IterationAddGeoTermSet",err,error,*999)
+    
+    IF(ASSOCIATED(interfaceCondition)) THEN
+      IF(interfaceCondition%INTERFACE_CONDITION_FINISHED) THEN
+        interfaceContactMetrics=>interfaceCondition%interfaceContactMetrics
+        IF(ASSOCIATED(interfaceContactMetrics)) THEN
+          interfaceContactMetrics%iterationGeometricTerm=iterationNumber
+        ELSE
+          CALL FLAG_ERROR("Interface contact metrics is not associated.",err,error,*999)
+        ENDIF
+      ELSE
+        CALL FLAG_ERROR("Interface condition is not finished.",err,error,*999)
+      ENDIF
+      
+    ELSE
+      CALL FLAG_ERROR("Interface condition is not associated.",err,error,*999)
+    ENDIF
+    
+    CALL EXITS("InterfaceContactMetrics_IterationAddGeoTermSet")
+    RETURN
+999 CALL ERRORS("InterfaceContactMetrics_IterationAddGeoTermSet",err,error)
+    CALL EXITS("InterfaceContactMetrics_IterationAddGeoTermSet")
+    RETURN 1
+    
+  END SUBROUTINE InterfaceContactMetrics_IterationAddGeoTermSet
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Calculates the metrics of contact points for linearisation 
+  SUBROUTINE FrictionlessContact_ContactMetricsCalculate(interfaceCondition,iterationNumber,err,error,*)
+
+    !Argument variables
+    TYPE(INTERFACE_CONDITION_TYPE), POINTER :: interfaceCondition !<A pointer to the interface condition
+    INTEGER(INTG), INTENT(IN) :: iterationNumber !<The current iteration number in non-linear solver
     INTEGER(INTG), INTENT(OUT) :: err !<The error code 
     TYPE(VARYING_STRING), INTENT(OUT) :: error !<The error string
     !Local Variables
@@ -1089,6 +1137,11 @@ CONTAINS
               IF(ASSOCIATED(contactMetrics)) THEN
                 penaltyField=>interfaceCondition%PENALTY%PENALTY_FIELD
                 IF(ASSOCIATED(penaltyField)) THEN
+                  !Determine if geometric term is going to be added in this iteration
+                  contactMetrics%addGeometricTerm=.FALSE.
+                  IF((iterationNumber>=contactMetrics%iterationGeometricTerm) .AND. (contactMetrics%iterationGeometricTerm>0)) THEN
+                    contactMetrics%addGeometricTerm=.TRUE.
+                  ENDIF
 
                   !#################################################################################################################
                   
@@ -1168,14 +1221,8 @@ CONTAINS
                       ! Calculate gap vector
                       gapsComponents(1:noGeoComp)=dataPoints%DATA_POINTS(contactPtIdx)%position(1:noGeoComp)- &
                         & interpolatedPoint%VALUES(1:noGeoComp,NO_PART_DERIV)
-                        
-                      ! Store the second derivative information
-                      contactPointMetrics%tangentDerivatives(1,1,:)=interpolatedPoint%VALUES(1:noGeoComp,PART_DERIV_S1_S1)
-                      contactPointMetrics%tangentDerivatives(1,2,:)=interpolatedPoint%VALUES(1:noGeoComp,PART_DERIV_S1_S2)
-                      contactPointMetrics%tangentDerivatives(2,1,:)=contactPointMetrics%tangentDerivatives(1,2,:)
-                      contactPointMetrics%tangentDerivatives(2,2,:)=interpolatedPoint%VALUES(1:noGeoComp,PART_DERIV_S2_S2)
                       
-                      !#################################################################################################################
+                      !#############################################################################################################
                       
                       ! Calculate normal and tangent vectors defined on the master surface, assumed 3D mesh in contact
                       ! Determine the sign of normal inward/outward
@@ -1190,33 +1237,41 @@ CONTAINS
                       CALL FIELD_POSITION_NORMAL_TANGENTS_CALCULATE_INT_PT_METRIC(interpolatedPointsMetrics &
                         & (FIELD_U_VARIABLE_TYPE)%PTR,reverseNormal,junkPosition, &
                         & contactPointMetrics%normal,tangents,err,error,*999)
-                      ! Re-populate tangent vectors into the appropriate format
-                      contactPointMetrics%tangents(1,1:noGeoComp)=tangents(1:noGeoComp,1)
-                      contactPointMetrics%tangents(2,1:noGeoComp)=tangents(1:noGeoComp,2)
-                      ! Store the covariant and contravariant information
-                      contactPointMetrics%covariantMetricTensor=interpolatedPointsMetrics(FIELD_U_VARIABLE_TYPE)%PTR% &
-                        & GL(1:noXi,1:noXi)
-                      contactPointMetrics%contravariantMetricTensor=interpolatedPointsMetrics(FIELD_U_VARIABLE_TYPE)%PTR% &
-                        & GU(1:noXi,1:noXi)
-                      
                       ! Calculate signed gap
                       contactPointMetrics%signedGapNormal=DOT_PRODUCT(gapsComponents,contactPointMetrics%normal)
                       IF(contactPointMetrics%signedGapNormal>ZERO_TOLERANCE) contactMetrics%inContact=.TRUE.
+                      
+                      !#############################################################################################################
+                      
+                      ! These terms are only required if geometric term is added to the contact stiffness matrix
+                      IF(contactMetrics%addGeometricTerm) THEN
+                        ! Store the second derivative information
+                        contactPointMetrics%tangentDerivatives(1,1,:)=interpolatedPoint%VALUES(1:noGeoComp,PART_DERIV_S1_S1)
+                        contactPointMetrics%tangentDerivatives(1,2,:)=interpolatedPoint%VALUES(1:noGeoComp,PART_DERIV_S1_S2)
+                        contactPointMetrics%tangentDerivatives(2,1,:)=contactPointMetrics%tangentDerivatives(1,2,:)
+                        contactPointMetrics%tangentDerivatives(2,2,:)=interpolatedPoint%VALUES(1:noGeoComp,PART_DERIV_S2_S2)
                         
-                      !###################################################################################################################
-                      
-                      ! Calculate inverse A
-                      ! Calculate A first
-                      A=0.0_DP !Initialise to be 0.0
-                      DO i=1,noXi
-                        DO j=1,noXi
-                          A(i,j)=contactPointMetrics%covariantMetricTensor(i,j)+ DOT_PRODUCT(contactPointMetrics%normal, &
-                            & contactPointMetrics%tangentDerivatives(i,j,:))*contactPointMetrics%signedGapNormal
+                        ! Re-populate tangent vectors into the appropriate format
+                        contactPointMetrics%tangents(1,1:noGeoComp)=tangents(1:noGeoComp,1)
+                        contactPointMetrics%tangents(2,1:noGeoComp)=tangents(1:noGeoComp,2)
+                        ! Store the covariant and contravariant information
+                        contactPointMetrics%covariantMetricTensor=interpolatedPointsMetrics(FIELD_U_VARIABLE_TYPE)%PTR% &
+                          & GL(1:noXi,1:noXi)
+                        contactPointMetrics%contravariantMetricTensor=interpolatedPointsMetrics(FIELD_U_VARIABLE_TYPE)%PTR% &
+                          & GU(1:noXi,1:noXi)
+                        
+                        ! Calculate inverse A
+                        ! Calculate A first
+                        A=0.0_DP !Initialise to be 0.0
+                        DO i=1,noXi
+                          DO j=1,noXi
+                            A(i,j)=contactPointMetrics%covariantMetricTensor(i,j)+ DOT_PRODUCT(contactPointMetrics%normal, &
+                              & contactPointMetrics%tangentDerivatives(i,j,:))*contactPointMetrics%signedGapNormal
+                          ENDDO
                         ENDDO
-                      ENDDO
-                      CALL INVERT(A,contactPointMetrics%inverseA,detA,ERR,ERROR,*999)
-                      
-                      !###################################################################################################################
+                        CALL INVERT(A,contactPointMetrics%inverseA,detA,ERR,ERROR,*999)
+                      ENDIF !add geometric term
+                      !#############################################################################################################
                     ENDIF !orthogonally projected
                   ENDDO !contactPtIdx
                   CALL FIELD_INTERPOLATED_POINTS_METRICS_FINALISE(interpolatedPointsMetrics,err,error,*999)

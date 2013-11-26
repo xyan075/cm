@@ -1481,17 +1481,18 @@ CONTAINS
                 colXi=pointsConnectivity%pointsConnectivity(globalDataPointNum,colBodyIdx)%reducedXi
                 
                 !################################################################################################################
-                !Calculate quantities that do not vary w.r.t xyz or node
-                kappa=0.0_DP
-                !Calculate kappa (see Jae's cm implementation)
-                DO xiIdxAlpha=1,2
-                  DO xiIdxBeta=1,2
-                    kappa(xiIdxAlpha,xiIdxBeta)= & 
-                      & DOT_PRODUCT(contactPointMetrics%tangentDerivatives(xiIdxAlpha,xiIdxBeta,:), &
-                      & contactPointMetrics%normal(:))
-                  ENDDO !xiIdxBeta
-                ENDDO !xiIdxAlpha
-                
+                IF(contactMetrics%addGeometricTerm) THEN !Only calculate if geometric term is included
+                  !Calculate quantities that do not vary w.r.t xyz or node
+                  kappa=0.0_DP
+                  !Calculate kappa (see Jae's cm implementation)
+                  DO xiIdxAlpha=1,2
+                    DO xiIdxBeta=1,2
+                      kappa(xiIdxAlpha,xiIdxBeta)= & 
+                        & DOT_PRODUCT(contactPointMetrics%tangentDerivatives(xiIdxAlpha,xiIdxBeta,:), &
+                        & contactPointMetrics%normal(:))
+                    ENDDO !xiIdxBeta
+                  ENDDO !xiIdxAlpha
+                ENDIF
                 !################################################################################################################
                 rowPreviousFaceNo=0
                 !Find the row dof 
@@ -1527,39 +1528,39 @@ CONTAINS
                       !Find dof associated with this particular field, component, node, derivative and version.
                       rowIdx=dependentVariable%components(rowFieldComp)%PARAM_TO_DOF_MAP%NODE_PARAM2DOF_MAP%NODES( &
                         & rowGlobalNode)%DERIVATIVES(rowDerivative)%VERSIONS(rowVersion)
-
-                      !###########################################################################################################
-                      !Calculate row metrics
-                      
                       !Evaluate the basis at the projected/connected xi
                       rowPhi=BASIS_EVALUATE_XI(rowDomainFaceBasis,rowDomainFaceBasis% &
                         & ELEMENT_PARAMETER_INDEX(rowFaceDerivative,rowLocalFaceNodeIdx),NO_PART_DERIV,rowXi,err,error)
-                      !\todo: generalise contact xi direction, at the moment assume in xi1 and xi2
-                      phiDeriRow(1)=BASIS_EVALUATE_XI(rowDomainFaceBasis,rowDomainFaceBasis% &
-                        & ELEMENT_PARAMETER_INDEX(rowFaceDerivative,rowLocalFaceNodeIdx),PART_DERIV_S1,rowXi,err,error)
-                      phiDeriRow(2)=BASIS_EVALUATE_XI(rowDomainFaceBasis,rowDomainFaceBasis% &
-                        & ELEMENT_PARAMETER_INDEX(rowFaceDerivative,rowLocalFaceNodeIdx),PART_DERIV_S2,rowXi,err,error)  
+                      
+                      !###########################################################################################################
+                      IF(contactMetrics%addGeometricTerm) THEN !Only calculate if geometric term is included
+                        !Calculate row metrics
+                        !\todo: generalise contact xi direction, at the moment assume in xi1 and xi2
+                        phiDeriRow(1)=BASIS_EVALUATE_XI(rowDomainFaceBasis,rowDomainFaceBasis% &
+                          & ELEMENT_PARAMETER_INDEX(rowFaceDerivative,rowLocalFaceNodeIdx),PART_DERIV_S1,rowXi,err,error)
+                        phiDeriRow(2)=BASIS_EVALUATE_XI(rowDomainFaceBasis,rowDomainFaceBasis% &
+                          & ELEMENT_PARAMETER_INDEX(rowFaceDerivative,rowLocalFaceNodeIdx),PART_DERIV_S2,rowXi,err,error)  
+                          
+                        !NRow TRow changes at every row dof
+                        DO xiIdxAlpha=1,2
+                          IF (rowBodyIdx==1) THEN
+                            NRow(xiIdxAlpha)=0.0_DP
+                            TRow(xiIdxAlpha)=rowPhi*contactPointMetrics%tangents(xiIdxAlpha,rowFieldComp)
+                          ELSE
+                            NRow(xiIdxAlpha)=-phiDeriRow(xiIdxAlpha)*contactPointMetrics%normal(rowFieldComp) 
+                            TRow(xiIdxAlpha)=-rowPhi*contactPointMetrics%tangents(xiIdxAlpha,rowFieldComp)
+                          ENDIF !rowBodyIdx
+                        ENDDO !xiIdxAlpha    
                         
-                      !NRow TRow changes at every row dof
-                      DO xiIdxAlpha=1,2
-                        IF (rowBodyIdx==1) THEN
-                          NRow(xiIdxAlpha)=0.0_DP
-                          TRow(xiIdxAlpha)=rowPhi*contactPointMetrics%tangents(xiIdxAlpha,rowFieldComp)
-                        ELSE
-                          NRow(xiIdxAlpha)=-phiDeriRow(xiIdxAlpha)*contactPointMetrics%normal(rowFieldComp) 
-                          TRow(xiIdxAlpha)=-rowPhi*contactPointMetrics%tangents(xiIdxAlpha,rowFieldComp)
-                        ENDIF !rowBodyIdx
-                      ENDDO !xiIdxAlpha    
-                      
-                      !DRow varies at every row dof
-                      DRow=0.0_DP
-                      DO xiIdxAlpha=1,2
-                        DO xiIdxBeta=1,2
-                          DRow(xiIdxAlpha)=DRow(xiIdxAlpha)+contactPointMetrics%inverseA(xiIdxAlpha,xiIdxBeta)* &
-                            & (TRow(xiIdxBeta)+contactPointMetrics%signedGapNormal*NRow(xiIdxBeta))
-                        ENDDO !xiIdxBeta
-                      ENDDO !xiIdxAlpha   
-                      
+                        !DRow varies at every row dof
+                        DRow=0.0_DP
+                        DO xiIdxAlpha=1,2
+                          DO xiIdxBeta=1,2
+                            DRow(xiIdxAlpha)=DRow(xiIdxAlpha)+contactPointMetrics%inverseA(xiIdxAlpha,xiIdxBeta)* &
+                              & (TRow(xiIdxBeta)+contactPointMetrics%signedGapNormal*NRow(xiIdxBeta))
+                          ENDDO !xiIdxBeta
+                        ENDDO !xiIdxAlpha   
+                      ENDIF
                       !###########################################################################################################
 
                       colPreviousFaceNo=0
@@ -1596,66 +1597,69 @@ CONTAINS
                             !Find dof associated with this particular field, component, node, derivative and version.
                             colIdx=dependentVariable%components(colFieldComp)%PARAM_TO_DOF_MAP%NODE_PARAM2DOF_MAP%NODES( &
                               & colGlobalNode)%DERIVATIVES(colDerivative)%VERSIONS(colVersion)
-                            
-                            !#####################################################################################################
-                            !Calculate col metrics
-                            
                             !Evaluate the basis at the projected/connected xi
                             colPhi=BASIS_EVALUATE_XI(colDomainFaceBasis,colDomainFaceBasis% &
                               & ELEMENT_PARAMETER_INDEX(colFaceDerivative,colLocalFaceNodeIdx),NO_PART_DERIV,colXi,err,error)
-                            phiDeriCol(1)=BASIS_EVALUATE_XI(colDomainFaceBasis,colDomainFaceBasis% &
-                              & ELEMENT_PARAMETER_INDEX(colFaceDerivative,colLocalFaceNodeIdx),PART_DERIV_S1,colXi,err,error)
-                            phiDeriCol(2)=BASIS_EVALUATE_XI(colDomainFaceBasis,colDomainFaceBasis% &
-                              & ELEMENT_PARAMETER_INDEX(colFaceDerivative,colLocalFaceNodeIdx),PART_DERIV_S1,colXi,err,error) 
-                            
-                            !NCol and TCol changes at every col dof
-                            DO xiIdxAlpha=1,2
-                              IF (colBodyIdx==1) THEN
-                                NCol(xiIdxAlpha)=0.0_DP
-                                TCol(xiIdxAlpha)=colPhi*contactPointMetrics%tangents(xiIdxAlpha,colFieldComp)
-                              ELSE
-                                NCol(xiIdxAlpha)=-phiDeriCol(xiIdxAlpha)*contactPointMetrics%normal(colFieldComp) 
-                                TCol(xiIdxAlpha)=-colPhi*contactPointMetrics%tangents(xiIdxAlpha,colFieldComp)
-                              ENDIF
-                            ENDDO      
-                            
-                            !DCol varies at every col dof
-                            DCol=0.0_DP
-                            DO xiIdxAlpha=1,2
-                              DO xiIdxBeta=1,2
-                                DCol(xiIdxAlpha)=DCol(xiIdxAlpha)+contactPointMetrics%inverseA(xiIdxAlpha,xiIdxBeta)* &
-                                  & (TCol(xiIdxBeta)+contactPointMetrics%signedGapNormal*NCol(xiIdxBeta))
-                              ENDDO !xiIdxBeta
-                            ENDDO !xiIdxAlpha  
-                            
-                            !#####################################################################################################  
                             
                             !Calculate the force term --idx 1 for frictionless, normal direction
                             forceTerm=coefficient*rowPhi*contactPointMetrics%normal(rowFieldComp)* & 
                               & colPhi*contactPointMetrics%normal(colFieldComp)*contactPointMetrics%contactStiffness(1) 
-                            
-                            !Calculate geometric term, see Jae's thesis equation 4.40
                             geometricTerm=0.0_DP
-                            DO xiIdxGamma=1,2
-                              DO xiIdxBeta=1,2
-                                tempA=0.0_DP
-                                tempB=0.0_DP
-                                DO xiIdxAlpha=1,2
-                                  tempA=tempA+kappa(xiIdxAlpha,xiIdxGamma)*DRow(xiIdxAlpha) !For row variable
-                                  tempB=tempB+kappa(xiIdxAlpha,xiIdxBeta)*DCol(xiIdxAlpha) !For col variable
-                                ENDDO !xiIdxGamma
-                                geometricTerm=geometricTerm+contactPointMetrics%signedGapNormal* &
-                                  & contactPointMetrics%covariantMetricTensor(xiIdxGamma,xiIdxBeta)* &
-                                  & (NRow(xiIdxGamma)-tempA)*(NCol(xiIdxBeta)-tempB) + &
-                                  & kappa(xiIdxBeta,xiIdxGamma)*DRow(xiIdxGamma)*DCol(xiIdxBeta)
-                              ENDDO !xiIdxBeta
-                              geometricTerm=geometricTerm-DRow(xiIdxGamma)*NCol(xiIdxGamma)-NRow(xiIdxGamma)*DCol(xiIdxGamma)
-                            ENDDO !xiIdxAlpha  
                             
-                            matrixValue=forceTerm+geometricTerm*contactPointMetrics%contactForce
+                            !#####################################################################################################
+                            IF(contactMetrics%addGeometricTerm) THEN !Only calculate if geometric term is included
+                              !Calculate col metrics
+                              phiDeriCol(1)=BASIS_EVALUATE_XI(colDomainFaceBasis,colDomainFaceBasis% &
+                                & ELEMENT_PARAMETER_INDEX(colFaceDerivative,colLocalFaceNodeIdx),PART_DERIV_S1,colXi,err,error)
+                              phiDeriCol(2)=BASIS_EVALUATE_XI(colDomainFaceBasis,colDomainFaceBasis% &
+                                & ELEMENT_PARAMETER_INDEX(colFaceDerivative,colLocalFaceNodeIdx),PART_DERIV_S1,colXi,err,error) 
+                              
+                              !NCol and TCol changes at every col dof
+                              DO xiIdxAlpha=1,2
+                                IF (colBodyIdx==1) THEN
+                                  NCol(xiIdxAlpha)=0.0_DP
+                                  TCol(xiIdxAlpha)=colPhi*contactPointMetrics%tangents(xiIdxAlpha,colFieldComp)
+                                ELSE
+                                  NCol(xiIdxAlpha)=-phiDeriCol(xiIdxAlpha)*contactPointMetrics%normal(colFieldComp) 
+                                  TCol(xiIdxAlpha)=-colPhi*contactPointMetrics%tangents(xiIdxAlpha,colFieldComp)
+                                ENDIF
+                              ENDDO      
+                              
+                              !DCol varies at every col dof
+                              DCol=0.0_DP
+                              DO xiIdxAlpha=1,2
+                                DO xiIdxBeta=1,2
+                                  DCol(xiIdxAlpha)=DCol(xiIdxAlpha)+contactPointMetrics%inverseA(xiIdxAlpha,xiIdxBeta)* &
+                                    & (TCol(xiIdxBeta)+contactPointMetrics%signedGapNormal*NCol(xiIdxBeta))
+                                ENDDO !xiIdxBeta
+                              ENDDO !xiIdxAlpha  
+                              
+                              !****************************************************************************************************
+                              
+                              !Calculate geometric term, see Jae's thesis equation 4.40
+                              geometricTerm=0.0_DP
+                              DO xiIdxGamma=1,2
+                                DO xiIdxBeta=1,2
+                                  tempA=0.0_DP
+                                  tempB=0.0_DP
+                                  DO xiIdxAlpha=1,2
+                                    tempA=tempA+kappa(xiIdxAlpha,xiIdxGamma)*DRow(xiIdxAlpha) !For row variable
+                                    tempB=tempB+kappa(xiIdxAlpha,xiIdxBeta)*DCol(xiIdxAlpha) !For col variable
+                                  ENDDO !xiIdxGamma
+                                  geometricTerm=geometricTerm+contactPointMetrics%signedGapNormal* &
+                                    & contactPointMetrics%covariantMetricTensor(xiIdxGamma,xiIdxBeta)* &
+                                    & (NRow(xiIdxGamma)-tempA)*(NCol(xiIdxBeta)-tempB) + &
+                                    & kappa(xiIdxBeta,xiIdxGamma)*DRow(xiIdxGamma)*DCol(xiIdxBeta)
+                                ENDDO !xiIdxBeta
+                                geometricTerm=geometricTerm-DRow(xiIdxGamma)*NCol(xiIdxGamma)-NRow(xiIdxGamma)*DCol(xiIdxGamma)
+                              ENDDO !xiIdxAlpha  
+                              
+                              geometricTerm=geometricTerm*contactPointMetrics%contactForce
+                            ENDIF
+                            !#####################################################################################################  
                             
                             !Multiply by the scale factor
-                            matrixValue=matrixValue*rowDofScaleFactor*colDofScaleFactor
+                            matrixValue=(forceTerm+geometricTerm)*rowDofScaleFactor*colDofScaleFactor
 
                             !Multiply by scale factors
                             CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,rowIdx,colIdx,matrixValue,err,error,*999)
@@ -3225,7 +3229,7 @@ CONTAINS
             CALL TAU_PHASE_START(PHASE)
 #endif
             INTERFACE_CONDITION=>SOLVER_MAPPING%INTERFACE_CONDITIONS(interface_condition_idx)%PTR
-            CALL FrictionlessContact_contactMetricsCalculate(INTERFACE_CONDITION,err,error,*999)
+!            CALL FrictionlessContact_contactMetricsCalculate(INTERFACE_CONDITION,err,error,*999)
             CALL INTERFACE_CONDITION_ASSEMBLE(INTERFACE_CONDITION,ERR,ERROR,*999)
 #ifdef TAUPROF
             CALL TAU_PHASE_STOP(PHASE)
@@ -3913,7 +3917,7 @@ CONTAINS
                               IF(ASSOCIATED(interface)) THEN
                                 CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"**************** Reproject! ****************",ERR,ERROR,*999)
                                 CALL InterfacePointsConnectivity_DataReprojection(interface,interfaceCondition,err,error,*999)
-                                CALL FrictionlessContact_contactMetricsCalculate(interfaceCondition,err,error,*999)
+                                CALL FrictionlessContact_contactMetricsCalculate(interfaceCondition,iterationNumber,err,error,*999)
                                 CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"************** Contact residual! ***********",ERR,ERROR,*999)
                                 CALL EQUATIONS_SET_RESIDUAL_CONTACT_UPDATE_STATIC_FEM(solverMapping%EQUATIONS_SETS(1)%PTR,&
                                   & ERR,ERROR,*999)
