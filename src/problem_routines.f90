@@ -47,6 +47,7 @@ MODULE PROBLEM_ROUTINES
   USE BASE_ROUTINES
   USE BIOELECTRIC_ROUTINES
   USE CLASSICAL_FIELD_ROUTINES
+  USE CMISS_PETSC
   USE CONTROL_LOOP_ROUTINES
   USE DISTRIBUTED_MATRIX_VECTOR
   USE ELASTICITY_ROUTINES
@@ -1729,7 +1730,7 @@ CONTAINS
 
     !\todo Temporarily added the variables below to allow the interface condition to be used in the single region contact problem
     !to be manually specified. Need to Generalise.
-    INTEGER(INTG) :: equationsSetGlobalNumber,interfaceGlobalNumber,interfaceConditionGlobalNumber 
+    INTEGER(INTG) :: equationsSetGlobalNumber,interfaceGlobalNumber,interfaceConditionGlobalNumber,iterationNumber
     TYPE(INTERFACE_CONDITION_TYPE), POINTER :: interfaceCondition
     TYPE(INTERFACE_TYPE), POINTER :: interface
     
@@ -1838,11 +1839,14 @@ CONTAINS
                     IF(interfaceCondition%integrationType==INTERFACE_CONDITION_DATA_POINTS_INTEGRATION) THEN !Only reproject for data point interpolated field
                       interface=>interfaceCondition%INTERFACE
                       IF(ASSOCIATED(interface)) THEN
+                        CALL PETSC_SNESGETITERATIONNUMBER(SOLVER%NONLINEAR_SOLVER%NEWTON_SOLVER%LINESEARCH_SOLVER%SNES, &
+                          & iterationNumber,ERR,ERROR,*999)
                         CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"********************  Reproject! ****************",ERR,ERROR,*999)
                         CALL InterfacePointsConnectivity_DataReprojection(interface,interfaceCondition,err,error,*999)
-                        CALL FrictionlessContact_contactMetricsCalculate(interfaceCondition,1,err,error,*999)
+                        ! iteration+1 since iterationNumber is counting the iterations completed
+                        CALL FrictionlessContact_contactMetricsCalculate(interfaceCondition,iterationNumber+1,err,error,*999)
                         CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"********************  Contact residual! ***********",ERR,ERROR,*999)
-                        CALL EQUATIONS_SET_RESIDUAL_CONTACT_UPDATE_STATIC_FEM(SOLVER_MAPPING%EQUATIONS_SETS(1)%PTR,&
+                        CALL EQUATIONS_SET_RESIDUAL_CONTACT_UPDATE_STATIC_FEM(SOLVER_MAPPING%EQUATIONS_SETS(equations_set_idx)%PTR,&
                           & ERR,ERROR,*999)
                         !\todo Temporarily commented out INTERFACE_CONDITION_ASSEMBLE as the interface matrices are not
                         ! required for the single region contact problem. Needs to generalised.

@@ -1578,6 +1578,7 @@ $(OBJECT_DIR)/problem_routines.o	:	$(SOURCE_DIR)/problem_routines.f90 \
 	$(OBJECT_DIR)/base_routines.o \
 	$(OBJECT_DIR)/bioelectric_routines.o \
 	$(OBJECT_DIR)/classical_field_routines.o \
+	$(OBJECT_DIR)/cmiss_petsc.o \
 	$(OBJECT_DIR)/control_loop_routines.o \
 	$(OBJECT_DIR)/distributed_matrix_vector.o \
 	$(OBJECT_DIR)/elasticity_routines.o \

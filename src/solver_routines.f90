@@ -14717,6 +14717,7 @@ CONTAINS
                             & " is invalid."
                           CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
                         END SELECT
+                        CALL PETSC_SNESGETITERATIONNUMBER(LINESEARCH_SOLVER%SNES,NUMBER_ITERATIONS,ERR,ERROR,*999)
                         !Solve the nonlinear equations
                         CALL PETSC_SNESSOLVE(LINESEARCH_SOLVER%SNES,RHS_VECTOR%PETSC%VECTOR,SOLVER_VECTOR%PETSC%VECTOR, &
                           & ERR,ERROR,*999)
