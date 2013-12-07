@@ -1841,13 +1841,18 @@ CONTAINS
                       IF(ASSOCIATED(interface)) THEN
                         CALL PETSC_SNESGETITERATIONNUMBER(SOLVER%NONLINEAR_SOLVER%NEWTON_SOLVER%LINESEARCH_SOLVER%SNES, &
                           & iterationNumber,ERR,ERROR,*999)
-                        CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"********************  Reproject! ****************",ERR,ERROR,*999)
-                        CALL InterfacePointsConnectivity_DataReprojection(interface,interfaceCondition,err,error,*999)
+                          IF(SOLVER%SOLVERS%CONTROL_LOOP%PROBLEM%SUBTYPE==PROBLEM_FE_CONTACT_TRANSFORM_REPROJECT_SUBTYPE .OR. &
+                              & SOLVER%SOLVERS%CONTROL_LOOP%PROBLEM%SUBTYPE==PROBLEM_FE_CONTACT_REPROJECT_SUBTYPE .OR.  &
+                              & iterationNumber==0) THEN
+                            CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"********************  Reproject! ***************",ERR,ERROR,*999)
+                            CALL InterfacePointsConnectivity_DataReprojection(interface,interfaceCondition,err,error,*999)
+                          ENDIF
                         ! iteration+1 since iterationNumber is counting the iterations completed
                         CALL FrictionlessContact_contactMetricsCalculate(interfaceCondition,iterationNumber+1,err,error,*999)
                         CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"********************  Contact residual! ***********",ERR,ERROR,*999)
-                        CALL EQUATIONS_SET_RESIDUAL_CONTACT_UPDATE_STATIC_FEM(SOLVER_MAPPING%EQUATIONS_SETS(equations_set_idx)%PTR,&
-                          & ERR,ERROR,*999)
+                        !\todo: generalise when LHS mapping is in place
+                        CALL EQUATIONS_SET_RESIDUAL_CONTACT_UPDATE_STATIC_FEM(SOLVER_MAPPING% &
+                          & EQUATIONS_SETS(equationsSetGlobalNumber)%PTR,ERR,ERROR,*999)
                         !\todo Temporarily commented out INTERFACE_CONDITION_ASSEMBLE as the interface matrices are not
                         ! required for the single region contact problem. Needs to generalised.
                         !CALL INTERFACE_CONDITION_ASSEMBLE(interfaceCondition,err,error,*999)
@@ -1926,7 +1931,7 @@ CONTAINS
     TYPE(FIELD_TYPE), POINTER :: dependentField,penaltyField
     TYPE(BASIS_TYPE), POINTER :: dependentBasis,domainFaceBasis
     TYPE(DOMAIN_FACE_TYPE), POINTER :: domainFace
-    TYPE(EQUATIONS_SET_TYPE), POINTER :: multipleRegionEquationsSet
+!    TYPE(EQUATIONS_SET_TYPE), POINTER :: multipleRegionEquationsSet
     TYPE(FIELD_VARIABLE_TYPE), POINTER :: residualVariable
     TYPE(FIELD_PARAMETER_SET_TYPE), POINTER :: residualParameterSet
     TYPE(InterfaceContactMetricsType), POINTER :: contactMetrics 
@@ -1970,8 +1975,8 @@ CONTAINS
                 !Setup pointer to the equation set of the coupled bodies which are setup in thier own separate regions
                 !(note that these regions has not been added to the solver equations and are merely here for convinence if needed)
                 equationSetNumber=1
-                multipleRegionEquationsSet=>EQUATIONS_SET%REGION%PARENT_REGION%SUB_REGIONS(bodyIdx)%PTR%EQUATIONS_SETS% &
-                  & EQUATIONS_SETS(equationSetNumber)%PTR
+!                multipleRegionEquationsSet=>EQUATIONS_SET%REGION%PARENT_REGION%SUB_REGIONS(bodyIdx)%PTR%EQUATIONS_SETS% &
+!                  & EQUATIONS_SETS(equationSetNumber)%PTR
                 
                 ! Residual is +ve for body 1 and -ve for body 2  
                 SELECT CASE(bodyIdx)

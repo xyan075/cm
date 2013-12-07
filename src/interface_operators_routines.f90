@@ -1140,7 +1140,9 @@ CONTAINS
                   !Determine if geometric term is going to be added in this iteration
                   contactMetrics%addGeometricTerm=.FALSE.
                   IF((iterationNumber>=contactMetrics%iterationGeometricTerm) .AND. (contactMetrics%iterationGeometricTerm>0)) THEN
-                    contactMetrics%addGeometricTerm=.TRUE.
+                    IF(interfaceCondition%operator==INTERFACE_CONDITION_FLS_CONTACT_REPROJECT_OPERATOR) THEN
+                      contactMetrics%addGeometricTerm=.TRUE.
+                    ENDIF 
                   ENDIF
 
                   !#################################################################################################################
