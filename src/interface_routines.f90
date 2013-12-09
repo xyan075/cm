@@ -1499,7 +1499,7 @@ CONTAINS
 
     !Argument variables
     TYPE(INTERFACE_TYPE), POINTER :: interface !<A pointer to the interface where data reprojection is performed
-    TYPE(INTERFACE_CONDITION_TYPE), POINTER :: interfaceCondition !<A pointer to the interface where data reprojection is performed
+    TYPE(INTERFACE_CONDITION_TYPE), POINTER :: interfaceCondition !<A pointer to the interface condition where data reprojection is performed
     INTEGER(INTG), INTENT(OUT) :: err !<The error code
     TYPE(VARYING_STRING), INTENT(OUT) :: error !<The error string
     !Local Variables
