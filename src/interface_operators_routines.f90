@@ -1165,6 +1165,10 @@ CONTAINS
                   interpolatedPoint=>interpolatedPoints(FIELD_U_VARIABLE_TYPE)%PTR
                 
                   !#################################################################################################################
+                  
+                  !Initialise contact logicals
+                  contactMetrics%orthogonallyProjected=.TRUE. !Initialise orthogonal projected logicals
+                  contactMetrics%inContact=.FALSE. !Initialise in contact logicals
                     
                   DO contactPtIdx=1,contactMetrics%numberOfContactPts !contactPtIdx is a global contact point index
                     ! Get the metric structure for this contact point
@@ -1195,11 +1199,10 @@ CONTAINS
                     END SELECT
                     
                     ! Determine if a contact point has been orthogonally projected for this Newton step
-                    contactMetrics%orthogonallyProjected=.TRUE. !Initialise orthogonal projected logicals
-                    contactMetrics%inContact=.FALSE. !Initialise in contact logicals
+                    
                     DO xiIdx=1,SIZE(pointsConnectivity%pointsConnectivity(contactPtIdx,projectedMeshIdx)%reducedXi,1)
-                      IF(ABS(pointsConnectivity%pointsConnectivity(contactPtIdx,projectedMeshIdx)%reducedXi(xiIdx)) &
-                          & < ZERO_TOLERANCE) THEN
+                      IF((pointsConnectivity%pointsConnectivity(contactPtIdx,projectedMeshIdx)%reducedXi(xiIdx)==0.0_DP) .OR.  &
+                          & (pointsConnectivity%pointsConnectivity(contactPtIdx,projectedMeshIdx)%reducedXi(xiIdx)==1.0_DP))THEN
                         contactMetrics%orthogonallyProjected(contactPtIdx)=.FALSE.
                       ENDIF
                     ENDDO !xiIdx
@@ -1221,7 +1224,7 @@ CONTAINS
                       CALL FIELD_INTERPOLATE_XI(SECOND_PART_DERIV,pointsConnectivity%pointsConnectivity(contactPtIdx, &
                         & projectedMeshIdx)%reducedXi(:),interpolatedPoint,err,error,*999,FIELD_GEOMETRIC_COMPONENTS_TYPE)
                       ! Calculate gap vector
-                      gapsComponents(1:noGeoComp)=dataPoints%DATA_POINTS(contactPtIdx)%position(1:noGeoComp)- &
+                      gapsComponents(1:noGeoComp)=-dataPoints%DATA_POINTS(contactPtIdx)%position(1:noGeoComp)+ &
                         & interpolatedPoint%VALUES(1:noGeoComp,NO_PART_DERIV)
                       
                       !#############################################################################################################
@@ -1241,12 +1244,12 @@ CONTAINS
                         & contactPointMetrics%normal,tangents,err,error,*999)
                       ! Calculate signed gap
                       contactPointMetrics%signedGapNormal=DOT_PRODUCT(gapsComponents,contactPointMetrics%normal)
-                      IF(contactPointMetrics%signedGapNormal>ZERO_TOLERANCE) contactMetrics%inContact=.TRUE.
+                      IF(contactPointMetrics%signedGapNormal>ZERO_TOLERANCE) contactMetrics%inContact(contactPtIdx)=.TRUE.
                       
                       !#############################################################################################################
                       
                       ! These terms are only required if geometric term is added to the contact stiffness matrix
-                      IF(contactMetrics%addGeometricTerm) THEN
+                      IF((contactMetrics%addGeometricTerm) .AND. (contactMetrics%inContact(contactPtIdx))) THEN
                         ! Store the second derivative information
                         contactPointMetrics%tangentDerivatives(1,1,:)=interpolatedPoint%VALUES(1:noGeoComp,PART_DERIV_S1_S1)
                         contactPointMetrics%tangentDerivatives(1,2,:)=interpolatedPoint%VALUES(1:noGeoComp,PART_DERIV_S1_S2)
