@@ -110,6 +110,7 @@ MODULE FINITE_ELASTICITY_ROUTINES
     & FINITE_ELASTICITY_FINITE_ELEMENT_RESIDUAL_EVALUATE, &
     & FINITE_ELASTICITY_EQUATIONS_SET_SETUP,FINITE_ELASTICITY_EQUATIONS_SET_SOLUTION_METHOD_SET, &
     & FINITE_ELASTICITY_EQUATIONS_SET_SUBTYPE_SET,FINITE_ELASTICITY_PROBLEM_SUBTYPE_SET,FINITE_ELASTICITY_PROBLEM_SETUP, &
+    & FiniteElasticity_RigidBodyEquationsSetSubtypeSet, &
     & FiniteElasticity_ContactProblemSubtypeSet,FiniteElasticity_ContactProblemSetup, & 
     & FINITE_ELASTICITY_POST_SOLVE,FINITE_ELASTICITY_POST_SOLVE_OUTPUT_DATA, &
     & FINITE_ELASTICITY_PRE_SOLVE,FINITE_ELASTICITY_CONTROL_TIME_LOOP_PRE_LOOP,FiniteElasticity_ControlLoadIncrementLoopPostLoop, &
@@ -4998,6 +4999,49 @@ CONTAINS
     CALL EXITS("FINITE_ELASTICITY_EQUATIONS_SET_SUBTYPE_SET")
     RETURN 1
   END SUBROUTINE FINITE_ELASTICITY_EQUATIONS_SET_SUBTYPE_SET
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Sets/changes the equation subtype for a finite elasticity equation type of an elasticity equations set class.
+  SUBROUTINE FiniteElasticity_RigidBodyEquationsSetSubtypeSet(EQUATIONS_SET,EQUATIONS_SET_SUBTYPE,ERR,ERROR,*)
+
+    !Argument variables
+    TYPE(EQUATIONS_SET_TYPE), POINTER :: EQUATIONS_SET !<A pointer to the equations set to set the equation subtype for
+    INTEGER(INTG), INTENT(IN) :: EQUATIONS_SET_SUBTYPE !<The equation subtype to set
+    INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
+    !Local Variables
+    INTEGER(INTG) :: DUMMY_FIELD_USER_NUMBER
+    TYPE(FIELD_TYPE), POINTER :: DUMMY_FIELD
+    TYPE(VARYING_STRING) :: LOCAL_ERROR
+
+    CALL ENTERS("FiniteElasticity_RigidBodyEquationsSetSubtypeSet",ERR,ERROR,*999)
+
+    IF(ASSOCIATED(EQUATIONS_SET)) THEN
+      DUMMY_FIELD_USER_NUMBER=0
+      NULLIFY(DUMMY_FIELD)
+      SELECT CASE(EQUATIONS_SET_SUBTYPE)
+      CASE(EQUATIONS_SET_MOONEY_RIVLIN_SUBTYPE)
+        EQUATIONS_SET%CLASS=EQUATIONS_SET_MULTI_PHYSICS_CLASS
+        EQUATIONS_SET%TYPE=EQUATIONS_SET_FINITE_ELASTICITY_RIGID_BODY_TYPE
+        EQUATIONS_SET%SUBTYPE=EQUATIONS_SET_SUBTYPE
+      CASE DEFAULT
+        LOCAL_ERROR="Equations set subtype "//TRIM(NUMBER_TO_VSTRING(EQUATIONS_SET_SUBTYPE,"*",ERR,ERROR))// &
+          & " is not valid for a finite elasticity-rigid body equation type of a multi-physics class."
+        CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
+      END SELECT
+    ELSE
+      CALL FLAG_ERROR("Equations set is not associated.",ERR,ERROR,*999)
+    ENDIF
+
+    CALL EXITS("FiniteElasticity_RigidBodyEquationsSetSubtypeSet")
+    RETURN
+999 CALL ERRORS("FiniteElasticity_RigidBodyEquationsSetSubtypeSet",ERR,ERROR)
+    CALL EXITS("FiniteElasticity_RigidBodyEquationsSetSubtypeSet")
+    RETURN 1
+  END SUBROUTINE FiniteElasticity_RigidBodyEquationsSetSubtypeSet
 
   !
   !================================================================================================================================
