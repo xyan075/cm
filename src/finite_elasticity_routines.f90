@@ -2817,6 +2817,11 @@ CONTAINS
     ELSE
       NUMBER_OF_COMPONENTS = NUMBER_OF_DIMENSIONS
     ENDIF
+    
+    !\todo XY--rigid-deformable contact: Rigid body dofs are attached as the 5-10th (3 for translation 3 for rotation) components 
+    ! at the end the deformable field, to be generalised when LHS mapping is done
+    IF(EQUATIONS_SET%CLASS==EQUATIONS_SET_MULTI_PHYSICS_CLASS .AND.  &
+        & EQUATIONS_SET%TYPE==EQUATIONS_SET_FINITE_ELASTICITY_RIGID_BODY_TYPE) NUMBER_OF_COMPONENTS = NUMBER_OF_COMPONENTS + 6
 
     IF(ASSOCIATED(EQUATIONS_SET)) THEN
       SELECT CASE(EQUATIONS_SET%SUBTYPE)
