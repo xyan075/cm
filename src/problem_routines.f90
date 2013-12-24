@@ -1271,7 +1271,7 @@ CONTAINS
     INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
     TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
     !Local Variables
-    INTEGER(INTG) :: equations_set_idx,solver_matrix_idx
+    INTEGER(INTG) :: equations_set_idx,solver_matrix_idx,noComp
     TYPE(EQUATIONS_SET_TYPE), POINTER :: EQUATIONS_SET
     TYPE(SOLVER_EQUATIONS_TYPE), POINTER :: SOLVER_equations
     TYPE(SOLVER_MAPPING_TYPE), POINTER :: SOLVER_MAPPING
@@ -1332,11 +1332,26 @@ CONTAINS
                 !Calculate the Jacobian
                 DO equations_set_idx=1,SOLVER_MAPPING%NUMBER_OF_EQUATIONS_SETS
                   EQUATIONS_SET=>SOLVER_MAPPING%EQUATIONS_SETS(equations_set_idx)%PTR
+                  CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"********************Jacobian evaluation******************",ERR,ERROR,*999)
+                  !\todo: XY rigid-deformable contact, temporarily change the number of components to exclude rigid body dofs
+                  noComp=EQUATIONS_SET%EQUATIONS%EQUATIONS_MAPPING%NONLINEAR_MAPPING%RESIDUAL_VARIABLES(1)%PTR%NUMBER_OF_COMPONENTS
+                  EQUATIONS_SET%EQUATIONS%EQUATIONS_MAPPING%NONLINEAR_MAPPING%RESIDUAL_VARIABLES(1)%PTR%NUMBER_OF_COMPONENTS= &
+                    & noComp-6
                   !Assemble the equations for linear problems
                   CALL EQUATIONS_SET_JACOBIAN_EVALUATE(EQUATIONS_SET,ERR,ERROR,*999)
-!                  CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"********************Jacobian evaluation******************",ERR,ERROR,*999)
-                  ! Xiani  commented out
-                  CALL EQUATIONS_SET_JACOBIAN_CONTACT_UPDATE_STATIC_FEM(EQUATIONS_SET,ERR,ERROR,*999)
+                  !\todo: XY rigid-deformable contact, restore number of components
+                  EQUATIONS_SET%EQUATIONS%EQUATIONS_MAPPING%NONLINEAR_MAPPING%RESIDUAL_VARIABLES(1)%PTR%NUMBER_OF_COMPONENTS=noComp
+                  !\todo: XY -Modify Jacobian for contact
+                  IF(SOLVER%SOLVERS%CONTROL_LOOP%PROBLEM%TYPE==PROBLEM_FINITE_ELASTICITY_CONTACT_TYPE)THEN
+                    ! rigid body-deformable body contact
+                    IF(EQUATIONS_SET%CLASS==EQUATIONS_SET_MULTI_PHYSICS_CLASS .AND.  &
+                        & EQUATIONS_SET%TYPE==EQUATIONS_SET_FINITE_ELASTICITY_RIGID_BODY_TYPE) THEN
+                    
+                    ! deformable-deformable body contact
+                    ELSEIF(EQUATIONS_SET%TYPE==EQUATIONS_SET_FINITE_ELASTICITY_TYPE) THEN
+                      CALL EQUATIONS_SET_JACOBIAN_CONTACT_UPDATE_STATIC_FEM(EQUATIONS_SET,ERR,ERROR,*999)
+                    ENDIF !Rigid or deformable contact
+                  ENDIF !contact problem
                 ENDDO !equations_set_idx
                 !Update interface matrices
 !                DO interfaceConditionIdx=1,SOLVER_MAPPING%NUMBER_OF_INTERFACE_CONDITIONS
@@ -1832,48 +1847,56 @@ CONTAINS
                 !present in the single region contact problem. Needs to generalised.
                 !DO interfaceConditionIdx=1,solverMapping%NUMBER_OF_INTERFACE_CONDITIONS
                   !interfaceCondition=>solverMapping%INTERFACE_CONDITIONS(interfaceConditionIdx)%PTR
-                equationsSetGlobalNumber=1
-                interfaceGlobalNumber=1
-                interfaceConditionGlobalNumber=1
-                interfaceCondition=>SOLVER_MAPPING%EQUATIONS_SETS(equationsSetGlobalNumber)%PTR%REGION%PARENT_REGION% &
-                  & INTERFACES%INTERFACES(interfaceGlobalNumber)%PTR%INTERFACE_CONDITIONS% &
-                  & INTERFACE_CONDITIONS(interfaceConditionGlobalNumber)%PTR
-                IF(ASSOCIATED(interfaceCondition)) THEN
-                  IF(interfaceCondition%OPERATOR==INTERFACE_CONDITION_FLS_CONTACT_REPROJECT_OPERATOR .OR. &
-                      & interfaceCondition%OPERATOR==INTERFACE_CONDITION_FLS_CONTACT_OPERATOR) THEN !Only reproject for contact operator
-                    IF(interfaceCondition%integrationType==INTERFACE_CONDITION_DATA_POINTS_INTEGRATION) THEN !Only reproject for data point interpolated field
-                      interface=>interfaceCondition%INTERFACE
-                      IF(ASSOCIATED(interface)) THEN
-                        CALL PETSC_SNESGETITERATIONNUMBER(SOLVER%NONLINEAR_SOLVER%NEWTON_SOLVER%LINESEARCH_SOLVER%SNES, &
-                          & iterationNumber,ERR,ERROR,*999)
-                          IF(SOLVER%SOLVERS%CONTROL_LOOP%PROBLEM%SUBTYPE==PROBLEM_FE_CONTACT_TRANSFORM_REPROJECT_SUBTYPE .OR. &
-                              & SOLVER%SOLVERS%CONTROL_LOOP%PROBLEM%SUBTYPE==PROBLEM_FE_CONTACT_REPROJECT_SUBTYPE .OR.  &
-                              & iterationNumber==0) THEN
-!                            CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"********************  Reproject! ***************",ERR,ERROR,*999)
-                            CALL InterfacePointsConnectivity_DataReprojection(interface,interfaceCondition,err,error,*999)
+                IF(SOLVER%SOLVERS%CONTROL_LOOP%PROBLEM%TYPE==PROBLEM_FINITE_ELASTICITY_CONTACT_TYPE)THEN
+                  equationsSetGlobalNumber=1
+                  interfaceGlobalNumber=1
+                  interfaceConditionGlobalNumber=1
+                  interfaceCondition=>SOLVER_MAPPING%EQUATIONS_SETS(equationsSetGlobalNumber)%PTR%REGION%PARENT_REGION% &
+                    & INTERFACES%INTERFACES(interfaceGlobalNumber)%PTR%INTERFACE_CONDITIONS% &
+                    & INTERFACE_CONDITIONS(interfaceConditionGlobalNumber)%PTR
+                  IF(ASSOCIATED(interfaceCondition)) THEN
+                    IF(interfaceCondition%OPERATOR==INTERFACE_CONDITION_FLS_CONTACT_REPROJECT_OPERATOR .OR. &
+                        & interfaceCondition%OPERATOR==INTERFACE_CONDITION_FLS_CONTACT_OPERATOR) THEN !Only reproject for contact operator
+                      IF(interfaceCondition%integrationType==INTERFACE_CONDITION_DATA_POINTS_INTEGRATION) THEN !Only reproject for data point interpolated field
+                        interface=>interfaceCondition%INTERFACE
+                        IF(ASSOCIATED(interface)) THEN
+                          CALL PETSC_SNESGETITERATIONNUMBER(SOLVER%NONLINEAR_SOLVER%NEWTON_SOLVER%LINESEARCH_SOLVER%SNES, &
+                            & iterationNumber,ERR,ERROR,*999)
+                            IF(SOLVER%SOLVERS%CONTROL_LOOP%PROBLEM%SUBTYPE==PROBLEM_FE_CONTACT_TRANSFORM_REPROJECT_SUBTYPE .OR. &
+                                & SOLVER%SOLVERS%CONTROL_LOOP%PROBLEM%SUBTYPE==PROBLEM_FE_CONTACT_REPROJECT_SUBTYPE .OR.  &
+                                & iterationNumber==0) THEN
+  !                            CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"********************  Reproject! ***************",ERR,ERROR,*999)
+                              CALL InterfacePointsConnectivity_DataReprojection(interface,interfaceCondition,err,error,*999)
+                            ENDIF
+                          ! iteration+1 since iterationNumber is counting the iterations completed
+                          CALL FrictionlessContact_contactMetricsCalculate(interfaceCondition,iterationNumber+1,err,error,*999)
+  !                        CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"********************  Contact residual! ***********",ERR,ERROR,*999)
+                          !\todo: generalise when LHS mapping is in place
+                          IF(EQUATIONS_SET%CLASS==EQUATIONS_SET_MULTI_PHYSICS_CLASS .AND.  &
+                             & EQUATIONS_SET%TYPE==EQUATIONS_SET_FINITE_ELASTICITY_RIGID_BODY_TYPE) THEN !Rigid-deformable contact
+                            !Modify residual for rigid-deformable contact
+                          ELSEIF(EQUATIONS_SET%TYPE==EQUATIONS_SET_FINITE_ELASTICITY_TYPE) THEN !Deformable-deformable contact
+                            !Modify residual for deformable bodies contact
+                            CALL EQUATIONS_SET_RESIDUAL_CONTACT_UPDATE_STATIC_FEM(SOLVER_MAPPING% &
+                              & EQUATIONS_SETS(equationsSetGlobalNumber)%PTR,ERR,ERROR,*999)
                           ENDIF
-                        ! iteration+1 since iterationNumber is counting the iterations completed
-                        CALL FrictionlessContact_contactMetricsCalculate(interfaceCondition,iterationNumber+1,err,error,*999)
-!                        CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"********************  Contact residual! ***********",ERR,ERROR,*999)
-                        !\todo: generalise when LHS mapping is in place
-                        CALL EQUATIONS_SET_RESIDUAL_CONTACT_UPDATE_STATIC_FEM(SOLVER_MAPPING% &
-                          & EQUATIONS_SETS(equationsSetGlobalNumber)%PTR,ERR,ERROR,*999)
-!                        CALL SolverEquations_ResidualVectorGet(SOLVER_EQUATIONS,residualVectorDis,err,error,*999)
-                        CALL DISTRIBUTED_VECTOR_DATA_GET(SOLVER_EQUATIONS%solver_matrices%residual,residualVector,err,error,*999)
-                        
-                        !\todo Temporarily commented out INTERFACE_CONDITION_ASSEMBLE as the interface matrices are not
-                        ! required for the single region contact problem. Needs to generalised.
-                        !CALL INTERFACE_CONDITION_ASSEMBLE(interfaceCondition,err,error,*999)
-                      ELSE
-                        CALL FLAG_ERROR("Interface is not associated for nonlinear solver equations mapping.", &
-                          & err,error,*999)
+  !                        CALL SolverEquations_ResidualVectorGet(SOLVER_EQUATIONS,residualVectorDis,err,error,*999)
+                          CALL DISTRIBUTED_VECTOR_DATA_GET(SOLVER_EQUATIONS%solver_matrices%residual,residualVector,err,error,*999)
+                          
+                          !\todo Temporarily commented out INTERFACE_CONDITION_ASSEMBLE as the interface matrices are not
+                          ! required for the single region contact problem. Needs to generalised.
+                          !CALL INTERFACE_CONDITION_ASSEMBLE(interfaceCondition,err,error,*999)
+                        ELSE
+                          CALL FLAG_ERROR("Interface is not associated for nonlinear solver equations mapping.", &
+                            & err,error,*999)
+                        ENDIF
                       ENDIF
                     ENDIF
-                  ENDIF
-                ELSE
-                  CALL FLAG_ERROR("Interface condition is not associated for nonlinear solver equations mapping.", &
-                    & err,error,*999)
-                ENDIF
+                  ELSE
+                    CALL FLAG_ERROR("Interface condition is not associated for nonlinear solver equations mapping.", &
+                      & err,error,*999)
+                  ENDIF 
+                ENDIF !problemType==contact
               !ENDDO !interfaceConditionIdx
 
                 !\todo Temporarily comment out the looping through of interface conditions added to the solver as these are not
