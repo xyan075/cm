@@ -3037,7 +3037,7 @@ CONTAINS
     TYPE(ELEMENT_VECTOR_TYPE) :: elementVector
     INTEGER(INTG) :: componentIdx,localNy,version,derivativeIdx,derivative,nodeIdx,node,column
     INTEGER(INTG) :: componentInterpolationType
-    INTEGER(INTG) :: numberOfRows
+    INTEGER(INTG) :: numberOfRows,numberOfComponents
     REAL(DP) :: delta,origDepVar
 
     CALL ENTERS("EquationsSet_FiniteElementJacobianEvaluateFD",err,error,*999)
@@ -3077,7 +3077,14 @@ CONTAINS
           ! distributed out, have to use proper field accessing routines..
           ! so let's just loop over component, node/el, derivative
           column=0  ! element jacobian matrix column number
-          DO componentIdx=1,columnVariable%NUMBER_OF_COMPONENTS
+          !\todo: XY-rigid deformable body contact, generalise/remove when LHS mapping is ready
+          IF(equationsSet%CLASS==EQUATIONS_SET_MULTI_PHYSICS_CLASS .AND.  &
+              &  equationsSet%TYPE==EQUATIONS_SET_FINITE_ELASTICITY_RIGID_BODY_TYPE) THEN
+            numberOfComponents=columnVariable%NUMBER_OF_COMPONENTS-6 !remove the 6 dof of rigid body motion
+          ELSE
+            numberOfComponents=columnVariable%NUMBER_OF_COMPONENTS
+          ENDIF
+          DO componentIdx=1,numberOfComponents
             elementsTopology=>columnVariable%COMPONENTS(componentIdx)%DOMAIN%TOPOLOGY%ELEMENTS
             componentInterpolationType=columnVariable%COMPONENTS(componentIdx)%INTERPOLATION_TYPE
             SELECT CASE (componentInterpolationType)

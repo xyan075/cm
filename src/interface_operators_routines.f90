@@ -1237,8 +1237,8 @@ CONTAINS
                       CASE(2,4,6)
                         reverseNormal=.TRUE.
                       END SELECT
-                      CALL FIELD_INTERPOLATED_POINT_METRICS_CALCULATE(noGeoComp,interpolatedPointsMetrics &
-                        & (FIELD_U_VARIABLE_TYPE)%PTR,err,error,*999)
+                      CALL FIELD_INTERPOLATED_POINT_METRICS_CALCULATE(2,interpolatedPointsMetrics &
+                        & (FIELD_U_VARIABLE_TYPE)%PTR,err,error,*999) !2=COORDINATE_JACOBIAN_AREA_TYPE
                       CALL FIELD_POSITION_NORMAL_TANGENTS_CALCULATE_INT_PT_METRIC(interpolatedPointsMetrics &
                         & (FIELD_U_VARIABLE_TYPE)%PTR,reverseNormal,junkPosition, &
                         & contactPointMetrics%normal,tangents,err,error,*999)
