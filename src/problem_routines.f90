@@ -68,6 +68,7 @@ MODULE PROBLEM_ROUTINES
   USE MESH_ROUTINES
   USE MULTI_PHYSICS_ROUTINES
   USE PROBLEM_CONSTANTS
+  USE RIGID_BODY_ROUTINES
   USE SOLVER_ROUTINES
   USE SOLVER_MATRICES_ROUTINES
   USE STRINGS
@@ -1738,7 +1739,7 @@ CONTAINS
     TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
     !Local Variables
     INTEGER(INTG) :: equations_set_idx,solver_matrix_idx
-    TYPE(EQUATIONS_SET_TYPE), POINTER :: EQUATIONS_SET
+    TYPE(EQUATIONS_SET_TYPE), POINTER :: EQUATIONS_SET,equationSetRigidNodal
     TYPE(SOLVER_TYPE), POINTER :: CELLML_SOLVER,LINKING_SOLVER
     TYPE(SOLVER_EQUATIONS_TYPE), POINTER :: SOLVER_EQUATIONS
     TYPE(SOLVER_MAPPING_TYPE), POINTER :: SOLVER_MAPPING
@@ -1750,7 +1751,8 @@ CONTAINS
 
     !\todo Temporarily added the variables below to allow the interface condition to be used in the single region contact problem
     !to be manually specified. Need to Generalise.
-    INTEGER(INTG) :: equationsSetGlobalNumber,interfaceGlobalNumber,interfaceConditionGlobalNumber,iterationNumber
+    INTEGER(INTG) :: equationsSetGlobalNumber,interfaceGlobalNumber,interfaceConditionGlobalNumber,iterationNumber, &
+      & rigidBodyRegionNumber
     TYPE(INTERFACE_CONDITION_TYPE), POINTER :: interfaceCondition
     TYPE(INTERFACE_TYPE), POINTER :: interface
     
@@ -1829,6 +1831,7 @@ CONTAINS
                 IF(ASSOCIATED(CELLML_SOLVER)) THEN
                   CALL SOLVER_SOLVE(CELLML_SOLVER,ERR,ERROR,*999)
                 ENDIF
+                CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"********************Residual evaluation******************",ERR,ERROR,*999)
                 !Make sure the equations sets are up to date
                 DO equations_set_idx=1,SOLVER_MAPPING%NUMBER_OF_EQUATIONS_SETS
                   EQUATIONS_SET=>SOLVER_MAPPING%EQUATIONS_SETS(equations_set_idx)%PTR
@@ -1839,7 +1842,6 @@ CONTAINS
                   CASE(EQUATIONS_NONLINEAR)
                     !Evaluate the residual for nonlinear equations
                     CALL EQUATIONS_SET_RESIDUAL_EVALUATE(EQUATIONS_SET,ERR,ERROR,*999)
-
                   END SELECT
                 ENDDO !equations_set_idx
 
@@ -1849,11 +1851,17 @@ CONTAINS
                   !interfaceCondition=>solverMapping%INTERFACE_CONDITIONS(interfaceConditionIdx)%PTR
                 IF(SOLVER%SOLVERS%CONTROL_LOOP%PROBLEM%TYPE==PROBLEM_FINITE_ELASTICITY_CONTACT_TYPE)THEN
                   equationsSetGlobalNumber=1
+                  rigidBodyRegionNumber=2
                   interfaceGlobalNumber=1
                   interfaceConditionGlobalNumber=1
                   interfaceCondition=>SOLVER_MAPPING%EQUATIONS_SETS(equationsSetGlobalNumber)%PTR%REGION%PARENT_REGION% &
                     & INTERFACES%INTERFACES(interfaceGlobalNumber)%PTR%INTERFACE_CONDITIONS% &
                     & INTERFACE_CONDITIONS(interfaceConditionGlobalNumber)%PTR
+                    
+!                    SOLVER_MAPPING%equations_sets(1)%ptr%region%parent_region%sub_regions(2)%ptr%equations_sets%equations_sets(1)%ptr
+                    
+                  equationSetRigidNodal=>SOLVER_MAPPING%EQUATIONS_SETS(equationsSetGlobalNumber)%PTR%REGION% &
+                    & PARENT_REGION%SUB_REGIONS(rigidBodyRegionNumber)%PTR%EQUATIONS_SETS%EQUATIONS_SETS(1)%PTR
                   IF(ASSOCIATED(interfaceCondition)) THEN
                     IF(interfaceCondition%OPERATOR==INTERFACE_CONDITION_FLS_CONTACT_REPROJECT_OPERATOR .OR. &
                         & interfaceCondition%OPERATOR==INTERFACE_CONDITION_FLS_CONTACT_OPERATOR) THEN !Only reproject for contact operator
@@ -1865,8 +1873,11 @@ CONTAINS
                             IF(SOLVER%SOLVERS%CONTROL_LOOP%PROBLEM%SUBTYPE==PROBLEM_FE_CONTACT_TRANSFORM_REPROJECT_SUBTYPE .OR. &
                                 & SOLVER%SOLVERS%CONTROL_LOOP%PROBLEM%SUBTYPE==PROBLEM_FE_CONTACT_REPROJECT_SUBTYPE .OR.  &
                                 & iterationNumber==0) THEN
-  !                            CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"********************  Reproject! ***************",ERR,ERROR,*999)
+!                              CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"********************  Reproject! ***************",ERR,ERROR,*999)
+                              CALL RigidBody_ApplyTransformation(EQUATIONS_SET,equationSetRigidNodal,err,error,*999)
                               CALL InterfacePointsConnectivity_DataReprojection(interface,interfaceCondition,err,error,*999)
+                              
+                              
                             ENDIF
                           ! iteration+1 since iterationNumber is counting the iterations completed
                           CALL FrictionlessContact_contactMetricsCalculate(interfaceCondition,iterationNumber+1,err,error,*999)
@@ -1910,7 +1921,6 @@ CONTAINS
 !                DO interfaceConditionIdx=1,SOLVER_MAPPING%NUMBER_OF_INTERFACE_CONDITIONS
 !                  interfaceCondition=>SOLVER_MAPPING%INTERFACE_CONDITIONS(interfaceConditionIdx)%PTR
 !                  !Assemble the interface condition for the Jacobian LHS
-!                  CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"********************Residual evaluation******************",ERR,ERROR,*999)
 !                  CALL INTERFACE_CONDITION_ASSEMBLE(interfaceCondition,err,error,*999)
 !                ENDDO
                 !Assemble the solver matrices

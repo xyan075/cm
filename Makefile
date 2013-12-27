@@ -1607,6 +1607,7 @@ $(OBJECT_DIR)/problem_routines.o	:	$(SOURCE_DIR)/problem_routines.f90 \
 	$(OBJECT_DIR)/solver_matrices_routines.o \
 	$(OBJECT_DIR)/solver_routines.o \
 	$(OBJECT_DIR)/strings.o \
+	$(OBJECT_DIR)/rigid_body_routines.o \
 	$(OBJECT_DIR)/timer_f.o \
 	$(OBJECT_DIR)/types.o
 
@@ -1662,8 +1663,10 @@ $(OBJECT_DIR)/region_routines.o	:	$(SOURCE_DIR)/region_routines.f90 \
 	$(OBJECT_DIR)/types.o
 
 $(OBJECT_DIR)/rigid_body_routines.o	:	$(SOURCE_DIR)/rigid_body_routines.f90 \
-	$(OBJECT_DIR)/base_routines.o \
+  $(OBJECT_DIR)/base_routines.o \
+	$(OBJECT_DIR)/basis_routines.o \
 	$(OBJECT_DIR)/control_loop_routines.o \
+	$(OBJECT_DIR)/coordinate_routines.o \
 	$(OBJECT_DIR)/equations_set_constants.o \
 	$(OBJECT_DIR)/field_routines.o \
 	$(OBJECT_DIR)/input_output.o \
