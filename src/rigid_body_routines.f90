@@ -106,6 +106,7 @@ CONTAINS
       IF(ASSOCIATED(equationsSetNodal)) THEN
         ! The centred geometric field stored in rigid body equations set (equationsSetNodal) will be transformed according to 
         ! the rigid body dofs defined in the 5-10 components of equationsSetRigid, and stored in dependent field of equationsSetNodal
+        ! i.e. geometricField + RigidBodyMotion = dependentField (where the object is currently)
         geometricField=>equationsSetNodal%GEOMETRY%GEOMETRIC_FIELD
         dependentField=>equationsSetNodal%DEPENDENT%DEPENDENT_FIELD
         rigidDofField=>equationsSetRigid%DEPENDENT%DEPENDENT_FIELD

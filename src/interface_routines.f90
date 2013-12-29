@@ -1504,7 +1504,7 @@ CONTAINS
     TYPE(VARYING_STRING), INTENT(OUT) :: error !<The error string
     !Local Variables
     TYPE(InterfacePointsConnectivityType), POINTER :: interfacePointsConnectivity
-    TYPE(FIELD_TYPE), POINTER :: dependentFieldFixed,dependentFieldProjection
+    TYPE(FIELD_TYPE), POINTER :: dependentFieldFixed,dependentFieldProjection,LagrangeField,geometricFieldRigid
     TYPE(DATA_POINTS_TYPE), POINTER :: dataPoints
     TYPE(DATA_PROJECTION_TYPE), POINTER :: dataProjection
     TYPE(FIELD_INTERPOLATED_POINT_PTR_TYPE), POINTER :: interpolatedPoints(:)
@@ -1532,6 +1532,8 @@ CONTAINS
             dependentFieldFixed=>interfaceCondition%DEPENDENT%FIELD_VARIABLES(fixedBodyIdx)%PTR%FIELD
             IF(ASSOCIATED(dependentFieldFixed)) THEN
               numberOfGeometricComponents=dependentFieldFixed%GEOMETRIC_FIELD%VARIABLES(1)%NUMBER_OF_COMPONENTS
+              NULLIFY(interpolationParameters)
+              NULLIFY(interpolatedPoints)
               CALL FIELD_INTERPOLATION_PARAMETERS_INITIALISE(dependentFieldFixed,interpolationParameters,err,error,*999, &
                 & FIELD_GEOMETRIC_COMPONENTS_TYPE)
               CALL FIELD_INTERPOLATED_POINTS_INITIALISE(interpolationParameters,interpolatedPoints,err,error,*999, &
@@ -1552,6 +1554,8 @@ CONTAINS
                   dataPoints%DATA_POINTS(dataPointIdx)%position(component) = interpolatedPoint%VALUES(component,NO_PART_DERIV)
                 ENDDO !component
               ENDDO !dataPointIdx
+              CALL FIELD_INTERPOLATION_PARAMETERS_FINALISE(interpolationParameters,err,error,*999)
+              CALL FIELD_INTERPOLATED_POINTS_FINALISE(interpolatedPoints,err,error,*999)
             ELSE
               CALL FLAG_ERROR("Fixed dependent field is not associated.",err,error,*999)
             ENDIF
@@ -1567,6 +1571,37 @@ CONTAINS
                 CALL DATA_PROJECTION_DATA_POINTS_PROJECTION_EVALUATE(dataProjection,dependentFieldProjection,err,error,*999)
                 CALL InterfacePointsConnectivity_UpdateFromProjection(InterfacePointsConnectivity,dataProjection, &
                   & projectionBodyIdx,err,error,*999) 
+                  
+                !\todo: XY -rigid deformable contact, temporarily store contact points evaluated on rigid body (relative to centre
+                ! of mass) in the 3-components Lagrange field
+                LagrangeField=>interfaceCondition%LAGRANGE%LAGRANGE_FIELD !Store the interpolated contact points in Lagrange field
+                geometricFieldRigid=>dependentFieldProjection%GEOMETRIC_FIELD !Interpolate rigid body geometric field
+                NULLIFY(interpolationParameters)
+                NULLIFY(interpolatedPoints)
+                CALL FIELD_INTERPOLATION_PARAMETERS_INITIALISE(geometricFieldRigid,interpolationParameters,err,error,*999, &
+                  & FIELD_GEOMETRIC_COMPONENTS_TYPE)
+                CALL FIELD_INTERPOLATED_POINTS_INITIALISE(interpolationParameters,interpolatedPoints,err,error,*999, &
+                  & FIELD_GEOMETRIC_COMPONENTS_TYPE)
+                interpolatedPoint=>interpolatedPoints(FIELD_U_VARIABLE_TYPE)%PTR
+                DO dataPointIdx=1,dataPoints%NUMBER_OF_DATA_POINTS
+                  elementNumber=interfacePointsConnectivity%pointsConnectivity(dataPointIdx,projectionBodyIdx)% &
+                    & coupledMeshElementNumber
+                  coupledMeshFaceLineNumber=geometricFieldRigid%DECOMPOSITION%TOPOLOGY%ELEMENTS% &
+                    & ELEMENTS(elementNumber)% &
+                    & ELEMENT_FACES(interfacePointsConnectivity%pointsConnectivity(dataPointIdx,projectionBodyIdx)% &
+                    & elementLineFaceNumber)
+                  CALL FIELD_INTERPOLATION_PARAMETERS_FACE_GET(FIELD_VALUES_SET_TYPE,coupledMeshFaceLineNumber, &
+                    & interpolationParameters(FIELD_U_VARIABLE_TYPE)%PTR,err,error,*999,FIELD_GEOMETRIC_COMPONENTS_TYPE)
+                  CALL FIELD_INTERPOLATE_XI(NO_PART_DERIV,interfacePointsConnectivity%pointsConnectivity(dataPointIdx, &
+                    & projectionBodyIdx)%reducedXi(:),interpolatedPoint,err,error,*999,FIELD_GEOMETRIC_COMPONENTS_TYPE)
+                  DO component=1,numberOfGeometricComponents
+                    CALL Field_ParameterSetUpdateDataPoint(LagrangeField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE, &
+                      & dataPointIdx,component,interpolatedPoint%VALUES(component,NO_PART_DERIV),ERR,ERROR,*999) !DataUserNumber is the same as global number
+                  ENDDO !component
+                ENDDO !dataPointIdx
+                CALL FIELD_INTERPOLATION_PARAMETERS_FINALISE(interpolationParameters,err,error,*999)
+                CALL FIELD_INTERPOLATED_POINTS_FINALISE(interpolatedPoints,err,error,*999)
+                
               ELSE
                 CALL FLAG_ERROR("Projection dependent field is not associated.",err,error,*999)
               ENDIF       

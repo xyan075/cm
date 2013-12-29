@@ -1244,6 +1244,10 @@ CONTAINS
                         & contactPointMetrics%normal,tangents,err,error,*999)
                       ! Calculate signed gap
                       contactPointMetrics%signedGapNormal=DOT_PRODUCT(gapsComponents,contactPointMetrics%normal)
+                      
+                      ! \todo: 1 is for the frictionless contact, normal contact stiffness 
+                      contactPointMetrics%contactForce=contactPointMetrics%signedGapNormal* &
+                        & contactPointMetrics%contactStiffness(normalStiffnessComp)
                       IF(contactPointMetrics%signedGapNormal>ZERO_TOLERANCE) contactMetrics%inContact(contactPtIdx)=.TRUE.
                       
                       !#############################################################################################################
