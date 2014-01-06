@@ -1905,12 +1905,12 @@ CONTAINS
                 rigidBodyMatrix(1,1)=1.0_DP
                 rigidBodyMatrix(2,2)=1.0_DP
                 rigidBodyMatrix(3,3)=1.0_DP
-                rigidBodyMatrix(1,5)=-contactPtPosition(3)
-                rigidBodyMatrix(1,6)=contactPtPosition(2)
-                rigidBodyMatrix(2,4)=contactPtPosition(3)
-                rigidBodyMatrix(2,6)=-contactPtPosition(1)
-                rigidBodyMatrix(3,4)=-contactPtPosition(2)
-                rigidBodyMatrix(3,5)=contactPtPosition(1)
+                rigidBodyMatrix(1,5)=contactPtPosition(3)
+                rigidBodyMatrix(1,6)=-contactPtPosition(2)
+                rigidBodyMatrix(2,4)=-contactPtPosition(3)
+                rigidBodyMatrix(2,6)=contactPtPosition(1)
+                rigidBodyMatrix(3,4)=contactPtPosition(2)
+                rigidBodyMatrix(3,5)=-contactPtPosition(1)
                 
                 rowPreviousFaceNo=0
                 DO rowFieldComp=1,3
@@ -1986,10 +1986,10 @@ CONTAINS
             CALL DISTRIBUTED_MATRIX_UPDATE_START(jacobian,err,error,*999)
             CALL DISTRIBUTED_MATRIX_UPDATE_FINISH(jacobian,err,error,*999)
             
-            DO junkIdx=1,56
-              CALL DISTRIBUTED_MATRIX_VALUES_GET(jacobian,junkIdx,junkIdx,forceTerm,err,error,*999)
-              CALL WRITE_STRING_TWO_VALUE(GENERAL_OUTPUT_TYPE,"Jacobian(",junkIdx,") = ",forceTerm,err,error,*999)
-            ENDDO
+!            DO junkIdx=1,56
+!              CALL DISTRIBUTED_MATRIX_VALUES_GET(jacobian,junkIdx,junkIdx,forceTerm,err,error,*999)
+!              CALL WRITE_STRING_TWO_VALUE(GENERAL_OUTPUT_TYPE,"Jacobian(",junkIdx,") = ",forceTerm,err,error,*999)
+!            ENDDO
             
 !            CALL DISTRIBUTED_MATRIX_VALUES_GET(jacobian,51,51,forceTerm,err,error,*999)
 !            CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"Jacobian(51,51) = ",forceTerm,err,error,*999)
@@ -2554,12 +2554,12 @@ CONTAINS
                   rigidBodyMatrix(1,1)=1.0_DP
                   rigidBodyMatrix(2,2)=1.0_DP
                   rigidBodyMatrix(3,3)=1.0_DP
-                  rigidBodyMatrix(1,5)=-contactPtPosition(3)
-                  rigidBodyMatrix(1,6)=contactPtPosition(2)
-                  rigidBodyMatrix(2,4)=contactPtPosition(3)
-                  rigidBodyMatrix(2,6)=-contactPtPosition(1)
-                  rigidBodyMatrix(3,4)=-contactPtPosition(2)
-                  rigidBodyMatrix(3,5)=contactPtPosition(1)
+                  rigidBodyMatrix(1,5)=contactPtPosition(3)
+                  rigidBodyMatrix(1,6)=-contactPtPosition(2)
+                  rigidBodyMatrix(2,4)=-contactPtPosition(3)
+                  rigidBodyMatrix(2,6)=contactPtPosition(1)
+                  rigidBodyMatrix(3,4)=contactPtPosition(2)
+                  rigidBodyMatrix(3,5)=-contactPtPosition(1)
                   !\todo: generalise the offset for deformable body components, i.e. 4
                   DO fieldComponent=1,3
                     DO rigidBodyDofCompIdx=1,6
