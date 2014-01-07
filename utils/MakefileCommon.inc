@@ -660,17 +660,17 @@ endif
 ZLIB_INCLUDE_PATH =#
 ZLIB_LIBRARIES =#
 ZLIB_LIB_PATH =#
-ifeq ($(or ${OPENCMISS_USE_CELLML},${OPENCMISS_USE_FIELDML}),true)
-  ZLIB_LIBRARIES += $(call convertlistlink,$(OCE_ZLIBLIBS))
-  ZLIB_LIB_PATH += $(addprefix -L, $(OCE_ZLIBLIBPATH) )
-  ZLIB_INCLUDE_PATH += $(addprefix -I, $(OCE_ZLIBINCLUDEPATH) )
-else
-  ifeq ($(and ${OPENCMISS_USE_HDF5},$(OCE_HDF5),true)
-    ZLIB_LIBRARIES += $(call convertlistlink,$(OCE_ZLIBLIBS))
-    ZLIB_LIB_PATH += $(addprefix -L, $(OCE_ZLIBLIBPATH) )
-    ZLIB_INCLUDE_PATH += $(addprefix -I, $(OCE_ZLIBINCLUDEPATH) )
-  endif
-endif
+#ifeq ($(or ${OPENCMISS_USE_CELLML},${OPENCMISS_USE_FIELDML}),true)
+#  ZLIB_LIBRARIES += $(call convertlistlink,$(OCE_ZLIBLIBS))
+#  ZLIB_LIB_PATH += $(addprefix -L, $(OCE_ZLIBLIBPATH) )
+#  ZLIB_INCLUDE_PATH += $(addprefix -I, $(OCE_ZLIBINCLUDEPATH) )
+#else
+#  ifeq ($(and ${OPENCMISS_USE_HDF5},$(OCE_HDF5),true)
+#    ZLIB_LIBRARIES += $(call convertlistlink,$(OCE_ZLIBLIBS))
+#    ZLIB_LIB_PATH += $(addprefix -L, $(OCE_ZLIBLIBPATH) )
+#    ZLIB_INCLUDE_PATH += $(addprefix -I, $(OCE_ZLIBINCLUDEPATH) )
+#  endif
+#endif
 
 #CUDA
 CUDA_INCLUDE_PATH =#
