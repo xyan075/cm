@@ -1360,6 +1360,13 @@ MODULE OPENCMISS
     MODULE PROCEDURE CMISSControlLoop_MaximumIterationsSetNumber1
     MODULE PROCEDURE CMISSControlLoop_MaximumIterationsSetObj
   END INTERFACE !CMISSControlLoop_MaximumIterationsSet
+  
+  !>Sets/changes the load increments for a while or load increment control loop. \todo need a get method
+  INTERFACE CMISSControlLoop_LoadIncrementsSet
+    MODULE PROCEDURE CMISSControlLoop_LoadIncrementsSetNumber0
+    MODULE PROCEDURE CMISSControlLoop_LoadIncrementsSetNumber1
+    MODULE PROCEDURE CMISSControlLoop_LoadIncrementsSetObj
+  END INTERFACE !CMISSControlLoop_LoadIncrementsSet
 
   !>Returns the number of sub loops for a control loop.
   INTERFACE CMISSControlLoop_NumberOfSubLoopsGet
@@ -1438,7 +1445,7 @@ MODULE OPENCMISS
 
   PUBLIC CMISSControlLoop_LabelGet,CMISSControlLoop_LabelSet
 
-  PUBLIC CMISSControlLoop_MaximumIterationsSet
+  PUBLIC CMISSControlLoop_MaximumIterationsSet,CMISSControlLoop_LoadIncrementsSet
 
   PUBLIC CMISSControlLoop_NumberOfSubLoopsGet,CMISSControlLoop_NumberOfSubLoopsSet
 
@@ -16252,6 +16259,110 @@ CONTAINS
     RETURN
 
   END SUBROUTINE CMISSControlLoop_MaximumIterationsSetObj
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Sets/changes the load increments for a while control loop identified by user numbers.
+  SUBROUTINE CMISSControlLoop_LoadIncrementsSetNumber0(problemUserNumber,controlLoopIdentifier,loadIncrements,err)
+
+    !Argument variables
+    INTEGER(INTG), INTENT(IN) :: problemUserNumber !<The user number of the problem to set the load increments for.
+    INTEGER(INTG), INTENT(IN) :: controlLoopIdentifier !<The control loop identifier.
+    REAL(DP), INTENT(IN) :: loadIncrements(:) !<The load increments of the while control loop to set.
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code.
+    !Local variables
+    TYPE(CONTROL_LOOP_TYPE), POINTER :: controlLoop
+    TYPE(PROBLEM_TYPE), POINTER :: PROBLEM
+    TYPE(VARYING_STRING) :: LOCAL_ERROR
+
+    CALL ENTERS("CMISSControlLoop_LoadIncrementsSetNumber0",err,error,*999)
+
+    NULLIFY(controlLoop)
+    NULLIFY(PROBLEM)
+    CALL PROBLEM_USER_NUMBER_FIND(problemUserNumber,PROBLEM,err,error,*999)
+    IF(ASSOCIATED(PROBLEM)) THEN
+      CALL PROBLEM_CONTROL_LOOP_GET(PROBLEM,controlLoopIdentifier,controlLoop,err,error,*999)
+      CALL ControlLoop_LoadIncrementsSet(controlLoop,loadIncrements,err,error,*999)
+    ELSE
+      LOCAL_ERROR="A problem with an user number of "//TRIM(NUMBER_TO_VSTRING(problemUserNumber,"*",err,error))//" does not exist."
+      CALL FLAG_ERROR(LOCAL_ERROR,err,error,*999)
+    END IF
+
+    CALL EXITS("CMISSControlLoop_LoadIncrementsSetNumber0")
+    RETURN
+999 CALL ERRORS("CMISSControlLoop_LoadIncrementsSetNumber0",err,error)
+    CALL EXITS("CMISSControlLoop_LoadIncrementsSetNumber0")
+    CALL CMISS_HANDLE_ERROR(err,error)
+    RETURN
+
+  END SUBROUTINE CMISSControlLoop_LoadIncrementsSetNumber0
+
+  !
+  !================================================================================================================================
+  !
+
+  !>Sets/changes the load increments for a while control loop identified by user numbers.
+  SUBROUTINE CMISSControlLoop_LoadIncrementsSetNumber1(problemUserNumber,controlLoopIdentifiers,loadIncrements,err)
+
+    !Argument variables
+    INTEGER(INTG), INTENT(IN) :: problemUserNumber !<The user number of the problem to set the load increments for.
+    INTEGER(INTG), INTENT(IN) :: controlLoopIdentifiers(:) !<The control loop identifiers.
+    REAL(DP), INTENT(IN) :: loadIncrements(:) !<The load increments of the while control loop to set.
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code.
+    !Local variables
+    TYPE(CONTROL_LOOP_TYPE), POINTER :: controlLoop
+    TYPE(PROBLEM_TYPE), POINTER :: PROBLEM
+    TYPE(VARYING_STRING) :: LOCAL_ERROR
+
+    CALL ENTERS("CMISSControlLoop_LoadIncrementsSetNumber1",err,error,*999)
+
+    NULLIFY(controlLoop)
+    NULLIFY(PROBLEM)
+    CALL PROBLEM_USER_NUMBER_FIND(problemUserNumber,PROBLEM,err,error,*999)
+    IF(ASSOCIATED(PROBLEM)) THEN
+      CALL PROBLEM_CONTROL_LOOP_GET(PROBLEM,controlLoopIdentifiers,controlLoop,err,error,*999)
+      CALL ControlLoop_LoadIncrementsSet(controlLoop,loadIncrements,err,error,*999)
+    ELSE
+      LOCAL_ERROR="A problem with an user number of "//TRIM(NUMBER_TO_VSTRING(problemUserNumber,"*",err,error))//" does not exist."
+      CALL FLAG_ERROR(LOCAL_ERROR,err,error,*999)
+    END IF
+
+    CALL EXITS("CMISSControlLoop_LoadIncrementsSetNumber1")
+    RETURN
+999 CALL ERRORS("CMISSControlLoop_LoadIncrementsSetNumber1",err,error)
+    CALL EXITS("CMISSControlLoop_LoadIncrementsSetNumber1")
+    CALL CMISS_HANDLE_ERROR(err,error)
+    RETURN
+
+  END SUBROUTINE CMISSControlLoop_LoadIncrementsSetNumber1
+
+  !
+  !================================================================================================================================
+  !
+
+  !>Sets/changes the load increment for a while control loop identified by an object.
+  SUBROUTINE CMISSControlLoop_LoadIncrementsSetObj(controlLoop,loadIncrements,err)
+
+    !Argument variables
+    TYPE(CMISSControlLoopType), INTENT(INOUT) :: controlLoop !<The control loop to set the load increments for.
+    REAL(DP), INTENT(IN) :: loadIncrements(:) !<The load increments of the while control loop to set.
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code.
+    !Local variables
+
+    CALL ENTERS("CMISSControlLoop_LoadIncrementsSetObj",err,error,*999)
+
+    CALL ControlLoop_LoadIncrementsSet(controlLoop%CONTROL_LOOP,loadIncrements,err,error,*999)
+
+    CALL EXITS("CMISSControlLoop_LoadIncrementsSetObj")
+    RETURN
+999 CALL ERRORS("CMISSControlLoop_LoadIncrementsSetObj",err,error)
+    CALL EXITS("CMISSControlLoop_LoadIncrementsSetObj")
+    CALL CMISS_HANDLE_ERROR(err,error)
+    RETURN
+
+  END SUBROUTINE CMISSControlLoop_LoadIncrementsSetObj
 
   !
   !================================================================================================================================

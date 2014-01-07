@@ -6023,7 +6023,7 @@ CONTAINS
 
   !> Apply the boundary condition load increment to dependent field
   SUBROUTINE EQUATIONS_SET_BOUNDARY_CONDITIONS_INCREMENT(EQUATIONS_SET,BOUNDARY_CONDITIONS,ITERATION_NUMBER, &
-    & MAXIMUM_NUMBER_OF_ITERATIONS,ERR,ERROR,*)
+    & MAXIMUM_NUMBER_OF_ITERATIONS,ERR,ERROR,*,loadIncrements)
 
     !Argument variables
     TYPE(EQUATIONS_SET_TYPE), POINTER :: EQUATIONS_SET
@@ -6032,6 +6032,7 @@ CONTAINS
     INTEGER(INTG), INTENT(IN) :: MAXIMUM_NUMBER_OF_ITERATIONS !<Final index for load increment loop
     INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
     TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
+    REAL(DP), OPTIONAL, INTENT(IN) :: loadIncrements(:) !<Optional, the load increments for a control loop.
 
     !Local variables
     TYPE(FIELD_TYPE), POINTER :: DEPENDENT_FIELD
@@ -6106,22 +6107,27 @@ CONTAINS
                             dirichlet_dof_idx=DOMAIN_MAPPING%GLOBAL_TO_LOCAL_MAP(dirichlet_dof_idx)%LOCAL_NUMBER(1)
                             IF(0<dirichlet_dof_idx.AND.dirichlet_dof_idx<DOMAIN_MAPPING%GHOST_START) THEN
                               FULL_LOAD=FULL_LOADS(dirichlet_dof_idx)
-                              ! Apply full load if last step, or fixed BC
-                              IF(ITERATION_NUMBER==MAXIMUM_NUMBER_OF_ITERATIONS) THEN
-                                CALL FIELD_PARAMETER_SET_UPDATE_LOCAL_DOF(DEPENDENT_FIELD,variable_type,FIELD_VALUES_SET_TYPE, &
-                                  & dirichlet_dof_idx,FULL_LOAD,ERR,ERROR,*999)
+                              IF(PRESENT(loadIncrements)) THEN !Xiani Yan added, loadIncrement will only be present if it's allocated.
+                                CALL FIELD_PARAMETER_SET_ADD_LOCAL_DOF(DEPENDENT_FIELD,variable_type,FIELD_VALUES_SET_TYPE, &
+                                  & dirichlet_dof_idx,FULL_LOAD*loadIncrements(ITERATION_NUMBER),ERR,ERROR,*999)
                               ELSE
-                                !Calculate new load and apply to dependent field
-                                CURRENT_LOAD=CURRENT_LOADS(dirichlet_dof_idx)
-                                NEW_LOAD=CURRENT_LOAD+(FULL_LOAD-CURRENT_LOAD)/(MAXIMUM_NUMBER_OF_ITERATIONS-ITERATION_NUMBER+1)
-                                CALL FIELD_PARAMETER_SET_UPDATE_LOCAL_DOF(DEPENDENT_FIELD,variable_type,FIELD_VALUES_SET_TYPE, &
-                                  & dirichlet_dof_idx,NEW_LOAD,ERR,ERROR,*999)
-                                IF(DIAGNOSTICS1) THEN
-                                  CALL WRITE_STRING_VALUE(DIAGNOSTIC_OUTPUT_TYPE,"  dof idx",dirichlet_dof_idx,ERR,ERROR,*999)
-                                  CALL WRITE_STRING_VALUE(DIAGNOSTIC_OUTPUT_TYPE,"    current load",CURRENT_LOAD,ERR,ERROR,*999)
-                                  CALL WRITE_STRING_VALUE(DIAGNOSTIC_OUTPUT_TYPE,"    new load",NEW_LOAD,ERR,ERROR,*999)
-                                ENDIF
-                              ENDIF !Full or intermediate load
+                                ! Apply full load if last step, or fixed BC
+                                IF(ITERATION_NUMBER==MAXIMUM_NUMBER_OF_ITERATIONS) THEN
+                                  CALL FIELD_PARAMETER_SET_UPDATE_LOCAL_DOF(DEPENDENT_FIELD,variable_type,FIELD_VALUES_SET_TYPE, &
+                                    & dirichlet_dof_idx,FULL_LOAD,ERR,ERROR,*999)
+                                ELSE
+                                  !Calculate new load and apply to dependent field
+                                  CURRENT_LOAD=CURRENT_LOADS(dirichlet_dof_idx)
+                                  NEW_LOAD=CURRENT_LOAD+(FULL_LOAD-CURRENT_LOAD)/(MAXIMUM_NUMBER_OF_ITERATIONS-ITERATION_NUMBER+1)
+                                  CALL FIELD_PARAMETER_SET_UPDATE_LOCAL_DOF(DEPENDENT_FIELD,variable_type,FIELD_VALUES_SET_TYPE, &
+                                    & dirichlet_dof_idx,NEW_LOAD,ERR,ERROR,*999)
+                                  IF(DIAGNOSTICS1) THEN
+                                    CALL WRITE_STRING_VALUE(DIAGNOSTIC_OUTPUT_TYPE,"  dof idx",dirichlet_dof_idx,ERR,ERROR,*999)
+                                    CALL WRITE_STRING_VALUE(DIAGNOSTIC_OUTPUT_TYPE,"    current load",CURRENT_LOAD,ERR,ERROR,*999)
+                                    CALL WRITE_STRING_VALUE(DIAGNOSTIC_OUTPUT_TYPE,"    new load",NEW_LOAD,ERR,ERROR,*999)
+                                  ENDIF
+                                ENDIF !Full or intermediate load
+                              ENDIF !user specified load increments
                             ENDIF !non-ghost dof
                           ENDIF !current domain
                         CASE DEFAULT
@@ -6311,7 +6317,7 @@ CONTAINS
 
   !> Apply load increments for equations sets
   SUBROUTINE EQUATIONS_SET_LOAD_INCREMENT_APPLY(EQUATIONS_SET,BOUNDARY_CONDITIONS,ITERATION_NUMBER,MAXIMUM_NUMBER_OF_ITERATIONS, &
-    & ERR,ERROR,*)
+    & ERR,ERROR,*,loadIncrements)
 
     !Argument variables
     TYPE(EQUATIONS_SET_TYPE), POINTER :: EQUATIONS_SET
@@ -6320,13 +6326,14 @@ CONTAINS
     INTEGER(INTG), INTENT(IN) :: MAXIMUM_NUMBER_OF_ITERATIONS !<Final index for load increment loop
     INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
     TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
+    REAL(DP), OPTIONAL, INTENT(IN) :: loadIncrements(:) !<Optional, the load increments for a control loop.
 
     CALL ENTERS("EQUATIONS_SET_LOAD_INCREMENT_APPLY",ERR,ERROR,*999)
 
     IF(ASSOCIATED(EQUATIONS_SET)) THEN
       !Increment boundary conditions
       CALL EQUATIONS_SET_BOUNDARY_CONDITIONS_INCREMENT(EQUATIONS_SET,BOUNDARY_CONDITIONS,ITERATION_NUMBER, &
-        & MAXIMUM_NUMBER_OF_ITERATIONS,ERR,ERROR,*999)
+        & MAXIMUM_NUMBER_OF_ITERATIONS,ERR,ERROR,*999,loadIncrements)
 
       !Apply any other equation set specific increments
       SELECT CASE(EQUATIONS_SET%CLASS)

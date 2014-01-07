@@ -572,7 +572,7 @@ CONTAINS
                         IF(ASSOCIATED(SOLVER%SOLVER_EQUATIONS)) THEN
                           !Apply incremented boundary conditions here => 
                           CALL PROBLEM_SOLVER_LOAD_INCREMENT_APPLY(SOLVER%SOLVER_EQUATIONS,LOAD_INCREMENT_LOOP%ITERATION_NUMBER, &
-                            & LOAD_INCREMENT_LOOP%MAXIMUM_NUMBER_OF_ITERATIONS,ERR,ERROR,*999)
+                            & LOAD_INCREMENT_LOOP%MAXIMUM_NUMBER_OF_ITERATIONS,ERR,ERROR,*999,LOAD_INCREMENT_LOOP%increments)
                         ENDIF
                         CALL PROBLEM_SOLVER_SOLVE(SOLVER,ERR,ERROR,*999)
                       ELSE
@@ -1889,7 +1889,8 @@ CONTAINS
   !
 
   !> Apply the load increment for each equations_set associated with solver.
-  SUBROUTINE PROBLEM_SOLVER_LOAD_INCREMENT_APPLY(SOLVER_EQUATIONS,ITERATION_NUMBER,MAXIMUM_NUMBER_OF_ITERATIONS,ERR,ERROR,*)
+  SUBROUTINE PROBLEM_SOLVER_LOAD_INCREMENT_APPLY(SOLVER_EQUATIONS,ITERATION_NUMBER,MAXIMUM_NUMBER_OF_ITERATIONS,ERR,ERROR,*, &
+      & loadIncrements)
     
     !Argument variables
     TYPE(SOLVER_EQUATIONS_TYPE), POINTER :: SOLVER_EQUATIONS !<A pointer to the solver equations to solve
@@ -1897,6 +1898,7 @@ CONTAINS
     INTEGER(INTG), INTENT(IN) :: MAXIMUM_NUMBER_OF_ITERATIONS !<Final index for load increment loop
     INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
     TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
+    REAL(DP), OPTIONAL, INTENT(IN) :: loadIncrements(:) !<Optional, the load increments for a control loop.
     !Local variables
     TYPE(SOLVER_MAPPING_TYPE), POINTER :: SOLVER_MAPPING
     TYPE(EQUATIONS_SET_TYPE), POINTER :: EQUATIONS_SET
@@ -1911,7 +1913,7 @@ CONTAINS
         DO equations_set_idx=1,SOLVER_MAPPING%NUMBER_OF_EQUATIONS_SETS
           EQUATIONS_SET=>SOLVER_MAPPING%EQUATIONS_SETS(equations_set_idx)%PTR
           CALL EQUATIONS_SET_LOAD_INCREMENT_APPLY(EQUATIONS_SET,SOLVER_EQUATIONS%BOUNDARY_CONDITIONS,ITERATION_NUMBER, &
-            & MAXIMUM_NUMBER_OF_ITERATIONS,ERR,ERROR,*999)
+            & MAXIMUM_NUMBER_OF_ITERATIONS,ERR,ERROR,*999,loadIncrements)
         ENDDO !equations_set_idx
       ELSE
         CALL FLAG_ERROR("Solver equations solver mapping is not associated.",ERR,ERROR,*999)
