@@ -1222,6 +1222,10 @@ CONTAINS
                             & local_ny,INITIAL_VALUE,ERR,ERROR,*999)
                           CALL FIELD_PARAMETER_SET_UPDATE_LOCAL_DOF(FIELD,VARIABLE_TYPE,FIELD_BOUNDARY_CONDITIONS_SET_TYPE, &
                             & local_ny,INITIAL_VALUE+VALUES(i),ERR,ERROR,*999)
+                          ! Store the initial dependent field 
+                          !\Todo: XY-initial load only set up for FIXED_INCREMENTED type, can be added to other types if needed
+                          CALL FIELD_PARAMETER_SET_UPDATE_LOCAL_DOF(FIELD,VARIABLE_TYPE,FIELD_INITIAL_VALUES_SET_TYPE, &
+                            & local_ny,INITIAL_VALUE,ERR,ERROR,*999)
                         CASE(BOUNDARY_CONDITION_PRESSURE)
                           CALL FIELD_PARAMETER_SET_ADD_LOCAL_DOF(FIELD,VARIABLE_TYPE,FIELD_PRESSURE_VALUES_SET_TYPE, &
                             & local_ny,VALUES(i),ERR,ERROR,*999)
@@ -1408,6 +1412,10 @@ CONTAINS
                         CASE(BOUNDARY_CONDITION_FIXED_INCREMENTED) !For load increment loops
                           CALL FIELD_PARAMETER_SET_UPDATE_LOCAL_DOF(FIELD,VARIABLE_TYPE,FIELD_BOUNDARY_CONDITIONS_SET_TYPE, &
                             & local_ny,VALUES(i),ERR,ERROR,*999)
+                          ! Store the initial dependent field
+                          !\Todo: XY-initial load only set up for FIXED_INCREMENTED type, can be added to other types if needed
+                          CALL FIELD_PARAMETER_SETS_COPY(FIELD,VARIABLE_TYPE,FIELD_VALUES_SET_TYPE,FIELD_INITIAL_VALUES_SET_TYPE, &
+                            & 1.0_DP,ERR,ERROR,*999)  
                         CASE(BOUNDARY_CONDITION_PRESSURE)
                           CALL FIELD_PARAMETER_SET_UPDATE_LOCAL_DOF(FIELD,VARIABLE_TYPE,FIELD_PRESSURE_VALUES_SET_TYPE, &
                             & local_ny,VALUES(i),ERR,ERROR,*999)
@@ -1529,8 +1537,12 @@ CONTAINS
     CASE(BOUNDARY_CONDITION_FIXED_INCREMENTED) !For load increment loops
       dofType=BOUNDARY_CONDITION_DOF_FIXED
       CALL Field_ParameterSetEnsureCreated(boundaryConditionsVariable%VARIABLE%FIELD,boundaryConditionsVariable%VARIABLE_TYPE, &
-        & FIELD_BOUNDARY_CONDITIONS_SET_TYPE,err,error,*999)
+        & FIELD_INITIAL_VALUES_SET_TYPE,err,error,*999)
       boundaryConditionsVariable%parameterSetRequired(FIELD_BOUNDARY_CONDITIONS_SET_TYPE)=.TRUE.
+      !Also set up a parameter set to record the dependent field initial values
+      !\Todo: XY-initial load only set up for FIXED_INCREMENTED type, can be added to other types if needed
+      CALL Field_ParameterSetEnsureCreated(boundaryConditionsVariable%VARIABLE%FIELD,boundaryConditionsVariable%VARIABLE_TYPE, &
+        & FIELD_BOUNDARY_CONDITIONS_SET_TYPE,err,error,*999)
     CASE(BOUNDARY_CONDITION_PRESSURE)
       ! Pressure boundary conditions leave the RHS dof as free, as the Neumann terms
       ! are calculated in finite elasticity routines when calculating the element residual

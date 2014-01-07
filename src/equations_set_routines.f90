@@ -6055,8 +6055,8 @@ CONTAINS
     TYPE(BOUNDARY_CONDITIONS_PRESSURE_INCREMENTED_TYPE), POINTER :: PRESSURE_INCREMENTED_BOUNDARY_CONDITIONS
     INTEGER(INTG) :: variable_idx,variable_type,dirichlet_idx,dirichlet_dof_idx,neumann_point_dof
     INTEGER(INTG) :: condition_idx, condition_global_dof, condition_local_dof, MY_COMPUTATIONAL_NODE_NUMBER
-    REAL(DP), POINTER :: FULL_LOADS(:),CURRENT_LOADS(:), PREV_LOADS(:)
-    REAL(DP) :: FULL_LOAD, CURRENT_LOAD, NEW_LOAD, PREV_LOAD
+    REAL(DP), POINTER :: FULL_LOADS(:),CURRENT_LOADS(:), PREV_LOADS(:), initialLoads(:)
+    REAL(DP) :: FULL_LOAD, CURRENT_LOAD, NEW_LOAD, PREV_LOAD, initialLoad
     TYPE(VARYING_STRING) :: LOCAL_ERROR
 
     CALL ENTERS("EQUATIONS_SET_BOUNDARY_CONDITIONS_INCREMENT",ERR,ERROR,*999)
@@ -6106,6 +6106,11 @@ CONTAINS
                       CALL FIELD_PARAMETER_SET_DATA_GET(DEPENDENT_FIELD,variable_type,FIELD_VALUES_SET_TYPE, &
                         & CURRENT_LOADS,ERR,ERROR,*999)
   !                     write(*,*)'CURRENT_LOADS = ',CURRENT_LOADS
+                      IF(PRESENT(loadIncrements)) THEN !Xiani Yan added, loadIncrement will only be present if it's allocated. 
+                        !\Todo: XY-initial load only set up for FIXED_INCREMENTED type, can be added to other types if needed
+                        CALL FIELD_PARAMETER_SET_DATA_GET(DEPENDENT_FIELD,variable_type,FIELD_INITIAL_VALUES_SET_TYPE, &
+                          & initialLoads,ERR,ERROR,*999)
+                      ENDIF
                       !Get full increment, calculate new load, then apply to dependent field
                       DO dirichlet_idx=1,BOUNDARY_CONDITIONS_VARIABLE%NUMBER_OF_DIRICHLET_CONDITIONS
                         dirichlet_dof_idx=DIRICHLET_BOUNDARY_CONDITIONS%DIRICHLET_DOF_INDICES(dirichlet_idx)
@@ -6120,8 +6125,9 @@ CONTAINS
                             IF(0<dirichlet_dof_idx.AND.dirichlet_dof_idx<DOMAIN_MAPPING%GHOST_START) THEN
                               FULL_LOAD=FULL_LOADS(dirichlet_dof_idx)
                               IF(PRESENT(loadIncrements)) THEN !Xiani Yan added, loadIncrement will only be present if it's allocated.
+                                initialLoad=initialLoads(dirichlet_dof_idx)
                                 CALL FIELD_PARAMETER_SET_ADD_LOCAL_DOF(DEPENDENT_FIELD,variable_type,FIELD_VALUES_SET_TYPE, &
-                                  & dirichlet_dof_idx,FULL_LOAD*loadIncrements(ITERATION_NUMBER),ERR,ERROR,*999)
+                                  & dirichlet_dof_idx,(FULL_LOAD-initialLoad)*loadIncrements(ITERATION_NUMBER),ERR,ERROR,*999)
                               ELSE
                                 ! Apply full load if last step, or fixed BC
                                 IF(ITERATION_NUMBER==MAXIMUM_NUMBER_OF_ITERATIONS) THEN
