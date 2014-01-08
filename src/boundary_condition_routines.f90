@@ -1018,9 +1018,9 @@ CONTAINS
 
     !Note: This routine is for constant interpolation
     IF(ASSOCIATED(BOUNDARY_CONDITIONS)) THEN
-      IF(BOUNDARY_CONDITIONS%BOUNDARY_CONDITIONS_FINISHED) THEN
-        CALL FLAG_ERROR("Boundary conditions have been finished.",ERR,ERROR,*999)
-      ELSE
+!      IF(BOUNDARY_CONDITIONS%BOUNDARY_CONDITIONS_FINISHED) THEN
+!        CALL FLAG_ERROR("Boundary conditions have been finished.",ERR,ERROR,*999)
+!      ELSE
         IF(ASSOCIATED(FIELD)) THEN
           CALL FIELD_COMPONENT_DOF_GET_CONSTANT(FIELD,VARIABLE_TYPE,COMPONENT_NUMBER,local_ny,global_ny, &
             & ERR,ERROR,*999)
@@ -1039,7 +1039,7 @@ CONTAINS
         ELSE
           CALL FLAG_ERROR("The dependent field is not associated.",ERR,ERROR,*999)
         ENDIF
-      ENDIF
+!      ENDIF
     ELSE
       CALL FLAG_ERROR("Boundary conditions is not associated.",ERR,ERROR,*999)
     ENDIF
@@ -1167,9 +1167,9 @@ CONTAINS
     NULLIFY(dependent_variable)
 
     IF(ASSOCIATED(BOUNDARY_CONDITIONS)) THEN
-      IF(BOUNDARY_CONDITIONS%BOUNDARY_CONDITIONS_FINISHED) THEN
-        CALL FLAG_ERROR("Boundary conditions have been finished.",ERR,ERROR,*999)
-      ELSE
+!      IF(BOUNDARY_CONDITIONS%BOUNDARY_CONDITIONS_FINISHED) THEN
+!        CALL FLAG_ERROR("Boundary conditions have been finished.",ERR,ERROR,*999)
+!      ELSE
         IF(ASSOCIATED(FIELD)) THEN
           NULLIFY(DEPENDENT_VARIABLE)
           CALL FIELD_VARIABLE_GET(FIELD,VARIABLE_TYPE,DEPENDENT_VARIABLE,ERR,ERROR,*999)
@@ -1293,7 +1293,7 @@ CONTAINS
         ELSE
           CALL FLAG_ERROR("The dependent field is not associated..",ERR,ERROR,*999)
         ENDIF
-      ENDIF
+!      ENDIF
     ELSE
       CALL FLAG_ERROR("Boundary conditions is not associated.",ERR,ERROR,*999)
     ENDIF
