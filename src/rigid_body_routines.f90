@@ -122,13 +122,13 @@ CONTAINS
         ENDDO !componentIdx
         ! Construct rotation matrix
         rotationMatrix(1,1)=COS(theta(2))*COS(theta(3))
-        rotationMatrix(1,2)=COS(theta(2))*SIN(theta(3))
-        rotationMatrix(1,3)=-SIN(theta(2))
-        rotationMatrix(2,1)=SIN(theta(1))*SIN(theta(2))*COS(theta(3))-COS(theta(1))*SIN(theta(3))
-        rotationMatrix(2,2)=SIN(theta(1))*SIN(theta(2))*SIN(theta(3))+COS(theta(1))*COS(theta(3))
-        rotationMatrix(2,3)=SIN(theta(1))*COS(theta(2))
-        rotationMatrix(3,1)=COS(theta(1))*SIN(theta(2))*COS(theta(3))+SIN(theta(1))*SIN(theta(3))
-        rotationMatrix(3,2)=COS(theta(1))*SIN(theta(2))*SIN(theta(3))-SIN(theta(1))*COS(theta(3))
+        rotationMatrix(1,2)=-COS(theta(2))*SIN(theta(3))
+        rotationMatrix(1,3)=SIN(theta(2))
+        rotationMatrix(2,1)=SIN(theta(1))*SIN(theta(2))*COS(theta(3))+COS(theta(1))*SIN(theta(3))
+        rotationMatrix(2,2)=-SIN(theta(1))*SIN(theta(2))*SIN(theta(3))+COS(theta(1))*COS(theta(3))
+        rotationMatrix(2,3)=-SIN(theta(1))*COS(theta(2))
+        rotationMatrix(3,1)=-COS(theta(1))*SIN(theta(2))*COS(theta(3))+SIN(theta(1))*SIN(theta(3))
+        rotationMatrix(3,2)=COS(theta(1))*SIN(theta(2))*SIN(theta(3))+SIN(theta(1))*COS(theta(3))
         rotationMatrix(3,3)=COS(theta(1))*COS(theta(2))
         !**********************************************************************************************************************
         ! Transform the field
