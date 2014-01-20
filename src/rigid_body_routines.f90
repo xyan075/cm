@@ -130,12 +130,26 @@ CONTAINS
         rotationMatrix(3,1)=-COS(theta(1))*SIN(theta(2))*COS(theta(3))+SIN(theta(1))*SIN(theta(3))
         rotationMatrix(3,2)=COS(theta(1))*SIN(theta(2))*SIN(theta(3))+SIN(theta(1))*COS(theta(3))
         rotationMatrix(3,3)=COS(theta(1))*COS(theta(2))
+        
+!        rotationMatrix=1.0_DP
+!        rotationMatrix(1,2)=-theta(3)
+!        rotationMatrix(1,3)=theta(2)
+!        rotationMatrix(2,1)=theta(3)
+!        rotationMatrix(2,3)=-theta(1)
+!        rotationMatrix(3,1)=-theta(2)
+!        rotationMatrix(3,2)=theta(1)
+        
         !**********************************************************************************************************************
         ! Transform the field
         ! Determine if the all components have the same mesh components/ bases
+        sameBases=.TRUE.
         DO componentIdx=1,noGeoComp-1
           IF(geometricField%VARIABLES(FIELD_U_VARIABLE_TYPE)%COMPONENTS(componentIdx)%MESH_COMPONENT_NUMBER/= &
             & geometricField%VARIABLES(FIELD_U_VARIABLE_TYPE)%COMPONENTS(componentIdx+1)%MESH_COMPONENT_NUMBER) sameBases=.FALSE.
+!          CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"mesh comp no:",geometricField%VARIABLES(FIELD_U_VARIABLE_TYPE)% &
+!            & COMPONENTS(componentIdx)%MESH_COMPONENT_NUMBER,ERR,ERROR,*999)
+!          CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"mesh comp no + 1:",geometricField%VARIABLES(FIELD_U_VARIABLE_TYPE)% &
+!            & COMPONENTS(componentIdx+1)%MESH_COMPONENT_NUMBER,ERR,ERROR,*999)  
         ENDDO
         IF(sameBases) THEN
           domain=>geometricField%VARIABLES(FIELD_U_VARIABLE_TYPE)%COMPONENTS(1)%DOMAIN !Use the 1st component domain since they are the same for all components
@@ -163,6 +177,14 @@ CONTAINS
               ENDDO !versionIdx
             ENDDO !derivativeIdx
           ENDDO !nodeIdx
+          ! output to screen rigid body dofs
+!          CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"centre of mass(1) = ",centreOfMass(1),err,error,*999)
+!          CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"centre of mass(2) = ",centreOfMass(2),err,error,*999)
+!          CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"centre of mass(3) = ",centreOfMass(3),err,error,*999)
+!          
+!          CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"theta(1) = ",theta(1),err,error,*999)
+!          CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"theta(2) = ",theta(2),err,error,*999)
+!          CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"theta(3) = ",theta(3),err,error,*999)
         ELSE
           CALL FLAG_ERROR("Transformation for different component bases not implemented.",err,error,*999)
         ENDIF
@@ -603,7 +625,7 @@ CONTAINS
     TYPE(FIELD_INTERPOLATED_POINT_TYPE), POINTER :: interpolatedPoint
     TYPE(FIELD_INTERPOLATED_POINT_METRICS_TYPE), POINTER :: pointMetrics
     INTEGER(INTG) :: elementIdx,gaussIdx,componentIdx
-    INTEGER(INTG) :: meshComponentNumber,localElementNumber,noGeoComp
+    INTEGER(INTG) :: meshComponentNumber,localElementNumber,noGeoComp,userNodeNumber
     REAL(DP) :: gaussWeight,mass,centreOfMass(3)
     TYPE(VARYING_STRING) :: localError
     
@@ -653,6 +675,20 @@ CONTAINS
                 ENDDO !gaussIdx
               ENDDO !elementIdx
               centreOfMass(1:noGeoComp)=centreOfMass(1:noGeoComp)/mass
+              
+              !---------------------------------------------------------------------------------------------------------------------
+              ! Centre of mass has been shift to a node for testing purpose, will need to be removed or done properly
+!              userNodeNumber=1107
+!              DO componentIdx=1,noGeoComp
+!                CALL FIELD_PARAMETER_SET_GET_NODE(geometricField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE,1,1, &
+!                  & userNodeNumber,componentIdx,centreOfMass(componentIdx),ERR,ERROR,*999)
+!              ENDDO !componentIdx
+!              
+!              CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"centre of mass(1) = ",centreOfMass(1),err,error,*999)
+!              CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"centre of mass(2) = ",centreOfMass(2),err,error,*999)
+!              CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"centre of mass(3) = ",centreOfMass(3),err,error,*999)
+              
+              !---------------------------------------------------------------------------------------------------------------------
               ! Update independent field with the calculate centre of mass
               DO componentIdx=1,noGeoComp
                 CALL FIELD_PARAMETER_SET_UPDATE_CONSTANT(independentField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE, &
