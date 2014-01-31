@@ -65,6 +65,7 @@ MODULE PROBLEM_ROUTINES
   USE INTERFACE_ROUTINES
   USE ISO_VARYING_STRING
   USE KINDS
+  USE LISTS
   USE MESH_ROUTINES
   USE MULTI_PHYSICS_ROUTINES
   USE PROBLEM_CONSTANTS
@@ -1348,6 +1349,7 @@ CONTAINS
                     IF(EQUATIONS_SET%CLASS==EQUATIONS_SET_MULTI_PHYSICS_CLASS .AND.  &
                         & EQUATIONS_SET%TYPE==EQUATIONS_SET_FINITE_ELASTICITY_RIGID_BODY_TYPE) THEN
                       CALL EquationsSet_JacobianRigidBodyContactUpdateStaticFEM(EQUATIONS_SET,ERR,ERROR,*999)
+                      CALL EquationsSet_JacobianRigidBodyContactPerturb(EQUATIONS_SET,ERR,ERROR,*999)
                     ! deformable-deformable body contact
                     ELSEIF(EQUATIONS_SET%TYPE==EQUATIONS_SET_FINITE_ELASTICITY_TYPE) THEN
                       CALL EQUATIONS_SET_JACOBIAN_CONTACT_UPDATE_STATIC_FEM(EQUATIONS_SET,ERR,ERROR,*999)
@@ -1883,8 +1885,8 @@ CONTAINS
                             !Calculate the force term --idx 1 for frictionless, normal direction
                             forceTerm=coefficient*rowPhi*contactPointMetrics%normal(rowFieldComp)* & 
                               & colPhi*contactPointMetrics%normal(colFieldComp)*contactPointMetrics%contactStiffness(1)* &
-                              & rowDofScaleFactor*colDofScaleFactor!*contactPointMetrics%Jacobian*interface%DATA_POINTS% &
-!                              & DATA_POINTS(globalDataPointNum)%WEIGHTS(1)
+                              & rowDofScaleFactor*colDofScaleFactor*contactPointMetrics%Jacobian*interface%DATA_POINTS% &
+                              & DATA_POINTS(globalDataPointNum)%WEIGHTS(1)
                             
                             !Multiply by scale factors
                             CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,rowIdx,colIdx,forceTerm,err,error,*999)
@@ -1954,16 +1956,16 @@ CONTAINS
                       !\todo: generalise the offset for deformable body components, i.e. 4
                       colFieldComp=rowFieldComp
                       DO colFieldComp=1,3
-                      
                         DO rigidBodyColDofCompIdx=1,6
                           colPhi=rigidBodyMatrix(colFieldComp,rigidBodyColDofCompIdx)
                           colIdx=defDepVariable%components(rigidBodyColDofCompIdx+4)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP 
                           forceTerm=coefficient*rowPhi*contactPointMetrics%normal(rowFieldComp)* & 
                             & colPhi*contactPointMetrics%normal(colFieldComp)*contactPointMetrics%contactStiffness(1)* &
-                            & rowDofScaleFactor!*contactPointMetrics%Jacobian*interface%DATA_POINTS% &
-!                            & DATA_POINTS(globalDataPointNum)%WEIGHTS(1)
-                          CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,rowIdx,colIdx,forceTerm,err,error,*999)
+                            & rowDofScaleFactor*contactPointMetrics%Jacobian*interface%DATA_POINTS% &
+                            & DATA_POINTS(globalDataPointNum)%WEIGHTS(1)
                           CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,colIdx,rowIdx,forceTerm,err,error,*999)
+                          IF(rigidBodyColDofCompIdx<4)  &
+                            & CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,rowIdx,colIdx,forceTerm,err,error,*999)
                         ENDDO !dofIdx
                       ENDDO !colFieldComp
                     ENDDO !rowFaceDerivative
@@ -1979,13 +1981,13 @@ CONTAINS
                     rowIdx=defDepVariable%components(rigidBodyRowDofCompIdx+4)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP 
                       colFieldComp=rowFieldComp
                       DO colFieldComp=1,3
-                        DO rigidBodyColDofCompIdx=1,6
+                        DO rigidBodyColDofCompIdx=1,3
                           colPhi=rigidBodyMatrix(colFieldComp,rigidBodyColDofCompIdx)
                           colIdx=defDepVariable%components(rigidBodyColDofCompIdx+4)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP 
                           forceTerm=coefficient*rowPhi*contactPointMetrics%normal(rowFieldComp)*colPhi* &
-                            & contactPointMetrics%normal(colFieldComp)*contactPointMetrics%contactStiffness(1)!* &
-!                            & contactPointMetrics%Jacobian*interface%DATA_POINTS%DATA_POINTS(globalDataPointNum)% &
-!                            & WEIGHTS(1)
+                            & contactPointMetrics%normal(colFieldComp)*contactPointMetrics%contactStiffness(1)* &
+                            & contactPointMetrics%Jacobian*interface%DATA_POINTS%DATA_POINTS(globalDataPointNum)% &
+                            & WEIGHTS(1)
                           CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,rowIdx,colIdx,forceTerm,err,error,*999)
                         ENDDO !rigidBodyColDofCompIdx
                       ENDDO !colFieldComp
@@ -2033,6 +2035,199 @@ CONTAINS
     CALL EXITS("EquationsSet_JacobianRigidBodyContactUpdateStaticFEM")
     RETURN 1
   END SUBROUTINE EquationsSet_JacobianRigidBodyContactUpdateStaticFEM
+  
+    !
+  !================================================================================================================================
+  !
+
+  !>Evaluates the Jacobian for a static equations set with rigid body contact using the finite element method, with perturbation method
+  SUBROUTINE EquationsSet_JacobianRigidBodyContactPerturb(equationsSet,ERR,ERROR,*)
+
+    !Argument variables
+    TYPE(EQUATIONS_SET_TYPE), POINTER :: equationsSet !<A pointer to the equations set to evaluate the Jacobian for
+    INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
+    !Local Variables
+    TYPE(FIELD_TYPE), POINTER :: defDepField,LagrangeField
+    TYPE(EQUATIONS_TYPE), POINTER :: equations
+    TYPE(EQUATIONS_MATRICES_TYPE), POINTER :: equationsMatrices
+    TYPE(EQUATIONS_MATRICES_NONLINEAR_TYPE), POINTER :: nonlinearMatrices
+    TYPE(EQUATIONS_MAPPING_NONLINEAR_TYPE), POINTER :: nonlinearMapping
+    TYPE(INTERFACE_TYPE), POINTER :: interface !<A pointer to the interface 
+    TYPE(INTERFACE_CONDITION_TYPE), POINTER :: interfaceCondition  !<A pointer to the equations set to evaluate the element Jacobian for
+    TYPE(InterfacePointsConnectivityType), POINTER :: pointsConnectivity !<A pointer to the interface points connectivity
+    TYPE(InterfaceContactMetricsType), POINTER :: contactMetrics 
+    TYPE(DISTRIBUTED_MATRIX_TYPE), POINTER :: jacobian
+    TYPE(FIELD_VARIABLE_TYPE), POINTER :: defDepVariable
+    TYPE(DISTRIBUTED_VECTOR_TYPE), POINTER :: parameters
+    TYPE(EQUATIONS_SET_TYPE), POINTER :: equationSetRigidNodal
+    TYPE(LIST_TYPE), POINTER :: faceNumberList,defDofList
+    TYPE(DOMAIN_FACE_TYPE), POINTER :: domainFace
+    
+    INTEGER(INTG) :: jacobianNumber,interfaceGlobalNumber,interfaceConditionGlobalNumber,localNy,numberOfContactPoints, &
+      & numberOfPointsInContact,elementNumber,elementFaceNumber,deformableBodyIdx,decompositionFaceNumber,meshComp, &
+      & numberOfContactFaces,versionNumber,localNodeNumber,globalDerivativeNumber,numberOfContactDofs
+    INTEGER(INTG), ALLOCATABLE :: contactFaces(:),contactDofs(:)
+    INTEGER(INTG) :: perturbDofIdx,rowDofIdx,dataPointIdx,faceIdx,nodeIdx,derivativeIdx,componentIdx
+    REAL(DP) :: delta,origDepVar,jacobianEntry
+    
+    TYPE(VARYING_STRING) :: localError
+    
+    CALL ENTERS("EquationsSet_JacobianRigidBodyContactPerturb",ERR,ERROR,*999)
+
+    IF(ASSOCIATED(equationsSet)) THEN
+      defDepField=>equationsSet%DEPENDENT%DEPENDENT_FIELD
+      IF(ASSOCIATED(defDepField)) THEN
+        equations=>equationsSet%EQUATIONS
+        IF(ASSOCIATED(equations)) THEN
+          equationsMatrices=>equations%EQUATIONS_MATRICES
+          IF(ASSOCIATED(equationsMatrices)) THEN
+            nonlinearMatrices=>equationsMatrices%NONLINEAR_MATRICES
+            !nonlinearResidual=>nonlinearMatrices%RESIDUAL
+            nonlinearMapping=>equations%EQUATIONS_MAPPING%NONLINEAR_MAPPING
+            
+            interfaceGlobalNumber=1
+            interfaceConditionGlobalNumber=1
+            interface=>equationsSet%REGION%PARENT_REGION%INTERFACES%INTERFACES(interfaceGlobalNumber)%PTR
+            interfaceCondition=>interface%INTERFACE_CONDITIONS%INTERFACE_CONDITIONS(interfaceConditionGlobalNumber)%PTR
+            pointsConnectivity=>interface%pointsConnectivity
+            contactMetrics=>interfaceCondition%interfaceContactMetrics
+            LagrangeField=>interfaceCondition%LAGRANGE%LAGRANGE_FIELD
+            
+            meshComp=1
+            jacobianNumber=1
+            jacobian=>nonlinearMatrices%JACOBIANS(jacobianNumber)%PTR%JACOBIAN
+            defDepVariable=>nonlinearMapping%JACOBIAN_TO_VAR_MAP(jacobianNumber)%VARIABLE
+            parameters=>defDepVariable%PARAMETER_SETS%PARAMETER_SETS(FIELD_VALUES_SET_TYPE)%PTR%PARAMETERS  ! vector of dependent variables, basically
+            
+            equationSetRigidNodal=>interface%PARENT_REGION%SUB_REGIONS(2)%PTR%EQUATIONS_SETS%EQUATIONS_SETS(1)%PTR
+            
+            CALL DistributedVector_L2Norm(parameters,delta,err,error,*999)
+            delta=1E-10_DP
+!            delta=(1.0_DP+delta)*1E-7_DP
+            
+!            deformableBodyIdx=1;
+!            numberOfContactPoints=interface%DATA_POINTS%NUMBER_OF_DATA_POINTS
+!            ! Count number of points in contact
+!            numberOfPointsInContact=0
+!            DO dataPointIdx=1,numberOfContactPoints
+!              IF(contactMetrics%inContact(dataPointIdx)) numberOfPointsInContact=numberOfPointsInContact+1
+!            ENDDO !dataPointIdx
+!            
+!            ! Find all the faces in contact
+!            NULLIFY(faceNumberList)
+!            CALL LIST_CREATE_START(faceNumberList,err,error,*999)
+!            CALL LIST_DATA_TYPE_SET(faceNumberList,LIST_INTG_TYPE,err,error,*999)
+!            CALL LIST_INITIAL_SIZE_SET(faceNumberList,numberOfPointsInContact,err,error,*999)
+!            CALL LIST_CREATE_FINISH(faceNumberList,err,error,*999)
+!            ! add all face numbers into the list
+!            DO dataPointIdx=1,numberOfContactPoints
+!              elementNumber=pointsConnectivity%pointsConnectivity(dataPointIdx,deformableBodyIdx)%coupleDMeshElementNumber
+!              elementFaceNumber=pointsConnectivity%pointsConnectivity(dataPointIdx,deformableBodyIdx)%elementLineFaceNumber
+!              decompositionFaceNumber=defDepField%DECOMPOSITION%TOPOLOGY%ELEMENTS%ELEMENTS(elementNumber)% &
+!                & ELEMENT_FACES(elementFaceNumber)
+!              CALL LIST_ITEM_ADD(faceNumberList,decompositionFaceNumber,err,error,*999)
+!            ENDDO !dataPointIdx
+!            ! only keep the unique face numbers
+!            CALL LIST_REMOVE_DUPLICATES(faceNumberList,err,error,*999)
+!            CALL LIST_DETACH_AND_DESTROY(faceNumberList,numberOfContactFaces,contactFaces,ERR,ERROR,*999)
+!            
+!            ! Find all the dofs in contact
+!            NULLIFY(defDofList)
+!            CALL LIST_CREATE_START(defDofList,err,error,*999)
+!            CALL LIST_DATA_TYPE_SET(defDofList,LIST_INTG_TYPE,err,error,*999)
+!            CALL LIST_INITIAL_SIZE_SET(defDofList,numberOfPointsInContact,err,error,*999)
+!            CALL LIST_CREATE_FINISH(defDofList,err,error,*999)
+!            ! add all contact dofs into the list
+!            DO componentIdx=1,3
+!              DO faceIdx=1,numberOfContactFaces
+!                domainFace=>defDepField%DECOMPOSITION%DOMAIN(meshComp)%PTR%TOPOLOGY%FACES%FACES(contactFaces(faceIdx))
+!                DO nodeIdx=1,domainFace%BASIS%NUMBER_OF_NODES
+!                  localNodeNumber=domainFace%NODES_IN_FACE(nodeIdx)
+!                  DO derivativeIdx=1,domainFace%BASIS%NUMBER_OF_DERIVATIVES(nodeIdx)
+!                    globalDerivativeNumber=domainFace%DERIVATIVES_IN_FACE(1,derivativeIdx,nodeIdx)
+!                    versionNumber=domainFace%DERIVATIVES_IN_FACE(2,derivativeIdx,nodeIdx)
+!                    !Find dof associated with this particular field, component, node, derivative and version.
+!                    localNy=defDepVariable%components(componentIdx)%PARAM_TO_DOF_MAP%NODE_PARAM2DOF_MAP% &
+!                      & NODES(localNodeNumber)%DERIVATIVES(globalDerivativeNumber)%VERSIONS(versionNumber)
+!                    CALL LIST_ITEM_ADD(defDofList,localNy,err,error,*999)
+!                  ENDDO !derivativeIdx
+!                ENDDO !nodeIdx
+!              ENDDO !faceIdx
+!            ENDDO !componentIdx
+!            ! only keep the unique dof numbers
+!            CALL LIST_REMOVE_DUPLICATES(defDofList,err,error,*999)
+!            CALL LIST_DETACH_AND_DESTROY(defDofList,numberOfContactDofs,contactDofs,ERR,ERROR,*999)
+            
+            ! perturb deformable body dofs
+!            DO perturbDofIdx=1,numberOfContactDofs
+!              localNy=contactDofs(perturbDofIdx)
+!              ! Get the original dependent dof value
+!              CALL DISTRIBUTED_VECTOR_VALUES_GET(parameters,localNy,origDepVar,err,error,*999)
+!              ! Perturb the dof
+!              CALL DISTRIBUTED_VECTOR_VALUES_SET(parameters,localNy,origDepVar+delta,err,error,*999)
+!              CALL InterfacePointsConnectivity_DataReprojection(interface,interfaceCondition,err,error,*999)
+!              CALL FrictionlessContact_contactMetricsCalculate(interfaceCondition,1,err,error,*999)
+!              !Calculate perturbed residual 
+!              CALL EquationsSet_ResidualRigidBodyContactUpdateStaticFEM(equationsSet,.TRUE.,err,error,*999)! perturbation flag = true
+!              CALL DISTRIBUTED_VECTOR_VALUES_SET(parameters,localNy,origDepVar,err,error,*999)
+!              
+!              ! Update the corresponding dof Jacobian
+!              DO rowDofIdx=1,defDepVariable%NUMBER_OF_DOFS
+!                jacobianEntry=(contactMetrics%residualPerturbed(rowDofIdx)-contactMetrics%residualOriginal(rowDofIdx))/delta
+!                CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,rowDofIdx,localNy,jacobianEntry,err,error,*999)
+!              ENDDO !rowDofIdx
+!            ENDDO !perturbDofIdx
+            
+            !====================================================================================================================
+            ! perturb rigid body dofs
+            DO perturbDofIdx=1,3
+!              CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"Perturbation:",ERR,ERROR,*999)
+              ! Get the original dependent dof value
+              localNy=defDepVariable%COMPONENTS(perturbDofIdx+7)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
+              CALL DISTRIBUTED_VECTOR_VALUES_GET(parameters,localNy,origDepVar,err,error,*999)
+              ! Perturb the dof
+              CALL DISTRIBUTED_VECTOR_VALUES_SET(parameters,localNy,origDepVar+delta,err,error,*999)
+              CALL RigidBody_ApplyTransformation(equationsSet,equationSetRigidNodal,err,error,*999)
+              CALL InterfacePointsConnectivity_DataReprojection(interface,interfaceCondition,err,error,*999)
+              CALL FrictionlessContact_contactMetricsCalculate(interfaceCondition,1,err,error,*999)
+              !Calculate perturbed residual 
+              CALL EquationsSet_ResidualRigidBodyContactUpdateStaticFEM(equationsSet,.TRUE.,err,error,*999)! perturbation flag = true
+              CALL DISTRIBUTED_VECTOR_VALUES_SET(parameters,localNy,origDepVar,err,error,*999)
+              
+              ! Update the corresponding dof Jacobian
+              DO rowDofIdx=1,defDepVariable%NUMBER_OF_DOFS
+                jacobianEntry=(contactMetrics%residualPerturbed(rowDofIdx)-contactMetrics%residualOriginal(rowDofIdx))/delta
+                CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,rowDofIdx,localNy,jacobianEntry,err,error,*999)
+              ENDDO !rowDofIdx
+            ENDDO !perturbDofIdx
+            
+            CALL DISTRIBUTED_MATRIX_UPDATE_START(jacobian,err,error,*999)
+            CALL DISTRIBUTED_MATRIX_UPDATE_FINISH(jacobian,err,error,*999)
+            
+            CALL RigidBody_ApplyTransformation(equationsSet,equationSetRigidNodal,err,error,*999)
+            CALL InterfacePointsConnectivity_DataReprojection(interface,interfaceCondition,err,error,*999)
+            CALL FrictionlessContact_contactMetricsCalculate(interfaceCondition,1,err,error,*999)
+            
+          ELSE
+            CALL FLAG_ERROR("Equations matrices is not associated",err,error,*999)
+          ENDIF
+        ELSE
+          CALL FLAG_ERROR("Equations is not associated",err,error,*999)
+        ENDIF
+      ELSE
+        CALL FLAG_ERROR("Deformable dependent field is not associated",err,error,*999)
+      ENDIF
+    ELSE
+      CALL FLAG_ERROR("Equations set is not associated.",err,error,*999)
+    ENDIF
+       
+    CALL EXITS("EquationsSet_JacobianRigidBodyContactPerturb")
+    RETURN
+999 CALL ERRORS("EquationsSet_JacobianRigidBodyContactPerturb",ERR,ERROR)
+    CALL EXITS("EquationsSet_JacobianRigidBodyContactPerturb")
+    RETURN 1
+  END SUBROUTINE EquationsSet_JacobianRigidBodyContactPerturb
 
   !
   !================================================================================================================================
@@ -2207,7 +2402,7 @@ CONTAINS
                              & EQUATIONS_SET%TYPE==EQUATIONS_SET_FINITE_ELASTICITY_RIGID_BODY_TYPE) THEN !Rigid-deformable contact
                             !Modify residual for rigid-deformable contact
                             CALL EquationsSet_ResidualRigidBodyContactUpdateStaticFEM(SOLVER_MAPPING% &
-                              & EQUATIONS_SETS(equationsSetGlobalNumber)%PTR,ERR,ERROR,*999)
+                              & EQUATIONS_SETS(equationsSetGlobalNumber)%PTR,.FALSE.,ERR,ERROR,*999)
                           ELSEIF(EQUATIONS_SET%TYPE==EQUATIONS_SET_FINITE_ELASTICITY_TYPE) THEN !Deformable-deformable contact
                             !Modify residual for deformable bodies contact
                             CALL EQUATIONS_SET_RESIDUAL_CONTACT_UPDATE_STATIC_FEM(SOLVER_MAPPING% &
@@ -2454,10 +2649,11 @@ CONTAINS
   !
 
   !>Updates the equation set residual for a static equations set which includes rigid body contact using the finite element method
-  SUBROUTINE EquationsSet_ResidualRigidBodyContactUpdateStaticFEM(equationsSet,err,error,*)
+  SUBROUTINE EquationsSet_ResidualRigidBodyContactUpdateStaticFEM(equationsSet,perburbation,err,error,*)
 
     !Argument variables
     TYPE(EQUATIONS_SET_TYPE), POINTER :: equationsSet !<A pointer to the equations set to evaluate the residual for
+    LOGICAL, INTENT(IN) :: perburbation !If this function is used for perturbation of Jacobian evaluation
     INTEGER(INTG), INTENT(OUT) :: err !<The error code
     TYPE(VARYING_STRING), INTENT(OUT) :: error !<The error string
     !Local Variables
@@ -2507,6 +2703,22 @@ CONTAINS
             residualVariableIdx=1
             residualVariable=>nonlinearMapping%RESIDUAL_VARIABLES(residualVariableIdx)%PTR
             IF(ASSOCIATED(residualVariable)) THEN
+              ! \todo: XY - rigid body deformable contact, need to remove when LHS mapping is in
+              ! allocate memory space for the residual vector
+              IF(.NOT. ALLOCATED(contactMetrics%residualOriginal)) ALLOCATE(contactMetrics% &
+                & residualOriginal(residualVariable%NUMBER_OF_DOFS),STAT=err)
+              IF(err/=0) CALL FLAG_ERROR("Could not allocate original residual vector.",err,error,*999)
+              
+              IF(.NOT. ALLOCATED(contactMetrics%residualPerturbed)) ALLOCATE(contactMetrics% &
+                & residualPerturbed(residualVariable%NUMBER_OF_DOFS),STAT=err)
+              IF(err/=0) CALL FLAG_ERROR("Could not allocate perturbed residual vector.",err,error,*999)
+              
+              IF(perburbation) THEN
+                contactMetrics%residualPerturbed=0.0_DP
+              ELSE
+                contactMetrics%residualOriginal=0.0_DP
+              ENDIF
+            
               previousFaceNo=0
               DO globalDataPointNum=1,SIZE(pointsConnectivity%pointsConnectivity,1)
                 contactPointMetrics=>contactMetrics%contactPointMetrics(globalDataPointNum)
@@ -2552,14 +2764,19 @@ CONTAINS
                           & NODES(globalNode)%DERIVATIVES(derivative)%VERSIONS(versionNumber)
                         ! See Jae's thesis equation 4.34
                         residualValue=-coefficient*phi*contactPointMetrics%normal(fieldComponent)* &
-                          & contactPointMetrics%contactForce!*contactPointMetrics%Jacobian*interface%DATA_POINTS% &
-!                          & DATA_POINTS(globalDataPointNum)%WEIGHTS(1)
+                          & contactPointMetrics%contactForce*contactPointMetrics%Jacobian*interface%DATA_POINTS% &
+                          & DATA_POINTS(globalDataPointNum)%WEIGHTS(1)
                         !Get the face parameter index in the element
                         elemParameterNo=domainFace%BASIS%ELEMENT_PARAMETER_INDEX(faceDerivative,localFaceNodeIdx)
                         !Multiply the contribution by scale factor
                         residualValue=residualValue*equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)% &
                           & PTR%SCALE_FACTORS(elemParameterNo,fieldComponent)
-                        CALL DISTRIBUTED_VECTOR_VALUES_ADD(nonlinearMatrices%RESIDUAL,dofIdx,residualValue,err,error,*999)
+                        IF(perburbation) THEN
+                          contactMetrics%residualPerturbed(dofIdx)=residualValue
+                        ELSE
+                          contactMetrics%residualOriginal(dofIdx)=residualValue
+                          CALL DISTRIBUTED_VECTOR_VALUES_ADD(nonlinearMatrices%RESIDUAL,dofIdx,residualValue,err,error,*999)
+                        ENDIF
                       ENDDO !faceDerivative
                     ENDDO !localFaceNodeIdx  
                   ENDDO !fieldComponent
@@ -2587,8 +2804,8 @@ CONTAINS
                     DO rigidBodyDofCompIdx=1,6
                       dofIdx=residualVariable%components(rigidBodyDofCompIdx+4)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP 
                       residualValue=-coefficient*rigidBodyMatrix(fieldComponent,rigidBodyDofCompIdx)* &
-                        & contactPointMetrics%normal(fieldComponent)*contactPointMetrics%contactForce!* &
-!                        & contactPointMetrics%Jacobian*interface%DATA_POINTS%DATA_POINTS(globalDataPointNum)%WEIGHTS(1)
+                        & contactPointMetrics%normal(fieldComponent)*contactPointMetrics%contactForce* &
+                        & contactPointMetrics%Jacobian*interface%DATA_POINTS%DATA_POINTS(globalDataPointNum)%WEIGHTS(1)
                       CALL DISTRIBUTED_VECTOR_VALUES_ADD(nonlinearMatrices%RESIDUAL,dofIdx,residualValue,err,error,*999)
                     ENDDO !dofIdx
                   ENDDO !fieldComponent

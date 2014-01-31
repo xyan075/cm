@@ -2157,6 +2157,8 @@ END TYPE GENERATED_MESH_ELLIPSOID_TYPE
     LOGICAL, ALLOCATABLE :: inContact(:) !< inContact(contactPointIdx). If in contact for at a contact point
     LOGICAL :: addGeometricTerm !< logical to tell the program if geometric term should be added
     INTEGER(INTG) :: iterationGeometricTerm !< the iteration number geometric term is added
+    REAL(DP), ALLOCATABLE :: residualOriginal(:) !< the original residual \todo: XY rigid-body deformable contact, need to be removed when LHS mapping is in
+    REAL(DP), ALLOCATABLE :: residualPerturbed(:) !< the perturbed residual\todo: XY rigid-body deformable contact, need to be removed when LHS mapping is in
   END TYPE InterfaceContactMetricsType
 
   !>Contains information for the interface condition data.

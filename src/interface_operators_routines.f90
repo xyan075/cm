@@ -947,6 +947,8 @@ CONTAINS
       contactMetrics%iterationGeometricTerm=0
       IF(ALLOCATED(contactMetrics%orthogonallyProjected)) DEALLOCATE(contactMetrics%orthogonallyProjected)
       IF(ALLOCATED(contactMetrics%inContact)) DEALLOCATE(contactMetrics%inContact)
+      IF(ALLOCATED(contactMetrics%residualOriginal)) DEALLOCATE(contactMetrics%residualOriginal)
+      IF(ALLOCATED(contactMetrics%residualPerturbed)) DEALLOCATE(contactMetrics%residualPerturbed)
       IF(ALLOCATED(contactMetrics%contactPointMetrics)) THEN
         DO contactPtIdx=1,SIZE(contactMetrics%contactPointMetrics,1)
           CALL InterfaceContactMetrics_ContactPointFinalise(contactMetrics%contactPointMetrics(contactPtIdx),err,error,*999)
@@ -1110,7 +1112,7 @@ CONTAINS
     TYPE(InterfacePointsConnectivityType), POINTER :: pointsConnectivity !<A pointer to the interface points connectivity
     TYPE(InterfaceContactMetricsType), POINTER :: contactMetrics 
     TYPE(InterfaceContactPointMetricsType), POINTER :: contactPointMetrics
-    TYPE(FIELD_TYPE), POINTER :: projectedDependentField,penaltyField,slaveGeometricField
+    TYPE(FIELD_TYPE), POINTER :: projectedDependentField,penaltyField,slaveDependentField,slaveGeometricField,LagrangeField
     TYPE(FIELD_INTERPOLATION_PARAMETERS_PTR_TYPE), POINTER :: interpolationParametersMaster(:),interpolationParametersSlave(:)
     TYPE(FIELD_INTERPOLATED_POINT_PTR_TYPE), POINTER :: interpolatedPointsMaster(:),interpolatedPointsSlave(:)
     TYPE(FIELD_INTERPOLATED_POINT_METRICS_PTR_TYPE), POINTER :: interpolatedPointsMetricsMaster(:),interpolatedPointsMetricsSlave(:)
@@ -1118,8 +1120,8 @@ CONTAINS
     
     INTEGER(INTG) :: projectedMeshIdx,noGeoComp,noXi,localElementNumber,localFaceLineNumber,normalStiffnessComp,penaltyPtDof, &
       & ContPtElementNum,slaveMeshIdx
-    INTEGER(INTG) :: contactPtIdx,xiIdx,i,j
-    REAL(DP) :: gapsComponents(3),junkPosition(3),tangents(3,2), A(2,2), detA
+    INTEGER(INTG) :: contactPtIdx,xiIdx,i,j,componentIdx
+    REAL(DP) :: gapsComponents(3),junkPosition(3),tangents(3,2), A(2,2), detA, centreOfMass(3)
     LOGICAL :: reverseNormal
     
     
@@ -1166,8 +1168,16 @@ CONTAINS
                     & err,error,*999)
                   interpolatedPointMaster=>interpolatedPointsMaster(FIELD_U_VARIABLE_TYPE)%PTR
                   
-                  ! Gete geometric field for the slave
                   slaveMeshIdx=1; 
+                  
+                  ! Get the current centre of mass for the master
+                  slaveDependentField=>interfaceCondition%DEPENDENT%FIELD_VARIABLES(slaveMeshIdx)%PTR%FIELD
+                  DO componentIdx=1,noGeoComp
+                    CALL FIELD_PARAMETER_SET_GET_CONSTANT(slaveDependentField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE, &
+                      & componentIdx+4,centreOfMass(componentIdx),err,error,*999)
+                  ENDDO !componentIdx
+                  
+                  ! Gete geometric field for the slave
                   slaveGeometricField=>interfaceCondition%DEPENDENT%FIELD_VARIABLES(slaveMeshIdx)%PTR%FIELD%GEOMETRIC_FIELD !slave
                   
                   NULLIFY(interpolationParametersSlave)
@@ -1242,6 +1252,19 @@ CONTAINS
                       ! Calculate gap vector
                       gapsComponents(1:noGeoComp)=-dataPoints%DATA_POINTS(contactPtIdx)%position(1:noGeoComp)+ &
                         & interpolatedPointMaster%VALUES(1:noGeoComp,NO_PART_DERIV)
+                        
+                      !#############################################################################################################
+                      
+                      !\todo: XY -rigid deformable contact, temporarily store contact points evaluated on rigid body (relative to centre
+                      ! of mass) in the 3-components Lagrange field
+                      LagrangeField=>interfaceCondition%LAGRANGE%LAGRANGE_FIELD
+                      ! Store the new relative position of the contact points on the master body
+                      DO componentIdx=1,noGeoComp
+                        !contactPtIdx is the same as global number
+                        CALL Field_ParameterSetUpdateDataPoint(LagrangeField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE, &
+                          & contactPtIdx,componentIdx,interpolatedPointMaster%VALUES(componentIdx,NO_PART_DERIV)- &
+                          & centreOfMass(componentIdx),ERR,ERROR,*999) 
+                      ENDDO !componentIdx
                         
                       !#############################################################################################################
                       

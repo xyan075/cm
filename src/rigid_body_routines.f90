@@ -178,12 +178,12 @@ CONTAINS
             ENDDO !derivativeIdx
           ENDDO !nodeIdx
           ! output to screen rigid body dofs
-!          CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"centre of mass(1) = ",centreOfMass(1),err,error,*999)
+          CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"centre of mass(1) = ",centreOfMass(1),err,error,*999)
 !          CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"centre of mass(2) = ",centreOfMass(2),err,error,*999)
 !          CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"centre of mass(3) = ",centreOfMass(3),err,error,*999)
 !          
 !          CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"theta(1) = ",theta(1),err,error,*999)
-!          CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"theta(2) = ",theta(2),err,error,*999)
+          CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"theta(2) = ",theta(2),err,error,*999)
 !          CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"theta(3) = ",theta(3),err,error,*999)
         ELSE
           CALL FLAG_ERROR("Transformation for different component bases not implemented.",err,error,*999)
