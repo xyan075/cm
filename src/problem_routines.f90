@@ -1793,22 +1793,22 @@ CONTAINS
             defDepVariable=>nonlinearMapping%JACOBIAN_TO_VAR_MAP(jacobianNumber)%VARIABLE
             
             ! Get the 6 dof for rigid body position 
-            DO componentIdx=1,3
-              CALL FIELD_PARAMETER_SET_GET_CONSTANT(defDepField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE,componentIdx+4, &
-                & centreOfMass(componentIdx),err,error,*999)
-            ENDDO !componentIdx
-            DO componentIdx=1,3
-              CALL FIELD_PARAMETER_SET_GET_CONSTANT(defDepField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE,componentIdx+7, &
-                & theta(componentIdx),err,error,*999)
-            ENDDO !componentIdx
-            
-            CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"centre of mass(1) = ",centreOfMass(1),err,error,*999)
-            CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"centre of mass(2) = ",centreOfMass(2),err,error,*999)
-            CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"centre of mass(3) = ",centreOfMass(3),err,error,*999)
-            
-            CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"theta(1) = ",theta(1),err,error,*999)
-            CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"theta(2) = ",theta(2),err,error,*999)
-            CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"theta(3) = ",theta(3),err,error,*999)
+!            DO componentIdx=1,3
+!              CALL FIELD_PARAMETER_SET_GET_CONSTANT(defDepField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE,componentIdx+4, &
+!                & centreOfMass(componentIdx),err,error,*999)
+!            ENDDO !componentIdx
+!            DO componentIdx=1,3
+!              CALL FIELD_PARAMETER_SET_GET_CONSTANT(defDepField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE,componentIdx+7, &
+!                & theta(componentIdx),err,error,*999)
+!            ENDDO !componentIdx
+!            
+!            CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"centre of mass(1) = ",centreOfMass(1),err,error,*999)
+!            CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"centre of mass(2) = ",centreOfMass(2),err,error,*999)
+!            CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"centre of mass(3) = ",centreOfMass(3),err,error,*999)
+!            
+!            CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"theta(1) = ",theta(1),err,error,*999)
+!            CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"theta(2) = ",theta(2),err,error,*999)
+!            CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"theta(3) = ",theta(3),err,error,*999)
             
             
             !Loop over each data point and find the connected element and their dofs
@@ -1975,7 +1975,7 @@ CONTAINS
                         & ELEMENT_PARAMETER_INDEX(rowFaceDerivative,rowLocalFaceNodeIdx),NO_PART_DERIV,defXi,err,error)
                       !\todo: generalise the offset for deformable body components, i.e. 4
                       colFieldComp=rowFieldComp
-!                      DO colFieldComp=1,3
+                      DO colFieldComp=1,3
                         DO rigidBodyColDofCompIdx=1,6
                           colPhi=rigidBodyMatrix(colFieldComp,rigidBodyColDofCompIdx)
                           colIdx=defDepVariable%components(rigidBodyColDofCompIdx+4)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP 
@@ -1987,7 +1987,7 @@ CONTAINS
                           IF(rigidBodyColDofCompIdx<11)  &
                             & CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,rowIdx,colIdx,forceTerm,err,error,*999)
                         ENDDO !dofIdx
-!                      ENDDO !colFieldComp
+                      ENDDO !colFieldComp
                     ENDDO !rowFaceDerivative
                   ENDDO !rowLocalFaceNodeIdx
                 ENDDO !rowFieldComp
@@ -2000,7 +2000,7 @@ CONTAINS
                     rowPhi=rigidBodyMatrix(rowFieldComp,rigidBodyRowDofCompIdx)
                     rowIdx=defDepVariable%components(rigidBodyRowDofCompIdx+4)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP 
                       colFieldComp=rowFieldComp
-!                      DO colFieldComp=1,3
+                      DO colFieldComp=1,3
                         DO rigidBodyColDofCompIdx=1,6
                           colPhi=rigidBodyMatrix(colFieldComp,rigidBodyColDofCompIdx)
                           colIdx=defDepVariable%components(rigidBodyColDofCompIdx+4)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP 
@@ -2010,7 +2010,7 @@ CONTAINS
                             & WEIGHTS(1)
                           CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,rowIdx,colIdx,forceTerm,err,error,*999)
                         ENDDO !rigidBodyColDofCompIdx
-!                      ENDDO !colFieldComp
+                      ENDDO !colFieldComp
                     ENDDO !rigidBodyRowDofCompIdx
                   ENDDO !rowFieldComp
               ENDIF !inContact
@@ -2124,7 +2124,7 @@ CONTAINS
             
 !            CALL DistributedVector_L2Norm(parameters,delta,err,error,*999)
 !            delta=(1.0_DP+delta)*1E-7_DP
-            delta=1E-13_DP
+            delta=1E-10_DP
             
 !            deformableBodyIdx=1;
 !            numberOfContactPoints=interface%DATA_POINTS%NUMBER_OF_DATA_POINTS
@@ -2201,10 +2201,10 @@ CONTAINS
             
             !====================================================================================================================
             ! perturb rigid body dofs
-            DO perturbDofIdx=1,6
+            DO perturbDofIdx=1,3
 !              CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"Perturbation:",ERR,ERROR,*999)
               ! Get the original dependent dof value
-              localNy=defDepVariable%COMPONENTS(perturbDofIdx+4)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
+              localNy=defDepVariable%COMPONENTS(perturbDofIdx+7)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
               CALL DISTRIBUTED_VECTOR_VALUES_GET(parameters,localNy,origDepVar,err,error,*999)
               ! Perturb the dof
               CALL DISTRIBUTED_VECTOR_VALUES_SET(parameters,localNy,origDepVar+delta,err,error,*999)
@@ -5793,13 +5793,15 @@ SUBROUTINE ProblemSolver_ConvergenceTestPetsc(snes,iterationNumber,xnorm,gnorm,f
               ENDIF
             ELSE
               normalisedEnergy=energy/newtonSolver%convergenceTest%energyFirstIter
-              newtonSolver%convergenceTest%normalisedEnergy=normalisedEnergy
               IF(ABS(normalisedEnergy)<newtonSolver%ABSOLUTE_TOLERANCE) THEN
                 reason=PETSC_SNES_CONVERGED_FNORM_ABS
+              ELSEIF(ABS(normalisedEnergy-newtonSolver%convergenceTest%normalisedEnergy)<newtonSolver%RELATIVE_TOLERANCE) THEN
+                reason=PETSC_SNES_CONVERGED_FNORM_RELATIVE !the difference between current step and previous step is very small
               ENDIF
               CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"*********************************************",err,error,*999)
               CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"Normalised energy = ",normalisedEnergy,err,error,*999)
               CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"*********************************************",err,error,*999)
+              newtonSolver%convergenceTest%normalisedEnergy=normalisedEnergy
             ENDIF
             CALL Petsc_SnesLineSearchFinalise(lineSearch,err,error,*999)
           ELSE
