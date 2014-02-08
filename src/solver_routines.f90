@@ -182,6 +182,7 @@ MODULE SOLVER_ROUTINES
   INTEGER(INTG), PARAMETER :: SOLVER_NEWTON_LINESEARCH_LINEAR=2 !<Linear search for Newton line search nonlinear solves \see SOLVER_ROUTINES_NewtonLineSearchTypes,SOLVER_ROUTINES
   INTEGER(INTG), PARAMETER :: SOLVER_NEWTON_LINESEARCH_QUADRATIC=3 !<Quadratic search for Newton line search nonlinear solves \see SOLVER_ROUTINES_NewtonLineSearchTypes,SOLVER_ROUTINES
   INTEGER(INTG), PARAMETER :: SOLVER_NEWTON_LINESEARCH_CUBIC=4!<Cubic search for Newton line search nonlinear solves \see SOLVER_ROUTINES_NewtonLineSearchTypes,SOLVER_ROUTINES
+  INTEGER(INTG), PARAMETER :: SOLVER_NEWTON_LINESEARCH_BRENTS_GOLDENSECTION=5!<Brent's and golden section (if Brent's fails) search for Newton line search nonlinear solves \see SOLVER_ROUTINES_NewtonLineSearchTypes,SOLVER_ROUTINES
   !>@}
 #else
   !> \addtogroup SOLVER_ROUTINES_NewtonLineSearchTypes SOLVER_ROUTINES::NewtonLineSearchTypes
@@ -403,7 +404,7 @@ MODULE SOLVER_ROUTINES
 
 #if ( PETSC_VERSION_MAJOR >= 3 && PETSC_VERSION_MINOR >= 3 )
   PUBLIC SOLVER_NEWTON_LINESEARCH_NONORMS,SOLVER_NEWTON_LINESEARCH_LINEAR,SOLVER_NEWTON_LINESEARCH_QUADRATIC, &
-    & SOLVER_NEWTON_LINESEARCH_CUBIC
+    & SOLVER_NEWTON_LINESEARCH_CUBIC,SOLVER_NEWTON_LINESEARCH_BRENTS_GOLDENSECTION
 #else
   PUBLIC SOLVER_NEWTON_LINESEARCH_NONORMS,SOLVER_NEWTON_LINESEARCH_NONE,SOLVER_NEWTON_LINESEARCH_QUADRATIC, &
     & SOLVER_NEWTON_LINESEARCH_CUBIC
@@ -14309,6 +14310,7 @@ CONTAINS
     EXTERNAL :: PROBLEM_SOLVER_RESIDUAL_EVALUATE_PETSC
     EXTERNAL :: ProblemSolver_ConvergenceTestPetsc
     EXTERNAL :: Problem_SolverNonlinearMonitorPETSC
+    EXTERNAL :: ProblemSolver_ShellLineSearchPetsc
     INTEGER(INTG) :: equations_matrix_idx,equations_set_idx,interface_condition_idx,interface_matrix_idx
     TYPE(DISTRIBUTED_MATRIX_TYPE), POINTER :: JACOBIAN_MATRIX
     TYPE(DISTRIBUTED_VECTOR_TYPE), POINTER :: RESIDUAL_VECTOR
@@ -14657,6 +14659,12 @@ CONTAINS
                     CASE(SOLVER_NEWTON_LINESEARCH_CUBIC)
                       CALL Petsc_SnesLineSearchSetType(linesearch_solver%snesLineSearch,PETSC_SNES_LINESEARCH_BT,err,error,*999)
                       CALL Petsc_SnesLineSearchSetOrder(linesearch_solver%snesLineSearch,PETSC_SNES_LINESEARCH_CUBIC, &
+                        & err,error,*999)
+                    CASE(SOLVER_NEWTON_LINESEARCH_BRENTS_GOLDENSECTION)
+                      CALL Petsc_SnesLineSearchSetType(linesearch_solver%snesLineSearch,PETSC_SNES_LINESEARCH_SHELL,err,error,*999)
+                      ! Set the linesearch function
+                      CALL Petsc_SNESLineSearchShellSetUserFunc(linesearch_solver%snesLineSearch, &
+                        & ProblemSolver_ShellLineSearchPetsc,LINESEARCH_SOLVER%NEWTON_SOLVER%NONLINEAR_SOLVER%SOLVER, &
                         & err,error,*999)
                     CASE DEFAULT
                       local_error="The nonlinear Newton line search type of "// &
@@ -15149,6 +15157,8 @@ CONTAINS
                       LINESEARCH_SOLVER%LINESEARCH_TYPE=SOLVER_NEWTON_LINESEARCH_QUADRATIC
                     CASE(SOLVER_NEWTON_LINESEARCH_CUBIC)
                       LINESEARCH_SOLVER%LINESEARCH_TYPE=SOLVER_NEWTON_LINESEARCH_CUBIC
+                    CASE(SOLVER_NEWTON_LINESEARCH_BRENTS_GOLDENSECTION)
+                      LINESEARCH_SOLVER%LINESEARCH_TYPE=SOLVER_NEWTON_LINESEARCH_BRENTS_GOLDENSECTION  
                     CASE DEFAULT
                       LOCAL_ERROR="The specified line search type of "//TRIM(NUMBER_TO_VSTRING(LINESEARCH_TYPE,"*",ERR,ERROR))// &
                         & " is invalid."

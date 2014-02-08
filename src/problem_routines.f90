@@ -5784,7 +5784,7 @@ SUBROUTINE ProblemSolver_ConvergenceTestPetsc(snes,iterationNumber,xnorm,gnorm,f
             CALL PETSC_VECINITIALISE(w,err,error,*999)
             CALL PETSC_VECINITIALISE(g,err,error,*999)
             CALL Petsc_SnesLineSearchGetVecs(lineSearch,x,f,y,w,g,err,error,*999)
-            CALL Petsc_VecDot(y,g,energy,err,error,*999)
+            CALL Petsc_VecDot(y,f,energy,err,error,*999)
             IF(iterationNumber==1) THEN
               IF(ABS(energy)<ZERO_TOLERANCE) THEN
                 reason=PETSC_SNES_CONVERGED_FNORM_ABS
@@ -5831,6 +5831,148 @@ SUBROUTINE ProblemSolver_ConvergenceTestPetsc(snes,iterationNumber,xnorm,gnorm,f
 997 RETURN    
 
 END SUBROUTINE ProblemSolver_ConvergenceTestPetsc
+
+!
+!================================================================================================================================
+!
+
+!>Called from the PETSc SNES solvers to solve for a linesearch for a Newton like nonlinear solver
+SUBROUTINE ProblemSolver_ShellLineSearchPetsc(lineSearch,ctx,err)
+
+  USE BASE_ROUTINES
+  USE CMISS_PETSC_TYPES
+  USE DISTRIBUTED_MATRIX_VECTOR
+  USE INPUT_OUTPUT
+  USE KINDS
+  USE PROBLEM_ROUTINES
+  USE SOLVER_ROUTINES
+  USE STRINGS
+  USE TYPES
+  USE CMISS_PETSC
+
+  IMPLICIT NONE
+  
+  !Argument variables
+  TYPE(PetscSnesLinesearchType), INTENT(INOUT) :: lineSearch !<The PETSc SNES LineSearch type
+  TYPE(SOLVER_TYPE), POINTER :: ctx !<The passed through context
+  INTEGER(INTG), INTENT(INOUT) :: err !<The error code
+  !Local Variables
+!  TYPE(PETSC_SNES_TYPE), INTENT(INOUT) :: snes !<The PETSc SNES type
+  TYPE(PETSC_VEC_TYPE) :: x,f,y,w,g
+  TYPE(NEWTON_SOLVER_TYPE), POINTER :: newtonSolver
+  TYPE(NONLINEAR_SOLVER_TYPE), POINTER :: nonlinearSolver
+  TYPE(NEWTON_LINESEARCH_SOLVER_TYPE), POINTER :: lineSearchSolver
+  REAL(DP) :: lambda,tau,a,b,c,FbNorm,FcNorm,FuNorm,FuNormPre,p,q,u,FTol
+  INTEGER(INTG) :: i
+  TYPE(VARYING_STRING) :: error,localError
+
+  IF(ASSOCIATED(ctx)) THEN
+    nonlinearSolver=>CTX%NONLINEAR_SOLVER
+    IF(ASSOCIATED(nonlinearSolver)) THEN
+      newtonSolver=>nonlinearSolver%NEWTON_SOLVER
+      IF(ASSOCIATED(newtonSolver)) THEN 
+        lineSearchSolver=>newtonSolver%LINESEARCH_SOLVER
+        SELECT CASE(lineSearchSolver%LINESEARCH_TYPE)
+        CASE(SOLVER_NEWTON_LINESEARCH_BRENTS_GOLDENSECTION) 
+          ! Get the vectors
+          CALL PETSC_VECINITIALISE(x,err,error,*999) ! current solution
+          CALL PETSC_VECINITIALISE(f,err,error,*999) ! residual function
+          CALL PETSC_VECINITIALISE(y,err,error,*999) ! current solution update
+          CALL PETSC_VECINITIALISE(w,err,error,*999) ! solution work vector
+          CALL PETSC_VECINITIALISE(g,err,error,*999) ! residual function work vector
+          CALL Petsc_SnesLineSearchGetVecs(lineSearch,x,f,y,w,g,err,error,*999)
+          
+          !---------------------------------------------------------------------------------------------------------------------
+          ! compute lambda
+          tau=0.5_DP*(3.0_DP-SQRT(5.0_DP))
+          a=0.0_DP
+          c=1.0_DP
+          b=a+tau*(c-a)
+          
+          !Evaluate the function residual norm from last solve
+          CALL PETSC_VECCOPY(x,w,ERR,ERROR,*999) !copy from x to w
+          CALL PETSC_SNESComputeFunction(lineSearchSolver%SNES,w,g,err,error,*999)
+          CALL Petsc_VecNorm(g,PETSC_NORM_2,FuNormPre,err,error,*999)
+          FTol=FuNormPre*0.5
+          !Evaluate the function residual by taking a full step
+          u=1.0_DP
+          CALL Petsc_VecAXPY(w,-u,y,err,error,*999)
+          CALL PETSC_SNESComputeFunction(lineSearchSolver%SNES,w,g,err,error,*999)
+          CALL Petsc_VecNorm(g,PETSC_NORM_2,FuNorm,err,error,*999)
+          
+          
+          i=1
+          DO WHILE ((FuNorm>FTol) .AND. (ABS((FuNormPre-FuNorm)/FuNormPre)>0.05_DP) .AND. (i<lineSearchSolver%LINESEARCH_MAXSTEP))
+            !F(b)
+            CALL PETSC_VECCOPY(x,w,ERR,ERROR,*999) !initialise w from x
+            CALL Petsc_VecAXPY(w,-b,y,err,error,*999)
+            CALL PETSC_SNESComputeFunction(lineSearchSolver%SNES,w,g,err,error,*999)
+            CALL Petsc_VecNorm(g,PETSC_NORM_2,FbNorm,err,error,*999)
+            !F(c)
+            CALL PETSC_VECCOPY(x,w,ERR,ERROR,*999) !initialise w from x
+            CALL Petsc_VecAXPY(w,-c,y,err,error,*999)
+            CALL PETSC_SNESComputeFunction(lineSearchSolver%SNES,w,g,err,error,*999)
+            CALL Petsc_VecNorm(g,PETSC_NORM_2,FcNorm,err,error,*999)
+            !u
+            p=(b-a)**2*(FbNorm-FcNorm)-(b-c)**2*(FbNorm-FcNorm)
+            q=(b-a)*(FbNorm-FcNorm)-(b-c)*(FbNorm-FcNorm)
+            u=b-(p/(2.0_DP*q))
+            !F(u)
+            CALL PETSC_VECCOPY(x,w,ERR,ERROR,*999) !initialise w from x
+            CALL Petsc_VecAXPY(w,-u,y,err,error,*999)
+            CALL PETSC_SNESComputeFunction(lineSearchSolver%SNES,w,g,err,error,*999)
+            CALL Petsc_VecNorm(g,PETSC_NORM_2,FuNorm,err,error,*999)
+            
+            IF(FuNorm>FbNorm) THEN
+              IF(u<b) THEN
+                a=u
+              ELSE !u>=b
+                c=u
+              ENDIF 
+            ELSE !FuNorm<=FbNorm
+              IF(u<b) THEN
+                c=b
+                b=u
+              ELSE !u>=b
+                a=b
+                b=u
+              ENDIF 
+            ENDIF
+            i=i+1
+          END DO
+          
+          
+          
+          
+          lambda=u
+          !---------------------------------------------------------------------------------------------------------------------
+          ! compute the new solution vector from lambda
+          CALL Petsc_VecAXPY(x,-lambda,y,err,error,*999)
+          ! compute residual function
+          CALL PETSC_SNESComputeFunction(lineSearchSolver%SNES,x,f,err,error,*999)
+          CALL Petsc_VecNorm(f,PETSC_NORM_2,FuNorm,err,error,*999)
+          CALL Petsc_SnesLineSearchComputeNorms(lineSearch,err,error,*999)
+        CASE DEFAULT
+          localError="The specified line search method type of "//TRIM(NUMBER_TO_VSTRING( &
+            & lineSearchSolver%LINESEARCH_TYPE,"*",err,error))//" is invalid."
+          CALL FLAG_ERROR(localError,err,error,*999)
+        END SELECT
+      ELSE
+        CALL FLAG_ERROR("Nonlinear solver Newton solver is not associated.",err,error,*999)
+      ENDIF
+    ELSE
+      CALL FLAG_ERROR("Solver nonlinear solver is not associated.",err,error,*999)
+    ENDIF
+  ELSE
+    CALL FLAG_ERROR("Solver context is not associated.",err,error,*999)
+  ENDIF
+  
+  RETURN
+999 CALL WRITE_ERROR(err,error,*998)
+998 CALL FLAG_WARNING("Error in convergence test.",err,error,*997)
+997 RETURN    
+
+END SUBROUTINE ProblemSolver_ShellLineSearchPetsc
 
 !
 !================================================================================================================================
