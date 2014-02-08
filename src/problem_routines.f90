@@ -4366,8 +4366,9 @@ SUBROUTINE ProblemSolver_ShellLineSearchPetsc(lineSearch,ctx,err)
   TYPE(NEWTON_SOLVER_TYPE), POINTER :: newtonSolver
   TYPE(NONLINEAR_SOLVER_TYPE), POINTER :: nonlinearSolver
   TYPE(NEWTON_LINESEARCH_SOLVER_TYPE), POINTER :: lineSearchSolver
-  REAL(DP) :: lambda,tau,a,b,c,FbNorm,FcNorm,FuNorm,FuNormPre,p,q,u,FTol
+  REAL(DP) :: lambda,tau,a,b,c,FbNorm,FcNorm,FuNorm,FuNormPre,p,q,u,FTol,bm
   INTEGER(INTG) :: i
+  LOGICAL :: parabolaFail
   TYPE(VARYING_STRING) :: error,localError
 
   IF(ASSOCIATED(ctx)) THEN
@@ -4406,6 +4407,7 @@ SUBROUTINE ProblemSolver_ShellLineSearchPetsc(lineSearch,ctx,err)
           
           
           i=1
+          parabolaFail=.FALSE.
           DO WHILE ((FuNorm>FTol) .AND. (ABS((FuNormPre-FuNorm)/FuNormPre)>0.05_DP) .AND. (i<lineSearchSolver%LINESEARCH_MAXSTEP))
             !F(b)
             CALL PETSC_VECCOPY(x,w,ERR,ERROR,*999) !initialise w from x
@@ -4418,9 +4420,18 @@ SUBROUTINE ProblemSolver_ShellLineSearchPetsc(lineSearch,ctx,err)
             CALL PETSC_SNESComputeFunction(lineSearchSolver%SNES,w,g,err,error,*999)
             CALL Petsc_VecNorm(g,PETSC_NORM_2,FcNorm,err,error,*999)
             !u
-            p=(b-a)**2*(FbNorm-FcNorm)-(b-c)**2*(FbNorm-FcNorm)
-            q=(b-a)*(FbNorm-FcNorm)-(b-c)*(FbNorm-FcNorm)
-            u=b-(p/(2.0_DP*q))
+            IF(parabolaFail) THEN
+              bm=0.5*(a+c)
+              IF(b<bm) THEN
+                u=b+tau*(c-b)
+              ELSE
+                u=b+tau*(a-b)
+              ENDIF
+            ELSE
+              p=(b-a)**2*(FbNorm-FcNorm)-(b-c)**2*(FbNorm-FcNorm)
+              q=(b-a)*(FbNorm-FcNorm)-(b-c)*(FbNorm-FcNorm)
+              u=b-(p/(2.0_DP*q))
+            ENDIF
             !F(u)
             CALL PETSC_VECCOPY(x,w,ERR,ERROR,*999) !initialise w from x
             CALL Petsc_VecAXPY(w,-u,y,err,error,*999)
@@ -4442,6 +4453,7 @@ SUBROUTINE ProblemSolver_ShellLineSearchPetsc(lineSearch,ctx,err)
                 b=u
               ENDIF 
             ENDIF
+            IF((u<a) .OR. (u>c)) parabolaFail=.TRUE.
             i=i+1
           END DO
           
