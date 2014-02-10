@@ -5792,7 +5792,8 @@ SUBROUTINE ProblemSolver_ConvergenceTestPetsc(snes,iterationNumber,xnorm,gnorm,f
                 newtonSolver%convergenceTest%energyFirstIter=energy
               ENDIF
             ELSE
-              normalisedEnergy=energy/newtonSolver%convergenceTest%energyFirstIter
+!              normalisedEnergy=energy/newtonSolver%convergenceTest%energyFirstIter
+              normalisedEnergy=energy
               IF(ABS(normalisedEnergy)<newtonSolver%ABSOLUTE_TOLERANCE) THEN
                 reason=PETSC_SNES_CONVERGED_FNORM_ABS
               ELSEIF(ABS(normalisedEnergy-newtonSolver%convergenceTest%normalisedEnergy)<newtonSolver%RELATIVE_TOLERANCE) THEN
@@ -5949,12 +5950,13 @@ SUBROUTINE ProblemSolver_ShellLineSearchPetsc(lineSearch,ctx,err)
                 b=u
               ENDIF 
             ENDIF
-            IF((u<a) .OR. (u>c)) parabolaFail=.TRUE.
+            IF((u<a) .OR. (u>c)) THEN
+              parabolaFail=.TRUE.
+              CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"********************  Golden section! ***************",ERR,ERROR,*999)
+            ENDIF 
             i=i+1
+            FuNormPre=FuNorm
           END DO
-          
-          
-          
           
           lambda=u
           !---------------------------------------------------------------------------------------------------------------------
