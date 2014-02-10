@@ -1362,6 +1362,13 @@ MODULE OPENCMISS
     MODULE PROCEDURE CMISSControlLoop_MaximumIterationsSetNumber1
     MODULE PROCEDURE CMISSControlLoop_MaximumIterationsSetObj
   END INTERFACE !CMISSControlLoop_MaximumIterationsSet
+  
+  !>Sets/changes the load increments for a while or load increment control loop. \todo need a get method
+  INTERFACE CMISSControlLoop_LoadIncrementsSet
+    MODULE PROCEDURE CMISSControlLoop_LoadIncrementsSetNumber0
+    MODULE PROCEDURE CMISSControlLoop_LoadIncrementsSetNumber1
+    MODULE PROCEDURE CMISSControlLoop_LoadIncrementsSetObj
+  END INTERFACE !CMISSControlLoop_LoadIncrementsSet
 
   !>Returns the number of sub loops for a control loop.
   INTERFACE CMISSControlLoop_NumberOfSubLoopsGet
@@ -1440,7 +1447,7 @@ MODULE OPENCMISS
 
   PUBLIC CMISSControlLoop_LabelGet,CMISSControlLoop_LabelSet
 
-  PUBLIC CMISSControlLoop_MaximumIterationsSet
+  PUBLIC CMISSControlLoop_MaximumIterationsSet,CMISSControlLoop_LoadIncrementsSet
 
   PUBLIC CMISSControlLoop_NumberOfSubLoopsGet,CMISSControlLoop_NumberOfSubLoopsSet
 
@@ -1923,7 +1930,8 @@ MODULE OPENCMISS
 
   !>Sets the projection xi for a data point identified by a given user number.
   INTERFACE CMISSDataProjection_ResultXiSet
-    MODULE PROCEDURE CMISSDataProjection_ResultXiSetNumber
+    MODULE PROCEDURE CMISSDataProjection_ResultXiSetInterfaceNumber
+    MODULE PROCEDURE CMISSDataProjection_ResultXiSetRegionNumber
     MODULE PROCEDURE CMISSDataProjection_ResultXiSetObj
   END INTERFACE !CMISSDataProjection_ResultXiSet
 
@@ -2159,6 +2167,7 @@ MODULE OPENCMISS
   INTEGER(INTG), PARAMETER :: CMISS_EQUATIONS_SET_FITTING_CLASS = EQUATIONS_SET_FITTING_CLASS !<Fitting equations set class \see OPENCMISS_EquationsSetClasses,OPENCMISS
   INTEGER(INTG), PARAMETER :: CMISS_EQUATIONS_SET_OPTIMISATION_CLASS = EQUATIONS_SET_OPTIMISATION_CLASS !<Optimisation equations set class \see OPENCMISS_EquationsSetClasses,OPENCMISS
   INTEGER(INTG), PARAMETER :: CMISS_EQUATIONS_SET_MULTI_PHYSICS_CLASS = EQUATIONS_SET_MULTI_PHYSICS_CLASS !<Multi Physics equations set class \see OPENCMISS_EquationsSetClasses,OPENCMISS
+  INTEGER(INTG), PARAMETER :: CMISS_EQUATIONS_SET_RIGID_BODY_CLASS = EQUATIONS_SET_RIGID_BODY_CLASS !<Rigid body equations set class \see OPENCMISS_EquationsSetClasses,OPENCMISS
   !>@}
   !> \addtogroup OPENCMISS_EquationsSetTypes OPENCMISS::EquationsSet::Types
   !> \brief Equations set Types.
@@ -2194,6 +2203,8 @@ MODULE OPENCMISS
   INTEGER(INTG), PARAMETER :: CMISS_EQUATIONS_SET_FINITE_ELASTICITY_STOKES_TYPE = EQUATIONS_SET_FINITE_ELASTICITY_STOKES_TYPE !<Finite Elasticity Stokes equations set type \see OPENCMISS_EquationsSetTypes,OPENCMISS
   INTEGER(INTG), PARAMETER :: CMISS_EQUATIONS_SET_FINITE_ELASTICITY_NAVIER_STOKES_TYPE = &
     & EQUATIONS_SET_FINITE_ELASTICITY_NAVIER_STOKES_TYPE !<Finite Elasticity Navier Stokes equations set type \see OPENCMISS_EquationsSetTypes,OPENCMISS
+  INTEGER(INTG), PARAMETER :: CMISS_EQUATIONS_SET_FINITE_ELASTICITY_RIGID_BODY_TYPE = &
+    & EQUATIONS_SET_FINITE_ELASTICITY_RIGID_BODY_TYPE !<Finite Elasticity interacts with rigid body equations set type \see OPENCMISS_EquationsSetTypes,OPENCMISS
   INTEGER(INTG), PARAMETER :: CMISS_EQUATIONS_SET_DIFFUSION_DIFFUSION_TYPE = EQUATIONS_SET_DIFFUSION_DIFFUSION_TYPE !<Diffusion Diffusion equations set type \see OPENCMISS_EquationsSetTypes,OPENCMISS
   INTEGER(INTG), PARAMETER :: CMISS_EQUATIONS_SET_DIFFUSION_ADVECTION_DIFFUSION_TYPE = &
     & EQUATIONS_SET_DIFFUSION_ADVECTION_DIFFUSION_TYPE !<Diffusion Advection Diffusion equations set type \see OPENCMISS_EquationsSetTypes,OPENCMISS
@@ -2652,7 +2663,7 @@ MODULE OPENCMISS
   PUBLIC CMISS_EQUATIONS_SET_NO_CLASS,CMISS_EQUATIONS_SET_ELASTICITY_CLASS,CMISS_EQUATIONS_SET_FLUID_MECHANICS_CLASS, &
     & CMISS_EQUATIONS_SET_ELECTROMAGNETICS_CLASS,CMISS_EQUATIONS_SET_CLASSICAL_FIELD_CLASS,CMISS_EQUATIONS_SET_BIOELECTRICS_CLASS, &
     & CMISS_EQUATIONS_SET_MODAL_CLASS,CMISS_EQUATIONS_SET_FITTING_CLASS,CMISS_EQUATIONS_SET_OPTIMISATION_CLASS, &
-    & CMISS_EQUATIONS_SET_MULTI_PHYSICS_CLASS
+    & CMISS_EQUATIONS_SET_MULTI_PHYSICS_CLASS,CMISS_EQUATIONS_SET_RIGID_BODY_CLASS
 
   PUBLIC CMISS_EQUATIONS_SET_NO_TYPE,CMISS_EQUATIONS_SET_LINEAR_ELASTICITY_TYPE,CMISS_EQUATIONS_SET_FINITE_ELASTICITY_TYPE, &
     & CMISS_EQUATIONS_SET_STOKES_EQUATION_TYPE,CMISS_EQUATIONS_SET_NAVIER_STOKES_EQUATION_TYPE, &
@@ -2674,6 +2685,7 @@ MODULE OPENCMISS
 
   PUBLIC CMISS_EQUATIONS_SET_FINITE_ELASTICITY_DARCY_TYPE, &
     & CMISS_EQUATIONS_SET_FINITE_ELASTICITY_STOKES_TYPE, CMISS_EQUATIONS_SET_FINITE_ELASTICITY_NAVIER_STOKES_TYPE, &
+    & CMISS_EQUATIONS_SET_FINITE_ELASTICITY_RIGID_BODY_TYPE, & 
     & CMISS_EQUATIONS_SET_DIFFUSION_DIFFUSION_TYPE, CMISS_EQUATIONS_SET_DIFFUSION_ADVECTION_DIFFUSION_TYPE
 
   PUBLIC CMISS_EQUATIONS_SET_NO_SUBTYPE,CMISS_EQUATIONS_SET_THREE_DIMENSIONAL_SUBTYPE, &
@@ -4419,6 +4431,12 @@ MODULE OPENCMISS
     MODULE PROCEDURE CMISSInterfaceCondition_EquationsDestroyObj
   END INTERFACE !CMISSInterfaceCondition_EquationsDestroy
   
+  !>Sets/changes the iteraction number when geometric term is added
+  INTERFACE CMISSInterfaceCondition_IterationToAddGeoTermSet
+    MODULE PROCEDURE CMISSInterfaceCondition_IterationToAddGeoTermSetNumber
+    MODULE PROCEDURE CMISSInterfaceCondition_IterationToAddGeoTermSetObj
+  END INTERFACE !CMISSInterfaceCondition_IterationToAddGeoTermSet
+  
   !>Returns the integration type for an interface condition.
   INTERFACE CMISSInterfaceCondition_IntegrationTypeGet
     MODULE PROCEDURE CMISSInterfaceCondition_IntegrationTypeGetNumber
@@ -4521,6 +4539,8 @@ MODULE OPENCMISS
   PUBLIC CMISSInterfaceCondition_EquationsCreateFinish,CMISSInterfaceCondition_EquationsCreateStart
 
   PUBLIC CMISSInterfaceCondition_EquationsDestroy
+  
+  PUBLIC CMISSInterfaceCondition_IterationToAddGeoTermSet
   
   PUBLIC CMISSInterfaceCondition_IntegrationTypeGet,CMISSInterfaceCondition_IntegrationTypeSet
 
@@ -6098,6 +6118,13 @@ MODULE OPENCMISS
     MODULE PROCEDURE CMISSSolver_GeometricTransformationMatrixSetObj1
   END INTERFACE CMISSSolver_GeometricTransformationMatrixSet
   
+  INTERFACE CMISSSolver_GeometricTransformationNodesSet
+    MODULE PROCEDURE CMISSSolver_GeometricTransformationNodesSetNumber0
+    MODULE PROCEDURE CMISSSolver_GeometricTransformationNodesSetNumber1
+    MODULE PROCEDURE CMISSSolver_GeometricTransformationNodesSetObj0
+    MODULE PROCEDURE CMISSSolver_GeometricTransformationNodesSetObj1
+  END INTERFACE CMISSSolver_GeometricTransformationNodesSet
+  
   !Sets number of load increments for the transformation
   INTERFACE CMISSSolver_GeometricTransformationNumberOfLoadIncrementsSet
     MODULE PROCEDURE CMISSSolver_GeometricTransformationNoLoadIncrementsSetNumber
@@ -6502,6 +6529,8 @@ MODULE OPENCMISS
   PUBLIC CMISSSolver_DynamicTimesSet
   
   PUBLIC CMISSSolver_GeometricTransformationArbitraryPathSet,CMISSSolver_GeometricTransformationClear
+  
+  PUBLIC CMISSSolver_GeometricTransformationNodesSet
   
   PUBLIC CMISSSolver_GeometricTransformationNumberOfLoadIncrementsSet
   
@@ -16315,6 +16344,110 @@ CONTAINS
     RETURN
 
   END SUBROUTINE CMISSControlLoop_MaximumIterationsSetObj
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Sets/changes the load increments for a while control loop identified by user numbers.
+  SUBROUTINE CMISSControlLoop_LoadIncrementsSetNumber0(problemUserNumber,controlLoopIdentifier,loadIncrements,err)
+
+    !Argument variables
+    INTEGER(INTG), INTENT(IN) :: problemUserNumber !<The user number of the problem to set the load increments for.
+    INTEGER(INTG), INTENT(IN) :: controlLoopIdentifier !<The control loop identifier.
+    REAL(DP), INTENT(IN) :: loadIncrements(:) !<The load increments of the while control loop to set.
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code.
+    !Local variables
+    TYPE(CONTROL_LOOP_TYPE), POINTER :: controlLoop
+    TYPE(PROBLEM_TYPE), POINTER :: PROBLEM
+    TYPE(VARYING_STRING) :: LOCAL_ERROR
+
+    CALL ENTERS("CMISSControlLoop_LoadIncrementsSetNumber0",err,error,*999)
+
+    NULLIFY(controlLoop)
+    NULLIFY(PROBLEM)
+    CALL PROBLEM_USER_NUMBER_FIND(problemUserNumber,PROBLEM,err,error,*999)
+    IF(ASSOCIATED(PROBLEM)) THEN
+      CALL PROBLEM_CONTROL_LOOP_GET(PROBLEM,controlLoopIdentifier,controlLoop,err,error,*999)
+      CALL ControlLoop_LoadIncrementsSet(controlLoop,loadIncrements,err,error,*999)
+    ELSE
+      LOCAL_ERROR="A problem with an user number of "//TRIM(NUMBER_TO_VSTRING(problemUserNumber,"*",err,error))//" does not exist."
+      CALL FLAG_ERROR(LOCAL_ERROR,err,error,*999)
+    END IF
+
+    CALL EXITS("CMISSControlLoop_LoadIncrementsSetNumber0")
+    RETURN
+999 CALL ERRORS("CMISSControlLoop_LoadIncrementsSetNumber0",err,error)
+    CALL EXITS("CMISSControlLoop_LoadIncrementsSetNumber0")
+    CALL CMISS_HANDLE_ERROR(err,error)
+    RETURN
+
+  END SUBROUTINE CMISSControlLoop_LoadIncrementsSetNumber0
+
+  !
+  !================================================================================================================================
+  !
+
+  !>Sets/changes the load increments for a while control loop identified by user numbers.
+  SUBROUTINE CMISSControlLoop_LoadIncrementsSetNumber1(problemUserNumber,controlLoopIdentifiers,loadIncrements,err)
+
+    !Argument variables
+    INTEGER(INTG), INTENT(IN) :: problemUserNumber !<The user number of the problem to set the load increments for.
+    INTEGER(INTG), INTENT(IN) :: controlLoopIdentifiers(:) !<The control loop identifiers.
+    REAL(DP), INTENT(IN) :: loadIncrements(:) !<The load increments of the while control loop to set.
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code.
+    !Local variables
+    TYPE(CONTROL_LOOP_TYPE), POINTER :: controlLoop
+    TYPE(PROBLEM_TYPE), POINTER :: PROBLEM
+    TYPE(VARYING_STRING) :: LOCAL_ERROR
+
+    CALL ENTERS("CMISSControlLoop_LoadIncrementsSetNumber1",err,error,*999)
+
+    NULLIFY(controlLoop)
+    NULLIFY(PROBLEM)
+    CALL PROBLEM_USER_NUMBER_FIND(problemUserNumber,PROBLEM,err,error,*999)
+    IF(ASSOCIATED(PROBLEM)) THEN
+      CALL PROBLEM_CONTROL_LOOP_GET(PROBLEM,controlLoopIdentifiers,controlLoop,err,error,*999)
+      CALL ControlLoop_LoadIncrementsSet(controlLoop,loadIncrements,err,error,*999)
+    ELSE
+      LOCAL_ERROR="A problem with an user number of "//TRIM(NUMBER_TO_VSTRING(problemUserNumber,"*",err,error))//" does not exist."
+      CALL FLAG_ERROR(LOCAL_ERROR,err,error,*999)
+    END IF
+
+    CALL EXITS("CMISSControlLoop_LoadIncrementsSetNumber1")
+    RETURN
+999 CALL ERRORS("CMISSControlLoop_LoadIncrementsSetNumber1",err,error)
+    CALL EXITS("CMISSControlLoop_LoadIncrementsSetNumber1")
+    CALL CMISS_HANDLE_ERROR(err,error)
+    RETURN
+
+  END SUBROUTINE CMISSControlLoop_LoadIncrementsSetNumber1
+
+  !
+  !================================================================================================================================
+  !
+
+  !>Sets/changes the load increment for a while control loop identified by an object.
+  SUBROUTINE CMISSControlLoop_LoadIncrementsSetObj(controlLoop,loadIncrements,err)
+
+    !Argument variables
+    TYPE(CMISSControlLoopType), INTENT(INOUT) :: controlLoop !<The control loop to set the load increments for.
+    REAL(DP), INTENT(IN) :: loadIncrements(:) !<The load increments of the while control loop to set.
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code.
+    !Local variables
+
+    CALL ENTERS("CMISSControlLoop_LoadIncrementsSetObj",err,error,*999)
+
+    CALL ControlLoop_LoadIncrementsSet(controlLoop%CONTROL_LOOP,loadIncrements,err,error,*999)
+
+    CALL EXITS("CMISSControlLoop_LoadIncrementsSetObj")
+    RETURN
+999 CALL ERRORS("CMISSControlLoop_LoadIncrementsSetObj",err,error)
+    CALL EXITS("CMISSControlLoop_LoadIncrementsSetObj")
+    CALL CMISS_HANDLE_ERROR(err,error)
+    RETURN
+
+  END SUBROUTINE CMISSControlLoop_LoadIncrementsSetObj
 
   !
   !================================================================================================================================
@@ -20600,13 +20733,71 @@ CONTAINS
     RETURN
 
   END SUBROUTINE CMISSDataProjection_ResultXiGetObj
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Sets/changes the starting xi of data projection identified by a region user number.
+  SUBROUTINE CMISSDataProjection_ResultXiSetInterfaceNumber(dataProjectionUserNumber,parentRegionUserNumber,interfaceUserNumber, &
+      & dataPointUserNumber,ProjectionXi,err)
+
+    !Argument variables
+    INTEGER(INTG), INTENT(IN) :: dataProjectionUserNumber !<The data projection user number of the data projection to get starting xi for.
+    INTEGER(INTG), INTENT(IN) :: parentRegionUserNumber !<The user number of the parent region.
+    INTEGER(INTG), INTENT(IN) :: interfaceUserNumber !<The user number of the interface.
+    INTEGER(INTG), INTENT(IN) :: dataPointUserNumber !<The data point number to set xi position for
+    REAL(DP), INTENT(IN) :: ProjectionXi(:) !<the xi position to set
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code.
+    !Local variables
+    TYPE(REGION_TYPE), POINTER :: PARENT_REGION
+    TYPE(INTERFACE_TYPE), POINTER :: INTERFACE
+    TYPE(DATA_POINTS_TYPE), POINTER :: DATA_POINTS
+    TYPE(DATA_PROJECTION_TYPE), POINTER :: DATA_PROJECTION
+    TYPE(VARYING_STRING) :: LOCAL_ERROR
+    INTEGER(INTG) :: GLOBAL_NUMBER !<data projection global number
+
+    CALL ENTERS("CMISSDataProjection_ResultXiSetInterfaceNumber",ERR,error,*999)
+
+    NULLIFY(PARENT_REGION)
+    NULLIFY(INTERFACE)
+    NULLIFY(DATA_POINTS)
+    NULLIFY(DATA_PROJECTION)
+    CALL REGION_USER_NUMBER_FIND(parentRegionUserNumber,PARENT_REGION,Err,ERROR,*999)
+    IF(ASSOCIATED(PARENT_REGION)) THEN
+      CALL INTERFACE_USER_NUMBER_FIND(interfaceUserNumber,PARENT_REGION,INTERFACE,Err,ERROR,*999)
+      IF(ASSOCIATED(INTERFACE)) THEN
+        CALL INTERFACE_DATA_POINTS_GET(INTERFACE,DATA_POINTS,err,error,*999)
+        CALL DATA_POINTS_DATA_PROJECTION_GLOBAL_NUMBER_GET(DATA_POINTS,DataProjectionUserNumber,GLOBAL_NUMBER,Err,ERROR,*999)
+        CALL DATA_POINTS_DATA_PROJECTION_GET(DATA_POINTS,GLOBAL_NUMBER,DATA_PROJECTION,Err,ERROR,*999)
+        CALL DATA_PROJECTION_RESULT_XI_SET(DATA_PROJECTION,dataPointUserNumber,ProjectionXi,err,error,*999)
+      ELSE
+        LOCAL_ERROR="An interface with an user number of "//TRIM(NUMBER_TO_VSTRING(interfaceUserNumber,"*",Err,ERROR))// &
+          & " does not exist."
+        CALL FLAG_ERROR(LOCAL_ERROR,Err,ERROR,*999)
+      ENDIF
+    ELSE
+      LOCAL_ERROR="A region with an user number of "//TRIM(NUMBER_TO_VSTRING(parentregionUserNumber,"*",Err,ERROR))// &
+        & " does not exist."
+      CALL FLAG_ERROR(LOCAL_ERROR,Err,ERROR,*999)
+    ENDIF
+
+    CALL EXITS("CMISSDataProjection_ResultXiSetInterfaceNumber")
+    RETURN
+999 CALL ERRORS("CMISSDataProjection_ResultXiSetInterfaceNumber",err,error)
+    CALL EXITS("CMISSDataProjection_ResultXiSetInterfaceNumber")
+    CALL CMISS_HANDLE_ERROR(err,error)
+    RETURN
+
+  END SUBROUTINE CMISSDataProjection_ResultXiSetInterfaceNumber
 
   !
   !================================================================================================================================
   !
 
   !>Sets the projection xi for a data point in a set of data points identified by user number.
-  SUBROUTINE CMISSDataProjection_ResultXiSetNumber(regionUserNumber,dataProjectionUserNumber,dataPointUserNumber,ProjectionXi,err)
+  SUBROUTINE CMISSDataProjection_ResultXiSetRegionNumber(regionUserNumber,dataProjectionUserNumber,dataPointUserNumber, &
+      & ProjectionXi,err)
 
     !Argument variables
     INTEGER(INTG), INTENT(IN) :: regionUserNumber !<The user number of the region containing the data points to set attributes for.
@@ -20621,7 +20812,7 @@ CONTAINS
     TYPE(REGION_TYPE), POINTER :: REGION
     TYPE(VARYING_STRING) :: LOCAL_ERROR
 
-    CALL ENTERS("CMISSDataProjection_ResultXiSetNumber",err,error,*999)
+    CALL ENTERS("CMISSDataProjection_ResultXiSetRegionNumber",err,error,*999)
 
     NULLIFY(REGION)
     NULLIFY(DATA_POINTS)    
@@ -20645,14 +20836,14 @@ CONTAINS
       CALL FLAG_ERROR(LOCAL_ERROR,err,error,*999)
     ENDIF
 
-    CALL EXITS("CMISSDataProjection_ResultXiSetNumber")
+    CALL EXITS("CMISSDataProjection_ResultXiSetRegionNumber")
     RETURN
-999 CALL ERRORS("CMISSDataProjection_ResultXiSetNumber",err,error)
-    CALL EXITS("CMISSDataProjection_ResultXiSetNumber")
+999 CALL ERRORS("CMISSDataProjection_ResultXiSetRegionNumber",err,error)
+    CALL EXITS("CMISSDataProjection_ResultXiSetRegionNumber")
     CALL CMISS_HANDLE_ERROR(err,error)
     RETURN
 
-  END SUBROUTINE CMISSDataProjection_ResultXiSetNumber
+  END SUBROUTINE CMISSDataProjection_ResultXiSetRegionNumber
 
   !
   !================================================================================================================================
@@ -39261,6 +39452,91 @@ CONTAINS
   !================================================================================================================================
   !
 
+  !>Set the non-linear solver iteration where geometric term is added to contact stiffness matrix for an interface condition identified by a user number.
+  SUBROUTINE CMISSInterfaceCondition_IterationToAddGeoTermSetNumber(regionUserNumber,interfaceUserNumber, &
+      & interfaceConditionUserNumber,iterationNumber,err)
+
+    !Argument variables
+    INTEGER(INTG), INTENT(IN) :: regionUserNumber !<The user number of the region containing the interface containing the interface condition to get the method for.
+    INTEGER(INTG), INTENT(IN) :: interfaceUserNumber !<The user number of the interface containing the interface condition to get the method for.
+    INTEGER(INTG), INTENT(IN) :: interfaceConditionUserNumber !<The user number of the interface condition to get the method for.
+    INTEGER(INTG), INTENT(IN) :: iterationNumber !< The iteration number when geometric term is added
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code.
+    !Local variables
+    TYPE(INTERFACE_TYPE), POINTER :: interface
+    TYPE(INTERFACE_CONDITION_TYPE), POINTER :: interfaceCondition
+    TYPE(REGION_TYPE), POINTER :: region
+    TYPE(VARYING_STRING) :: localError
+
+    CALL ENTERS("CMISSInterfaceCondition_IterationToAddGeoTermSetNumber",err,error,*999)
+
+    NULLIFY(region)
+    NULLIFY(interface)
+    NULLIFY(interfaceCondition)
+    CALL REGION_USER_NUMBER_FIND(regionUserNumber,region,err,error,*999)
+    IF(ASSOCIATED(region)) THEN
+      CALL INTERFACE_USER_NUMBER_FIND(interfaceUserNumber,region,interface,err,error,*999)
+      IF(ASSOCIATED(interface)) THEN
+        CALL INTERFACE_CONDITION_USER_NUMBER_FIND(interfaceConditionUserNumber,interface,interfaceCondition,err,error,*999)
+        IF(ASSOCIATED(interfaceCondition)) THEN
+          CALL InterfaceContactMetrics_IterationAddGeoTermSet(interfaceCondition,iterationNumber,err,error,*999)
+        ELSE
+          localError="An interface condition with an user number of "// &
+            & TRIM(NUMBER_TO_VSTRING(interfaceConditionUserNumber,"*",err,error))// &
+            & " does not exist on the interface with a user number of "// &
+            & TRIM(NUMBER_TO_VSTRING(interfaceUserNumber,"*",err,error))// &
+            & " defined on a region with a user number of "//TRIM(NUMBER_TO_VSTRING(regionUserNumber,"*",err,error))//"."
+          CALL FLAG_ERROR(localError,err,error,*999)
+        END IF
+      ELSE
+        localError="An interface with an user number of "//TRIM(NUMBER_TO_VSTRING(interfaceUserNumber,"*",err,error))// &
+          & " does not exist on region number "//TRIM(NUMBER_TO_VSTRING(regionUserNumber,"*",err,error))//"."
+        CALL FLAG_ERROR(localError,err,error,*999)
+      END IF
+    ELSE
+      localError="A region with an user number of "//TRIM(NUMBER_TO_VSTRING(regionUserNumber,"*",err,error))//" does not exist."
+      CALL FLAG_ERROR(localError,err,error,*999)
+    END IF
+
+    CALL EXITS("CMISSInterfaceCondition_IterationToAddGeoTermSetNumber")
+    RETURN
+999 CALL ERRORS("CMISSInterfaceCondition_IterationToAddGeoTermSetNumber",err,error)
+    CALL EXITS("CMISSInterfaceCondition_IterationToAddGeoTermSetNumber")
+    CALL CMISS_HANDLE_ERROR(err,error)
+    RETURN
+
+  END SUBROUTINE CMISSInterfaceCondition_IterationToAddGeoTermSetNumber
+
+  !
+  !================================================================================================================================
+  !
+
+  !>Set the non-linear solver iteration where geometric term is added to contact stiffness matrix for an interface condition identified by an object.
+  SUBROUTINE CMISSInterfaceCondition_IterationToAddGeoTermSetObj(interfaceCondition,iterationNumber,err)
+
+    !Argument variables
+    TYPE(CMISSInterfaceConditionType), INTENT(IN) :: interfaceCondition !<The interface condition to get the method for.
+    INTEGER(INTG), INTENT(IN) :: iterationNumber !<On return, the interface condition integration type. \see OPENCMISS_InterfaceConditionIntegrationTypes,OPENCMISS
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code.
+    !Local variables
+
+    CALL ENTERS("CMISSInterfaceCondition_IterationToAddGeoTermSetObj",err,error,*999)
+    
+    CALL InterfaceContactMetrics_IterationAddGeoTermSet(interfaceCondition%INTERFACE_CONDITION,iterationNumber,err,error,*999)
+
+    CALL EXITS("CMISSInterfaceCondition_IterationToAddGeoTermSetObj")
+    RETURN
+999 CALL ERRORS("CMISSInterfaceCondition_IterationToAddGeoTermSetObj",err,error)
+    CALL EXITS("CMISSInterfaceCondition_IterationToAddGeoTermSetObj")
+    CALL CMISS_HANDLE_ERROR(err,error)
+    RETURN
+
+  END SUBROUTINE CMISSInterfaceCondition_IterationToAddGeoTermSetObj
+  
+  !
+  !================================================================================================================================
+  !
+
   !>Returns the integration type for an interface condition identified by a user number.
   SUBROUTINE CMISSInterfaceCondition_IntegrationTypeGetNumber(regionUserNumber,interfaceUserNumber,interfaceConditionUserNumber, &
     & interfaceConditionIntegrationType,err)
@@ -49899,6 +50175,162 @@ CONTAINS
     RETURN
 
   END SUBROUTINE CMISSSolver_GeometricTransformationMatrixSetObj1
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Sets the node number for a geometric transformation identified by an user number.
+  SUBROUTINE CMISSSolver_GeometricTransformationNodesSetNumber0(problemUserNumber,controlLoopIdentifier,solverIndex, &
+      & NodesUserNumber,err)
+
+    !Argument variables
+    INTEGER(INTG), INTENT(IN) :: problemUserNumber !<The user number of the problem number with the solver to set the field for.
+    INTEGER(INTG), INTENT(IN) :: controlLoopIdentifier !<The control loop identifier with the solver to set the field for.
+    INTEGER(INTG), INTENT(IN) :: solverIndex !<The solver index for the geometric transformation solver.
+    INTEGER(INTG), INTENT(IN) :: NodesUserNumber !<The user node number to transform
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code.
+    !Local variables
+    TYPE(PROBLEM_TYPE), POINTER :: problem
+    TYPE(SOLVER_TYPE), POINTER :: solver
+    TYPE(FIELD_TYPE), POINTER :: field
+    TYPE(REGION_TYPE), POINTER :: region
+    TYPE(VARYING_STRING) :: localError
+
+    CALL ENTERS("CMISSSolver_GeometricTransformationNodesSetNumber0",err,error,*999)
+
+    NULLIFY(problem)
+    NULLIFY(solver)
+    NULLIFY(field)
+    NULLIFY(region)
+    CALL PROBLEM_USER_NUMBER_FIND(problemUserNumber,problem,err,error,*999)
+    IF(ASSOCIATED(problem)) THEN
+      CALL PROBLEM_SOLVER_GET(problem,controlLoopIdentifier,solverIndex,solver,err,error,*999)
+      IF(ASSOCIATED(solver)) THEN
+        CALL Solver_GeometricTransformationNodesSet(solver,[NodesUserNumber],err,error,*999)
+      ELSE
+        localError="A solver with index of "//TRIM(NUMBER_TO_VSTRING(solverIndex,"*",err,error))// &
+          & " does not exist."
+        CALL FLAG_ERROR(localError,err,error,*999)
+      ENDIF
+    ELSE
+      localError="A problem with an user number of "//TRIM(NUMBER_TO_VSTRING(problemUserNumber,"*",err,error))// &
+        & " does not exist."
+      CALL FLAG_ERROR(localError,err,error,*999)
+    ENDIF
+
+    CALL EXITS("CMISSSolver_GeometricTransformationNodesSetNumber0")
+    RETURN
+999 CALL ERRORS("CMISSSolver_GeometricTransformationNodesSetNumber0",err,error)
+    CALL EXITS("CMISSSolver_GeometricTransformationNodesSetNumber0")
+    CALL CMISS_HANDLE_ERROR(err,error)
+    RETURN
+
+  END SUBROUTINE CMISSSolver_GeometricTransformationNodesSetNumber0
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Sets the node numbers for a geometric transformation identified by an user number.
+  SUBROUTINE CMISSSolver_GeometricTransformationNodesSetNumber1(problemUserNumber,controlLoopIdentifier,solverIndex, &
+      & NodesUserNumbers,err)
+
+    !Argument variables
+    INTEGER(INTG), INTENT(IN) :: problemUserNumber !<The user number of the problem number with the solver to set the field for.
+    INTEGER(INTG), INTENT(IN) :: controlLoopIdentifier !<The control loop identifier with the solver to set the field for.
+    INTEGER(INTG), INTENT(IN) :: solverIndex !<The solver index for the geometric transformation solver.
+    INTEGER(INTG), INTENT(IN) :: NodesUserNumbers(:) !<The user node numbers to transform
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code.
+    !Local variables
+    TYPE(PROBLEM_TYPE), POINTER :: problem
+    TYPE(SOLVER_TYPE), POINTER :: solver
+    TYPE(FIELD_TYPE), POINTER :: field
+    TYPE(REGION_TYPE), POINTER :: region
+    TYPE(VARYING_STRING) :: localError
+
+    CALL ENTERS("CMISSSolver_GeometricTransformationNodesSetNumber1",err,error,*999)
+
+    NULLIFY(problem)
+    NULLIFY(solver)
+    NULLIFY(field)
+    NULLIFY(region)
+    CALL PROBLEM_USER_NUMBER_FIND(problemUserNumber,problem,err,error,*999)
+    IF(ASSOCIATED(problem)) THEN
+      CALL PROBLEM_SOLVER_GET(problem,controlLoopIdentifier,solverIndex,solver,err,error,*999)
+      IF(ASSOCIATED(solver)) THEN
+        CALL Solver_GeometricTransformationNodesSet(solver,NodesUserNumbers,err,error,*999)
+      ELSE
+        localError="A solver with index of "//TRIM(NUMBER_TO_VSTRING(solverIndex,"*",err,error))// &
+          & " does not exist."
+        CALL FLAG_ERROR(localError,err,error,*999)
+      ENDIF
+    ELSE
+      localError="A problem with an user number of "//TRIM(NUMBER_TO_VSTRING(problemUserNumber,"*",err,error))// &
+        & " does not exist."
+      CALL FLAG_ERROR(localError,err,error,*999)
+    ENDIF
+
+    CALL EXITS("CMISSSolver_GeometricTransformationNodesSetNumber1")
+    RETURN
+999 CALL ERRORS("CMISSSolver_GeometricTransformationNodesSetNumber1",err,error)
+    CALL EXITS("CMISSSolver_GeometricTransformationNodesSetNumber1")
+    CALL CMISS_HANDLE_ERROR(err,error)
+    RETURN
+
+  END SUBROUTINE CMISSSolver_GeometricTransformationNodesSetNumber1
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Sets the node number for a geometric transformation solver identified by an object.
+  SUBROUTINE CMISSSolver_GeometricTransformationNodesSetObj0(solver,NodesUserNumber,err)
+
+    !Argument variables
+    TYPE(CMISSSolverType), INTENT(IN) :: solver !<The geometric transformation solver to set the field for.
+    INTEGER(INTG), INTENT(IN) :: NodesUserNumber !<The user node number to transform
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code.
+    !Local variables
+
+    CALL ENTERS("CMISSSolver_GeometricTransformationNodesSetObj0",err,error,*999)
+    
+    CALL Solver_GeometricTransformationNodesSet(solver%solver,[NodesUserNumber],err,error,*999)
+    
+    CALL EXITS("CMISSSolver_GeometricTransformationNodesSetObj0")
+    RETURN
+999 CALL ERRORS("CMISSSolver_GeometricTransformationNodesSetObj0",err,error)
+    CALL EXITS("CMISSSolver_GeometricTransformationNodesSetObj0")
+    CALL CMISS_HANDLE_ERROR(err,error)
+    RETURN
+
+  END SUBROUTINE CMISSSolver_GeometricTransformationNodesSetObj0
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Sets the node numbers for a geometric transformation solver identified by an object.
+  SUBROUTINE CMISSSolver_GeometricTransformationNodesSetObj1(solver,NodesUserNumbers,err)
+
+    !Argument variables
+    TYPE(CMISSSolverType), INTENT(IN) :: solver !<The geometric transformation solver to set the field for.
+    INTEGER(INTG), INTENT(IN) :: NodesUserNumbers(:) !<The user node numbers to transform
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code.
+    !Local variables
+
+    CALL ENTERS("CMISSSolver_GeometricTransformationNodesSetObj1",err,error,*999)
+    
+    CALL Solver_GeometricTransformationNodesSet(solver%solver,NodesUserNumbers,err,error,*999)
+    
+    CALL EXITS("CMISSSolver_GeometricTransformationNodesSetObj1")
+    RETURN
+999 CALL ERRORS("CMISSSolver_GeometricTransformationNodesSetObj1",err,error)
+    CALL EXITS("CMISSSolver_GeometricTransformationNodesSetObj1")
+    CALL CMISS_HANDLE_ERROR(err,error)
+    RETURN
+
+  END SUBROUTINE CMISSSolver_GeometricTransformationNodesSetObj1
   
   !
   !================================================================================================================================

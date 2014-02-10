@@ -112,7 +112,7 @@ MODULE CONTROL_LOOP_ROUTINES
 
   PUBLIC CONTROL_LOOP_LABEL_GET,CONTROL_LOOP_LABEL_SET
 
-  PUBLIC CONTROL_LOOP_MAXIMUM_ITERATIONS_SET
+  PUBLIC CONTROL_LOOP_MAXIMUM_ITERATIONS_SET,ControlLoop_LoadIncrementsSet
   
   PUBLIC CONTROL_LOOP_NUMBER_OF_SUB_LOOPS_GET,CONTROL_LOOP_NUMBER_OF_SUB_LOOPS_SET
 
@@ -830,6 +830,80 @@ CONTAINS
     CALL EXITS("CONTROL_LOOP_MAXIMUM_ITERATIONS_SET")
     RETURN 1
   END SUBROUTINE CONTROL_LOOP_MAXIMUM_ITERATIONS_SET
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Sets the load increments for a while or load increment control loop. \see OPENCMISS_CMISSControlLoopLoadIncrementSet
+  SUBROUTINE ControlLoop_LoadIncrementsSet(controlLoop,loadIncrements,err,error,*)
+
+    !Argument variables
+    TYPE(CONTROL_LOOP_TYPE), POINTER, INTENT(IN) :: controlLoop !<A pointer to control loop to set the load increments for
+    REAL(DP), INTENT(IN) :: loadIncrements(:) !<The load increments for a control loop.
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: error !<The error string
+    !Local Variables
+    TYPE(CONTROL_LOOP_WHILE_TYPE), POINTER :: whileLoop
+    TYPE(CONTROL_LOOP_LOAD_INCREMENT_TYPE), POINTER :: loadIncrementLoop
+    INTEGER(INTG) :: stepIdx,countIdx
+    TYPE(VARYING_STRING) :: localError
+ 
+    CALL ENTERS("ControlLoop_LoadIncrementsSet",err,error,*999)
+
+    IF(ASSOCIATED(controlLoop)) THEN
+      IF(controlLoop%CONTROL_LOOP_FINISHED) THEN
+        CALL FLAG_ERROR("Control loop has been finished.",err,error,*999)
+      ELSE
+        IF(controlLoop%LOOP_TYPE==PROBLEM_CONTROL_WHILE_LOOP_TYPE) THEN
+          whileLoop=>controlLoop%WHILE_LOOP
+          IF(ASSOCIATED(whileLoop)) THEN
+            IF(SIZE(loadIncrements)<=whileLoop%MAXIMUM_NUMBER_OF_ITERATIONS) THEN
+              ALLOCATE(whileLoop%increments(whileLoop%MAXIMUM_NUMBER_OF_ITERATIONS),STAT=err)
+              IF(ERR/=0) CALL FLAG_ERROR("Could not allocate while loop load step increments.",ERR,ERROR,*999)
+              ! if input array is smaller than allocated, keep looping the load increments
+              countIdx=1
+              DO stepIdx=1,loadIncrementLoop%MAXIMUM_NUMBER_OF_ITERATIONS
+                loadIncrementLoop%increments(stepIdx)=loadIncrements(countIdx)
+                countIdx=countIdx+1
+                IF(countIdx==SIZE(loadIncrements)) countIdx=1
+              ENDDO !stepIdx
+            ELSE
+              CALL FLAG_ERROR("Number of load increments specified is greater than number of steps.",err,error,*999)
+            ENDIF
+          ELSE
+            CALL FLAG_ERROR("Control loop while loop is not associated.",err,error,*999)
+          ENDIF
+        ELSEIF(controlLoop%LOOP_TYPE==PROBLEM_CONTROL_LOAD_INCREMENT_LOOP_TYPE) THEN
+          loadIncrementLoop=>controlLoop%LOAD_INCREMENT_LOOP
+          IF(ASSOCIATED(loadIncrementLoop)) THEN
+            IF(SIZE(loadIncrements)<=loadIncrementLoop%MAXIMUM_NUMBER_OF_ITERATIONS) THEN
+              !Initialise load increments array
+              ALLOCATE(loadIncrementLoop%increments(loadIncrementLoop%MAXIMUM_NUMBER_OF_ITERATIONS),STAT=err)
+              IF(ERR/=0) CALL FLAG_ERROR("Could not allocate load increment loop load step increments.",ERR,ERROR,*999)
+              ! if input array is smaller than allocated, set the undefined load increment to 0
+              loadIncrementLoop%increments=0.0_DP
+              loadIncrementLoop%increments(1:SIZE(loadIncrements))=loadIncrements
+            ELSE
+              CALL FLAG_ERROR("Number of load increments specified is greater than number of steps.",err,error,*999)
+            ENDIF
+          ELSE
+            CALL FLAG_ERROR("Control loop load increment loop is not associated.",err,error,*999)
+          ENDIF
+        ELSE
+          CALL FLAG_ERROR("The specified control loop is not a while or load increment control loop.",err,error,*999)
+        ENDIF
+      ENDIF          
+    ELSE
+      CALL FLAG_ERROR("Control loop is not associated.",err,error,*999)
+    ENDIF
+       
+    CALL EXITS("ControlLoop_LoadIncrementsSet")
+    RETURN
+999 CALL ERRORS("ControlLoop_LoadIncrementsSet",err,error)
+    CALL EXITS("ControlLoop_LoadIncrementsSet")
+    RETURN 1
+  END SUBROUTINE ControlLoop_LoadIncrementsSet
 
   !
   !================================================================================================================================
@@ -1620,6 +1694,7 @@ CONTAINS
     CALL ENTERS("CONTROL_LOOP_WHILE_FINALISE",ERR,ERROR,*999)
 
     IF(ASSOCIATED(WHILE_LOOP)) THEN
+      IF(ALLOCATED(WHILE_LOOP%increments)) DEALLOCATE(WHILE_LOOP%increments) 
       DEALLOCATE(WHILE_LOOP)
     ENDIF
        
@@ -1686,6 +1761,7 @@ CONTAINS
     CALL ENTERS("CONTROL_LOOP_LOAD_INCREMENT_FINALISE",ERR,ERROR,*999)
 
     IF(ASSOCIATED(LOAD_INCREMENT_LOOP)) THEN
+      IF(ALLOCATED(LOAD_INCREMENT_LOOP%increments)) DEALLOCATE(LOAD_INCREMENT_LOOP%increments) 
       DEALLOCATE(LOAD_INCREMENT_LOOP)
     ENDIF
        

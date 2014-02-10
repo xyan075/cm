@@ -2136,6 +2136,32 @@ END TYPE GENERATED_MESH_ELLIPSOID_TYPE
     TYPE(FIELD_VARIABLE_PTR_TYPE), POINTER :: FIELD_VARIABLES(:) !<FIELD_VARIABLES(variable_idx). The pointer to the variable_idx'th dependent variable in the interface condition.
     INTEGER(INTG), POINTER :: VARIABLE_MESH_INDICES(:) !<VARIABLE_MESH_INDICES(variable_idx). The mesh index of the variable_idx'th dependent variable in the interface condition.
   END TYPE INTERFACE_DEPENDENT_TYPE
+  
+  !>Contains metrics information for contact points
+  TYPE InterfaceContactPointMetricsType
+    REAL(DP), ALLOCATABLE :: normal(:) !<normals(CoordinateIdx). Normal vector at each contact point 
+    REAL(DP), ALLOCATABLE :: tangents(:,:) !<tangents(xiIdx,CoordinateIdx). Tangent vectors 1 and 2 at each contact point 
+    REAL(DP) :: contactStiffness(3) !1-normal contact stiffness, 2-tangent contact stiffness 1, 3-tangent contact stiffness 2
+    REAL(DP) :: signedGapNormal !<signedGapNormal. signed scalar gap in the normal direction at each contact point
+    REAL(DP) :: contactForce !< current estimate of contact force = contact stiffness * signedGapNormal
+    REAL(DP) :: Jacobian !< The Jacobian of transformation for the undeformed geometry, used for evaluating contact residual and stiffness
+    REAL(DP), ALLOCATABLE :: tangentDerivatives(:,:,:) !<tangentDerivatives(xiIdxTangent,xiIdxDerivative,CoordinateIdx). del(tau)/del(xi) at each contact point
+    REAL(DP), ALLOCATABLE :: covariantMetricTensor(:,:) !<covariantMetricTensor(xiIdx1,xiIdx2). Covariant metric tensor at each contact point
+    REAL(DP), ALLOCATABLE :: contravariantMetricTensor(:,:) !<contravariantMetricTensor(xiIdx1,xiIdx2). Contravariant metric tensor at each contact point
+    REAL(DP), ALLOCATABLE :: inverseA(:,:) !< A matrix superscript(xiIdx1,xiIdx2). A matrix at each contact point
+  END TYPE InterfaceContactPointMetricsType
+  
+  !>Contains metrics information for contact points
+  TYPE InterfaceContactMetricsType
+    INTEGER(INTG) :: numberOfContactPts !< The number of contact points at the interface
+    TYPE(InterfaceContactPointMetricsType), ALLOCATABLE :: contactPointMetrics(:) !< contactPointMetrics(contactPointIdx)
+    LOGICAL, ALLOCATABLE :: orthogonallyProjected(:) !< orthogonallyProjected(contactPointIdx). If a contact point has been orthogonally projected
+    LOGICAL, ALLOCATABLE :: inContact(:) !< inContact(contactPointIdx). If in contact for at a contact point
+    LOGICAL :: addGeometricTerm !< logical to tell the program if geometric term should be added
+    INTEGER(INTG) :: iterationGeometricTerm !< the iteration number geometric term is added
+    REAL(DP), ALLOCATABLE :: residualOriginal(:) !< the original residual \todo: XY rigid-body deformable contact, need to be removed when LHS mapping is in
+    REAL(DP), ALLOCATABLE :: residualPerturbed(:) !< the perturbed residual\todo: XY rigid-body deformable contact, need to be removed when LHS mapping is in
+  END TYPE InterfaceContactMetricsType
 
   !>Contains information for the interface condition data.
   TYPE INTERFACE_CONDITION_TYPE
@@ -2144,6 +2170,7 @@ END TYPE GENERATED_MESH_ELLIPSOID_TYPE
     LOGICAL :: INTERFACE_CONDITION_FINISHED !<Is .TRUE. ifand where  the interfaand where and where ce condition has finished being created, .FALSE. if not.
     TYPE(INTERFACE_CONDITIONS_TYPE), POINTER :: INTERFACE_CONDITIONS !<A pointer back to the interface conditions.
     TYPE(INTERFACE_TYPE), POINTER :: INTERFACE !<A pointer back to the interface.
+    TYPE(InterfaceContactMetricsType), POINTER :: interfaceContactMetrics !<A pointer to the contact mechanics metrics for linearisation
     INTEGER(INTG) :: METHOD !<An integer which denotes the interface condition method. \see INTERFACE_CONDITIONS_Methods,INTERFACE_CONDITIONS
     INTEGER(INTG) :: OPERATOR !<An integer which denotes the type of interface operator. \see INTERFACE_CONDITIONS_Operator,INTERFACE_CONDITIONS
     INTEGER(INTG) :: integrationType !<An integer which denotes the integration type. \see INTERFACE_CONDITIONS_IntegrationType,INTERFACE_CONDITIONS
@@ -2689,6 +2716,7 @@ END TYPE GENERATED_MESH_ELLIPSOID_TYPE
     REAL(DP), ALLOCATABLE :: transformationMatrices(:,:,:) !<transformationMatrices(spatialCoord+1,spatialCoord+1,incrementIdx). 4x4 matrices for 3D transformation, 3x3 for 2D transformation
     TYPE(FIELD_TYPE), POINTER :: field !<fields to which the geometric transformations are applied 
     INTEGER(INTG) :: fieldVariableType !<The field variable type index to transform
+    INTEGER(INTG), ALLOCATABLE :: nodeUserNumbers(:) !<The nodes in the field to be transformed, if not allocated, then all nodes will be transformed, user node numbers are stored here since it's easier to access nodes from user numbers
   END TYPE GeometricTransformationSolverType
 
    !>A buffer type to allow for an array of pointers to a SOLVER_TYPE \see TYPES::SOLVER_TYPE
@@ -3086,6 +3114,7 @@ END TYPE GENERATED_MESH_ELLIPSOID_TYPE
     TYPE(CONTROL_LOOP_TYPE), POINTER :: CONTROL_LOOP
     INTEGER(INTG) :: ITERATION_NUMBER
     INTEGER(INTG) :: MAXIMUM_NUMBER_OF_ITERATIONS
+    REAL(DP), ALLOCATABLE :: increments(:) !increments(loadIncrementIdx), the percentage of load (boundary condition) at each load step
     LOGICAL :: CONTINUE_LOOP
   END TYPE CONTROL_LOOP_WHILE_TYPE
 
@@ -3094,6 +3123,8 @@ END TYPE GENERATED_MESH_ELLIPSOID_TYPE
     TYPE(CONTROL_LOOP_TYPE), POINTER :: CONTROL_LOOP
     INTEGER(INTG) :: ITERATION_NUMBER
     INTEGER(INTG) :: MAXIMUM_NUMBER_OF_ITERATIONS
+    REAL(DP), ALLOCATABLE :: increments(:) !increments(loadIncrementIdx), the percentage of load (boundary condition) at each load step
+    LOGICAL :: WRITE_INTERMEDIATE_RESULTS
   END TYPE CONTROL_LOOP_LOAD_INCREMENT_TYPE
 
   !>A buffer type to allow for an array of pointers to a CONTROL_LOOP_TYPE \see TYPES::CONTROL_LOOP_TYPE

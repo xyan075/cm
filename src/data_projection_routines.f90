@@ -3151,28 +3151,41 @@ CONTAINS
   !
   
   !>Sets the element for a data projection.
-  SUBROUTINE DATA_PROJECTION_ELEMENT_SET(DATA_PROJECTION,DATA_POINT_USER_NUMBER,ELEMENT_USER_NUMBER,ERR,ERROR,*)
+  SUBROUTINE DATA_PROJECTION_ELEMENT_SET(dataProjection,dataPointUserNumber,elementUserNumber,err,error,*)
 
     !Argument variables
-    TYPE(DATA_PROJECTION_TYPE), POINTER :: DATA_PROJECTION !<A pointer to the data projection to set the element for
-    INTEGER(INTG), INTENT(IN) :: DATA_POINT_USER_NUMBER !<data point user number
-    INTEGER(INTG), INTENT(IN) :: ELEMENT_USER_NUMBER !<the user element number to set
-    INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
-    TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
+    TYPE(DATA_PROJECTION_TYPE), POINTER :: dataProjection !<A pointer to the data projection to set the element for
+    INTEGER(INTG), INTENT(IN) :: dataPointUserNumber !<data point user number
+    INTEGER(INTG), INTENT(IN) :: elementUserNumber !<the user element number to set
+    TYPE(MESH_TYPE), POINTER :: mesh !<A pointer to the mesh attached to the data projection
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: error !<The error string
     !Local Variables
-    INTEGER(INTG) :: DATA_POINT_GLOBAL_NUMBER
-    LOGICAL :: DATA_POINT_EXISTS
+    INTEGER(INTG) :: dataPointGlobalNumber,elementGlobalNumber
+    LOGICAL :: dataPointExists,elementExists
     
     CALL ENTERS("DATA_PROJECTION_ELEMENT_SET",err,error,*999)
 
-    IF(ASSOCIATED(DATA_PROJECTION)) THEN
-      CALL DataProjection_DataPointCheckExist(DATA_PROJECTION,DATA_POINT_USER_NUMBER,DATA_POINT_EXISTS, &
-        & DATA_POINT_GLOBAL_NUMBER,ERR,ERROR,*999)
-      IF(DATA_POINT_EXISTS) THEN
-        DATA_PROJECTION%DATA_PROJECTION_RESULTS(DATA_POINT_GLOBAL_NUMBER)%ELEMENT_NUMBER=ELEMENT_USER_NUMBER
+    IF(ASSOCIATED(dataProjection)) THEN
+      CALL DataProjection_DataPointCheckExist(dataProjection,dataPointUserNumber,dataPointExists, &
+        & dataPointGlobalNumber,err,ERROR,*999)
+      IF(dataPointExists) THEN
+        mesh=>dataProjection%MESH
+        IF(ASSOCIATED(mesh)) THEN
+          !\todo: default the mesh component number to be 1, need to generalise
+          CALL MESH_TOPOLOGY_ELEMENT_CHECK_EXISTS(mesh,1,elementUserNumber,elementExists,elementGlobalNumber,err,error,*999)
+          IF(elementExists) THEN
+            dataProjection%DATA_PROJECTION_RESULTS(dataPointGlobalNumber)%ELEMENT_NUMBER=elementGlobalNumber
+          ELSE
+            CALL FLAG_ERROR("Element with user number ("//TRIM(NUMBER_TO_VSTRING &
+              & (elementUserNumber,"*",err,error))//") does not exist.",err,error,*999)
+          ENDIF
+        ELSE
+          CALL FLAG_ERROR("Data projection mesh is not associated.",err,error,*999)
+        ENDIF
       ELSE
         CALL FLAG_ERROR("Data point with user number ("//TRIM(NUMBER_TO_VSTRING &
-            & (DATA_POINT_USER_NUMBER,"*",ERR,ERROR))//") does not exist.",ERR,ERROR,*999)
+            & (dataPointUserNumber,"*",err,error))//") does not exist.",err,error,*999)
       ENDIF
     ELSE
       CALL FLAG_ERROR("Data projection is not associated.",err,error,*999)
@@ -3608,7 +3621,7 @@ CONTAINS
 
     IF(ASSOCIATED(DATA_PROJECTION)) THEN
       IF(DATA_PROJECTION%DATA_PROJECTION_FINISHED) THEN
-        IF(DATA_PROJECTION%DATA_PROJECTION_PROJECTED) THEN
+!        IF(DATA_PROJECTION%DATA_PROJECTION_PROJECTED) THEN
           CALL DATA_PROJECTION_DATA_POINTS_GLOBAL_NUMBER_GET(DATA_PROJECTION,DATA_POINT_USER_NUMBER, &
             & DATA_POINT_GLOBAL_NUMBER,ERR,ERROR,*999)
           IF(SIZE(PROJECTION_XI,1)==SIZE(DATA_PROJECTION%DATA_PROJECTION_RESULTS(DATA_POINT_GLOBAL_NUMBER)%XI,1)) THEN
@@ -3621,9 +3634,9 @@ CONTAINS
               & (DATA_POINT_GLOBAL_NUMBER)%XI,1),"*",ERR,ERROR))// &
               & "." ,ERR,ERROR,*999)
           ENDIF
-        ELSE
-          CALL FLAG_ERROR("Data projection have not been projected.",ERR,ERROR,*999)
-        ENDIF   
+!        ELSE
+!          CALL FLAG_ERROR("Data projection have not been projected.",ERR,ERROR,*999)
+!        ENDIF   
       ELSE
         CALL FLAG_ERROR("Data projection have not been finished.",ERR,ERROR,*999)
       ENDIF

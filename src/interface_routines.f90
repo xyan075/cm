@@ -162,8 +162,8 @@ CONTAINS
                       IF(ASSOCIATED(COUPLED_MESH_REGION)) THEN
                         IF(MESH_REGION%USER_NUMBER==COUPLED_MESH_REGION%USER_NUMBER) THEN
                           IF(MESH%USER_NUMBER==COUPLED_MESH%USER_NUMBER) THEN
-                            MESH_ALREADY_COUPLED=.TRUE.
-                            EXIT
+                            MESH_ALREADY_COUPLED=.FALSE. !\todo temporarily set to false to get single region contact working
+                            !EXIT !\todo temporarily commented to false to get single region contact working
                           ENDIF
                         ENDIF
                       ELSE
@@ -1499,7 +1499,7 @@ CONTAINS
 
     !Argument variables
     TYPE(INTERFACE_TYPE), POINTER :: interface !<A pointer to the interface where data reprojection is performed
-    TYPE(INTERFACE_CONDITION_TYPE), POINTER :: interfaceCondition !<A pointer to the interface where data reprojection is performed
+    TYPE(INTERFACE_CONDITION_TYPE), POINTER :: interfaceCondition !<A pointer to the interface condition where data reprojection is performed
     INTEGER(INTG), INTENT(OUT) :: err !<The error code
     TYPE(VARYING_STRING), INTENT(OUT) :: error !<The error string
     !Local Variables
@@ -1518,8 +1518,8 @@ CONTAINS
     
     NULLIFY(interpolatedPoints)
     NULLIFY(interpolationParameters)
-    fixedBodyIdx=2 !\todo: need to generalise
-    projectionBodyIdx=1
+    fixedBodyIdx=1 !\todo: need to generalise, slave
+    projectionBodyIdx=2 !master
 
     IF(ASSOCIATED(interface)) THEN
       IF(ASSOCIATED(interfaceCondition)) THEN
@@ -1557,9 +1557,9 @@ CONTAINS
             ENDIF
             
             !Data reprojection and update points connectivity information with the projection results
-            dataProjection=>dataPoints%DATA_PROJECTIONS(projectionBodyIdx+1)%PTR 
-            CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"ProjectedBodyDataProjectionLabel",ERR,ERROR,*999)
-            CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,dataProjection%label,ERR,ERROR,*999)
+            dataProjection=>dataPoints%DATA_PROJECTIONS(projectionBodyIdx+1)%PTR !projectionBodyIdx+1 since the first projection is for interface
+!            CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"ProjectedBodyDataProjectionLabel",ERR,ERROR,*999)
+!            CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,dataProjection%label,ERR,ERROR,*999)
             IF(ASSOCIATED(dataProjection)) THEN
               dependentFieldProjection=>interfaceCondition%DEPENDENT%FIELD_VARIABLES(projectionBodyIdx)%PTR%FIELD
               IF(ASSOCIATED(dependentFieldProjection)) THEN
@@ -2008,13 +2008,13 @@ CONTAINS
     INTEGER(INTG) :: dummyErr !<The error code
     TYPE(VARYING_STRING)  :: dummyError !<The error string
      
-    CALL ENTERS("InterfacePointsConnectivity_PointInitialise",err,error,*999)
+    CALL ENTERS("InterfacePointsConnectivity_PointInitialise",err,error,*998)
 
     interfacePointConnectivity%coupledMeshElementNumber=0
     interfacePointConnectivity%elementLineFaceNumber=0
     !Allocate memory for coupled mesh full and reduced xi location
     ALLOCATE(interfacePointConnectivity%xi(coupledMeshDimension),STAT=ERR)
-    IF(ERR/=0) CALL FLAG_ERROR("Could not allocate interface point connectivity full xi.",err,error,*999)
+    IF(ERR/=0) CALL FLAG_ERROR("Could not allocate interface point connectivity full xi.",err,error,*998)
     interfacePointConnectivity%xi=0.0_DP
     ALLOCATE(interfacePointConnectivity%reducedXi(interfaceMeshDimension),STAT=ERR)
     IF(ERR/=0) CALL FLAG_ERROR("Could not allocate interface point connectivity reduced xi.",err,error,*999)
@@ -2163,7 +2163,7 @@ CONTAINS
     IF(ASSOCIATED(InterfacePointsConnectivity)) THEN
       IF(ASSOCIATED(dataProjection)) THEN
         IF(dataProjection%DATA_PROJECTION_FINISHED) THEN
-          WRITE(*,*) "InterfacePointsConnectivity_UpdateFromProjection"
+!          WRITE(*,*) "InterfacePointsConnectivity_UpdateFromProjection"
           DO dataPointIdx=1,SIZE(dataProjection%DATA_PROJECTION_RESULTS,1) !Update reduced xi location, projection element number and element face/line number with projection result
             dataProjectionResult=>dataProjection%DATA_PROJECTION_RESULTS(dataPointIdx)
             InterfacePointsConnectivity%pointsConnectivity(dataPointIdx,coupledMeshIndex)%reducedXi(:)= &

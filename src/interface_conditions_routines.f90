@@ -416,6 +416,8 @@ CONTAINS
                 ELSE
                   CALL FLAG_ERROR("Interface field variable is not associated.",ERR,ERROR,*999)
                 ENDIF
+                !Allocate memory for interface contact metrics
+                CALL InterfaceContactMetrics_Initialise(INTERFACE_CONDITION,err,error,*999)
               CASE(INTERFACE_CONDITION_FIELD_NORMAL_CONTINUITY_OPERATOR)
                 CALL FLAG_ERROR("Not implemented.",ERR,ERROR,*999)
               CASE(INTERFACE_CONDITION_SOLID_FLUID_OPERATOR)
@@ -731,11 +733,12 @@ CONTAINS
                     NULLIFY(INTERFACE_VARIABLE)
                     DO WHILE(variable_idx<=INTERFACE_DEPENDENT%NUMBER_OF_DEPENDENT_VARIABLES.AND. &
                       & .NOT.ASSOCIATED(INTERFACE_VARIABLE))
-                      IF(ASSOCIATED(FIELD_VARIABLE,INTERFACE_DEPENDENT%FIELD_VARIABLES(variable_idx)%PTR)) THEN
-                        INTERFACE_VARIABLE=>INTERFACE_DEPENDENT%FIELD_VARIABLES(variable_idx)%PTR
-                      ELSE
+                      !\todo temporarily commented to false to get single region contact working
+                      !IF(ASSOCIATED(FIELD_VARIABLE,INTERFACE_DEPENDENT%FIELD_VARIABLES(variable_idx)%PTR)) THEN
+                      !  INTERFACE_VARIABLE=>INTERFACE_DEPENDENT%FIELD_VARIABLES(variable_idx)%PTR
+                      !ELSE
                         variable_idx=variable_idx+1
-                      ENDIF
+                      !ENDIF
                     ENDDO
                     IF(ASSOCIATED(INTERFACE_VARIABLE)) THEN
                       !Check if we are dealing with the same mesh index.
@@ -1322,6 +1325,7 @@ CONTAINS
       INTERFACE_CONDITION%INTERFACE_CONDITION_FINISHED=.FALSE.
       NULLIFY(INTERFACE_CONDITION%INTERFACE_CONDITIONS)
       NULLIFY(INTERFACE_CONDITION%INTERFACE)
+      NULLIFY(INTERFACE_CONDITION%interfaceContactMetrics)
       INTERFACE_CONDITION%METHOD=0
       INTERFACE_CONDITION%OPERATOR=0
       NULLIFY(INTERFACE_CONDITION%LAGRANGE)
@@ -1774,7 +1778,7 @@ CONTAINS
                   CALL FIELD_NUMBER_OF_COMPONENTS_SET(INTERFACE_CONDITION%PENALTY%PENALTY_FIELD,FIELD_U_VARIABLE_TYPE, &
                     & 1,ERR,ERROR,*999)
                   CALL FIELD_COMPONENT_INTERPOLATION_SET(INTERFACE_CONDITION%PENALTY%PENALTY_FIELD, &
-                      & FIELD_U_VARIABLE_TYPE,1,FIELD_CONSTANT_INTERPOLATION,ERR,ERROR,*999)
+                      & FIELD_U_VARIABLE_TYPE,1,FIELD_ELEMENT_BASED_INTERPOLATION,ERR,ERROR,*999)
                 ELSE
                   !Default the number of component to the first variable of the interface dependent field's number of components, 
                   CALL FIELD_NUMBER_OF_COMPONENTS_SET(INTERFACE_CONDITION%PENALTY%PENALTY_FIELD,FIELD_U_VARIABLE_TYPE, &
