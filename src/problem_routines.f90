@@ -1273,7 +1273,7 @@ CONTAINS
     INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
     TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
     !Local Variables
-    INTEGER(INTG) :: equations_set_idx,solver_matrix_idx,noComp
+    INTEGER(INTG) :: equations_set_idx,solver_matrix_idx,noComp,iterationNumber
     TYPE(EQUATIONS_SET_TYPE), POINTER :: EQUATIONS_SET
     TYPE(SOLVER_EQUATIONS_TYPE), POINTER :: SOLVER_equations
     TYPE(SOLVER_MAPPING_TYPE), POINTER :: SOLVER_MAPPING
@@ -1348,8 +1348,12 @@ CONTAINS
                     ! rigid body-deformable body contact
                     IF(EQUATIONS_SET%CLASS==EQUATIONS_SET_MULTI_PHYSICS_CLASS .AND.  &
                         & EQUATIONS_SET%TYPE==EQUATIONS_SET_FINITE_ELASTICITY_RIGID_BODY_TYPE) THEN
-                      CALL EquationsSet_JacobianRigidBodyContactUpdateStaticFEM(EQUATIONS_SET,ERR,ERROR,*999)
-!                      CALL EquationsSet_JacobianRigidBodyContactPerturb(EQUATIONS_SET,ERR,ERROR,*999)
+                      CALL PETSC_SNESGETITERATIONNUMBER(SOLVER%NONLINEAR_SOLVER%NEWTON_SOLVER%LINESEARCH_SOLVER%SNES, &
+                        & iterationNumber,ERR,ERROR,*999)
+                      CALL EquationsSet_JacobianRigidBodyContactUpdateStaticFEM(EQUATIONS_SET,iterationNumber,ERR,ERROR,*999)
+                      IF(iterationNumber>5)
+                        CALL EquationsSet_JacobianRigidBodyContactPerturb(EQUATIONS_SET,iterationNumber,ERR,ERROR,*999)
+                      ENDIF
                     ! deformable-deformable body contact
                     ELSEIF(EQUATIONS_SET%TYPE==EQUATIONS_SET_FINITE_ELASTICITY_TYPE) THEN
                       CALL EQUATIONS_SET_JACOBIAN_CONTACT_UPDATE_STATIC_FEM(EQUATIONS_SET,ERR,ERROR,*999)
@@ -1733,10 +1737,11 @@ CONTAINS
   !
 
   !>Evaluates the Jacobian for a static equations set with rigid body contact using the finite element method
-  SUBROUTINE EquationsSet_JacobianRigidBodyContactUpdateStaticFEM(equationsSet,ERR,ERROR,*)
+  SUBROUTINE EquationsSet_JacobianRigidBodyContactUpdateStaticFEM(equationsSet,iterationNumber,ERR,ERROR,*)
 
     !Argument variables
     TYPE(EQUATIONS_SET_TYPE), POINTER :: equationsSet !<A pointer to the equations set to evaluate the Jacobian for
+    INTEGER(INTG), INTENT(IN) :: iterationNumber !<iteration number of the current newton step
     INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
     TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
     !Local Variables
@@ -1984,8 +1989,7 @@ CONTAINS
                             & rowDofScaleFactor*contactPointMetrics%Jacobian*interface%DATA_POINTS% &
                             & DATA_POINTS(globalDataPointNum)%WEIGHTS(1)
                           CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,colIdx,rowIdx,forceTerm,err,error,*999)
-                          IF(rigidBodyColDofCompIdx<11)  &
-                            & CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,rowIdx,colIdx,forceTerm,err,error,*999)
+                          IF (iterationNumber<6) CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,rowIdx,colIdx,forceTerm,err,error,*999)
                         ENDDO !dofIdx
                       ENDDO !colFieldComp
                     ENDDO !rowFaceDerivative
@@ -1995,10 +1999,11 @@ CONTAINS
                 !                                         Contact subMatrix 22    
                 coefficient=1.0_DP;
                 !\todo: generalise the offset for deformable body components, i.e. 4
-                DO rowFieldComp=1,3
-                  DO rigidBodyRowDofCompIdx=1,6
-                    rowPhi=rigidBodyMatrix(rowFieldComp,rigidBodyRowDofCompIdx)
-                    rowIdx=defDepVariable%components(rigidBodyRowDofCompIdx+4)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP 
+                IF (iterationNumber<6) THEN
+                  DO rowFieldComp=1,3
+                    DO rigidBodyRowDofCompIdx=1,6
+                      rowPhi=rigidBodyMatrix(rowFieldComp,rigidBodyRowDofCompIdx)
+                      rowIdx=defDepVariable%components(rigidBodyRowDofCompIdx+4)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP 
                       colFieldComp=rowFieldComp
                       DO colFieldComp=1,3
                         DO rigidBodyColDofCompIdx=1,6
@@ -2012,7 +2017,8 @@ CONTAINS
                         ENDDO !rigidBodyColDofCompIdx
                       ENDDO !colFieldComp
                     ENDDO !rigidBodyRowDofCompIdx
-                  ENDDO !rowFieldComp
+                  ENDDO !rowFieldCompCMISS
+                ENDIF
               ENDIF !inContact
             ENDDO !globalDataPointNum
             CALL DISTRIBUTED_MATRIX_UPDATE_START(jacobian,err,error,*999)
@@ -2201,7 +2207,7 @@ CONTAINS
             
             !====================================================================================================================
             ! perturb rigid body dofs
-            DO perturbDofIdx=1,3
+            DO perturbDofIdx=1,6
 !              CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"Perturbation:",ERR,ERROR,*999)
               ! Get the original dependent dof value
               localNy=defDepVariable%COMPONENTS(perturbDofIdx+7)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
@@ -5792,8 +5798,8 @@ SUBROUTINE ProblemSolver_ConvergenceTestPetsc(snes,iterationNumber,xnorm,gnorm,f
                 newtonSolver%convergenceTest%energyFirstIter=energy
               ENDIF
             ELSE
-!              normalisedEnergy=energy/newtonSolver%convergenceTest%energyFirstIter
-              normalisedEnergy=energy
+              normalisedEnergy=energy/newtonSolver%convergenceTest%energyFirstIter
+!              normalisedEnergy=energy
               IF(ABS(normalisedEnergy)<newtonSolver%ABSOLUTE_TOLERANCE) THEN
                 reason=PETSC_SNES_CONVERGED_FNORM_ABS
               ELSEIF(ABS(normalisedEnergy-newtonSolver%convergenceTest%normalisedEnergy)<newtonSolver%RELATIVE_TOLERANCE) THEN
