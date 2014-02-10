@@ -1351,8 +1351,8 @@ CONTAINS
                       CALL PETSC_SNESGETITERATIONNUMBER(SOLVER%NONLINEAR_SOLVER%NEWTON_SOLVER%LINESEARCH_SOLVER%SNES, &
                         & iterationNumber,ERR,ERROR,*999)
                       CALL EquationsSet_JacobianRigidBodyContactUpdateStaticFEM(EQUATIONS_SET,iterationNumber,ERR,ERROR,*999)
-                      IF(iterationNumber>5)
-                        CALL EquationsSet_JacobianRigidBodyContactPerturb(EQUATIONS_SET,iterationNumber,ERR,ERROR,*999)
+                      IF(iterationNumber>5) THEN
+                        CALL EquationsSet_JacobianRigidBodyContactPerturb(EQUATIONS_SET,ERR,ERROR,*999)
                       ENDIF
                     ! deformable-deformable body contact
                     ELSEIF(EQUATIONS_SET%TYPE==EQUATIONS_SET_FINITE_ELASTICITY_TYPE) THEN
@@ -1999,7 +1999,7 @@ CONTAINS
                 !                                         Contact subMatrix 22    
                 coefficient=1.0_DP;
                 !\todo: generalise the offset for deformable body components, i.e. 4
-                IF (iterationNumber<6) THEN
+                IF(iterationNumber<6) THEN
                   DO rowFieldComp=1,3
                     DO rigidBodyRowDofCompIdx=1,6
                       rowPhi=rigidBodyMatrix(rowFieldComp,rigidBodyRowDofCompIdx)
@@ -2018,7 +2018,7 @@ CONTAINS
                       ENDDO !colFieldComp
                     ENDDO !rigidBodyRowDofCompIdx
                   ENDDO !rowFieldCompCMISS
-                ENDIF
+                ENDIF !iterationNumber<6
               ENDIF !inContact
             ENDDO !globalDataPointNum
             CALL DISTRIBUTED_MATRIX_UPDATE_START(jacobian,err,error,*999)
@@ -2120,13 +2120,13 @@ CONTAINS
                 & theta(componentIdx),err,error,*999)
             ENDDO !componentIdx
             
-            CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"centre of mass(1) = ",centreOfMass(1),err,error,*999)
-            CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"centre of mass(2) = ",centreOfMass(2),err,error,*999)
-            CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"centre of mass(3) = ",centreOfMass(3),err,error,*999)
-            
-            CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"theta(1) = ",theta(1),err,error,*999)
-            CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"theta(2) = ",theta(2),err,error,*999)
-            CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"theta(3) = ",theta(3),err,error,*999)
+!            CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"centre of mass(1) = ",centreOfMass(1),err,error,*999)
+!            CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"centre of mass(2) = ",centreOfMass(2),err,error,*999)
+!            CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"centre of mass(3) = ",centreOfMass(3),err,error,*999)
+!            
+!            CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"theta(1) = ",theta(1),err,error,*999)
+!            CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"theta(2) = ",theta(2),err,error,*999)
+!            CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"theta(3) = ",theta(3),err,error,*999)
             
 !            CALL DistributedVector_L2Norm(parameters,delta,err,error,*999)
 !            delta=(1.0_DP+delta)*1E-7_DP
@@ -2210,7 +2210,7 @@ CONTAINS
             DO perturbDofIdx=1,6
 !              CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"Perturbation:",ERR,ERROR,*999)
               ! Get the original dependent dof value
-              localNy=defDepVariable%COMPONENTS(perturbDofIdx+7)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
+              localNy=defDepVariable%COMPONENTS(perturbDofIdx+4)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
               CALL DISTRIBUTED_VECTOR_VALUES_GET(parameters,localNy,origDepVar,err,error,*999)
               ! Perturb the dof
               CALL DISTRIBUTED_VECTOR_VALUES_SET(parameters,localNy,origDepVar+delta,err,error,*999)
