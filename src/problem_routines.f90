@@ -1662,8 +1662,8 @@ CONTAINS
                               !#####################################################################################################  
                               
                               !Multiply by the scale factor
-  !                            matrixValue=(forceTerm+geometricTerm)*rowDofScaleFactor*colDofScaleFactor
-                              matrixValue=(forceTerm+geometricTerm)
+                              matrixValue=(forceTerm+geometricTerm)*rowDofScaleFactor*colDofScaleFactor
+!                              matrixValue=(forceTerm+geometricTerm)
 
                               !Multiply by scale factors
                               CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,rowIdx,colIdx,matrixValue,err,error,*999)
@@ -2047,9 +2047,8 @@ CONTAINS
                           !Get the face parameter index in the element
                           elemParameterNo=domainFace%BASIS%ELEMENT_PARAMETER_INDEX(faceDerivative,localFaceNodeIdx)
                           !Multiply the contribution by scale factor
-                          
-  !                        residualValue=residualValue*equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)% &
-  !                          & PTR%SCALE_FACTORS(elemParameterNo,fieldComponent)
+                          residualValue=residualValue*equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)% &
+                            & PTR%SCALE_FACTORS(elemParameterNo,fieldComponent)
                           CALL DISTRIBUTED_VECTOR_VALUES_ADD(nonlinearMatrices%RESIDUAL,dofIdx,residualValue,err,error,*999)
                         ENDDO !faceDerivative
                       ENDDO !localFaceNodeIdx
