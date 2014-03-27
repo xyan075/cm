@@ -7048,7 +7048,7 @@ CONTAINS
     !Argument Variables
     TYPE(PETSC_VEC_TYPE), INTENT(IN) :: x !<The vector x
     NormType, INTENT(IN) :: normType !<The norm type
-    REAL(DP), INTENT(OUT) :: xNorm !<The dot product 
+    REAL(DP), INTENT(OUT) :: xNorm !<The output
     INTEGER(INTG), INTENT(OUT) :: err !<The error code
     TYPE(VARYING_STRING), INTENT(OUT) :: error !<The error string
     !Local Variables

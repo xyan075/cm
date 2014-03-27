@@ -1120,7 +1120,7 @@ CONTAINS
     
     INTEGER(INTG) :: projectedMeshIdx,noGeoComp,noXi,localElementNumber,localFaceLineNumber,normalStiffnessComp,penaltyPtDof, &
       & ContPtElementNum,slaveMeshIdx
-    INTEGER(INTG) :: contactPtIdx,xiIdx,i,j,componentIdx
+    INTEGER(INTG) :: contactPtIdx,xiIdx,i,j,componentIdx,countPts
     REAL(DP) :: gapsComponents(3),junkPosition(3),tangents(3,2), A(2,2), detA, centreOfMass(3)
     LOGICAL :: reverseNormal
     
@@ -1187,6 +1187,9 @@ CONTAINS
                   CALL FIELD_INTERPOLATED_POINTS_METRICS_INITIALISE(interpolatedPointsSlave,interpolatedPointsMetricsSlave, &
                     & err,error,*999)
                   interpolatedPointSlave=>interpolatedPointsSlave(FIELD_U_VARIABLE_TYPE)%PTR
+                  
+!                  centreOfMass=0.0_DP
+!                  countPts=0
                   !#################################################################################################################
                   
                   !Initialise contact logicals
@@ -1262,7 +1265,7 @@ CONTAINS
                       DO componentIdx=1,noGeoComp
                         !contactPtIdx is the same as global number
                         CALL Field_ParameterSetUpdateDataPoint(LagrangeField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE, &
-                          & contactPtIdx,componentIdx,interpolatedPointMaster%VALUES(componentIdx,NO_PART_DERIV)- &
+                          & contactPtIdx,componentIdx,dataPoints%DATA_POINTS(contactPtIdx)%position(componentIdx)- &
                           & centreOfMass(componentIdx),ERR,ERROR,*999) 
                       ENDDO !componentIdx
                         
@@ -1305,7 +1308,13 @@ CONTAINS
                       contactPointMetrics%contactForce=contactPointMetrics%signedGapNormal* &
                         & contactPointMetrics%contactStiffness(normalStiffnessComp)
                       IF(contactPointMetrics%signedGapNormal>ZERO_TOLERANCE) contactMetrics%inContact(contactPtIdx)=.TRUE.
-                      
+!                      IF(contactMetrics%inContact(contactPtIdx)) THEN
+!                        countPts=countPts+1
+!                        DO componentIdx=1,3
+!                          centreOfMass(componentIdx)=centreOfMass(componentIdx)+ &
+!                            & dataPoints%DATA_POINTS(contactPtIdx)%position(componentIdx)
+!                        ENDDO !componentIdx
+!                      ENDIF
                       !#############################################################################################################
                       
                       ! These terms are only required if geometric term is added to the contact stiffness matrix
@@ -1345,6 +1354,23 @@ CONTAINS
                   CALL FIELD_INTERPOLATED_POINTS_METRICS_FINALISE(interpolatedPointsMetricsSlave,err,error,*999)
                   CALL FIELD_INTERPOLATION_PARAMETERS_FINALISE(interpolationParametersSlave,err,error,*999)
                   CALL FIELD_INTERPOLATED_POINTS_FINALISE(interpolatedPointsSlave,err,error,*999)
+                  
+                  
+                  !#############################################################################################################
+                  
+!                  DO componentIdx=1,3
+!                    centreOfMass(componentIdx)=centreOfMass(componentIdx)/countPts
+!                    DO contactPtIdx=1,contactMetrics%numberOfContactPts !contactPtIdx is a global contact point index
+!                      IF(contactMetrics%inContact(contactPtIdx)) THEN
+!                        CALL Field_ParameterSetUpdateDataPoint(LagrangeField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE, &
+!                          & contactPtIdx,componentIdx,dataPoints%DATA_POINTS(contactPtIdx)%position(componentIdx)- &
+!                          & centreOfMass(componentIdx),ERR,ERROR,*999) 
+!                        
+!                        
+!                      ENDIF
+!                    ENDDO !contactPtIdx
+!                  ENDDO !componentIdx
+                  !#############################################################################################################
                 ELSE
                   CALL FLAG_ERROR("Interface penalty field is not associated.",err,error,*999)
                 ENDIF
