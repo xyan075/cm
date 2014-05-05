@@ -2656,6 +2656,7 @@ END TYPE GENERATED_MESH_ELLIPSOID_TYPE
     REAL(DP) :: energyFirstIter !<The energy for the first iteration
     REAL(DP) :: normalisedEnergy !<The normalized energy for the subsequent iterations
     REAL(DP) :: previousFuncNorm !<The previous function norm
+    REAL(DP), ALLOCATABLE ::  residualFirstIter(:) !<The residual for the first iteration
   END TYPE NewtonSolverConvergenceTest
 
   !>Contains information for a Newton nonlinear solver

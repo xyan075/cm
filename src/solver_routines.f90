@@ -16525,7 +16525,7 @@ CONTAINS
         SELECT CASE(newtonSolver%convergenceTestType)
           CASE(SOLVER_NEWTON_CONVERGENCE_PETSC_DEFAULT)
             CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"  Function Norm    = ",norm,err,error,*999)
-          CASE(SOLVER_NEWTON_CONVERGENCE_ENERGY_NORM)
+          CASE(SOLVER_NEWTON_CONVERGENCE_ENERGY_NORM,SOLVER_NEWTON_CONVERGENCE_DIFFERENTIATED_RATIO)
             SELECT CASE(newtonSolver%NEWTON_SOLVE_TYPE)
             CASE(SOLVER_NEWTON_LINESEARCH)
               linesearchSolver=>newtonSolver%LINESEARCH_SOLVER
@@ -16546,9 +16546,6 @@ CONTAINS
                 & TRIM(NUMBER_TO_VSTRING(newtonSolver%NEWTON_SOLVE_TYPE,"*",err,error))//"is invalid."
               CALL FLAG_ERROR(localError,err,error,*999)
             END SELECT
-          CASE(SOLVER_NEWTON_CONVERGENCE_DIFFERENTIATED_RATIO)
-            CALL FLAG_ERROR("The Sum of differentiated ratios of unconstrained to constrained residuals"// &
-              &  "convergence test type is not implemented.",err,error,*999)
           END SELECT
       ELSE
         CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"  Function Norm    = ",norm,err,error,*999)

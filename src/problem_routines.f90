@@ -2178,7 +2178,7 @@ CONTAINS
             
 !            CALL DistributedVector_L2Norm(parameters,delta,err,error,*999)
 !            delta=(1.0_DP+delta)*1E-7_DP
-            delta=1E-7_DP
+            delta=1E-9_DP
             
 !            deformableBodyIdx=1;
 !            numberOfContactPoints=interface%DATA_POINTS%NUMBER_OF_DATA_POINTS
@@ -2915,13 +2915,16 @@ CONTAINS
                       CALL DISTRIBUTED_VECTOR_VALUES_ADD(nonlinearMatrices%RESIDUAL,dofIdx,residualValue,err,error,*999)
                     ENDIF
                   ENDDO !fieldComponent
-                  
-                  
-                  
-                  
                 ENDIF !inContact
               ENDDO !globalDataPointNum
               
+              CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"******************** torque ******************",ERR,ERROR,*999)
+              DO fieldComponent=1,3
+                dofIdx=residualVariable%components(7+fieldComponent)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
+                CALL DISTRIBUTED_VECTOR_VALUES_GET(nonlinearMatrices%RESIDUAL,dofIdx,residualValue,err,error,*999)
+                CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"torque = ",residualValue,err,error,*999)
+              ENDDO !fieldComponent
+              CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"**********************************************",ERR,ERROR,*999)
               !Update the residual parameter set
               residualParameterSet=>residualVariable%PARAMETER_SETS%SET_TYPE(FIELD_RESIDUAL_SET_TYPE)%PTR
               IF(ASSOCIATED(residualParameterSet)) THEN
@@ -5866,8 +5869,10 @@ SUBROUTINE ProblemSolver_ConvergenceTestPetsc(snes,iterationNumber,xnorm,gnorm,f
   TYPE(NEWTON_SOLVER_TYPE), POINTER :: newtonSolver
   TYPE(NONLINEAR_SOLVER_TYPE), POINTER :: nonlinearSolver
   TYPE(PetscSnesLinesearchType) :: lineSearch
-  REAL(DP) :: energy,normalisedEnergy,forceNorm,funcNorm
-  INTEGER(INTG) :: vecSize
+  REAL(DP) :: energy,normalisedEnergy,forceNorm,funcNorm,functionRatio
+  REAL(DP), ALLOCATABLE :: vecValues(:)
+  INTEGER(INTG), ALLOCATABLE :: vecInd(:)
+  INTEGER(INTG) :: vecSize,dofIdx
   TYPE(VARYING_STRING) :: error,localError
 
   IF(ASSOCIATED(ctx)) THEN
@@ -5925,7 +5930,57 @@ SUBROUTINE ProblemSolver_ConvergenceTestPetsc(snes,iterationNumber,xnorm,gnorm,f
             newtonSolver%convergenceTest%normalisedEnergy=0.0_DP
           ENDIF
         CASE(SOLVER_NEWTON_CONVERGENCE_DIFFERENTIATED_RATIO)
-          CALL FLAG_ERROR("Differentiated ratio convergence test not implemented.",err,error,*999)
+          IF(iterationNumber==0) THEN
+            CALL Petsc_SnesLineSearchInitialise(lineSearch,err,error,*999)
+            CALL Petsc_SnesGetSnesLineSearch(snes,lineSearch,err,error,*999)
+            CALL PETSC_VECINITIALISE(x,err,error,*999)
+            CALL PETSC_VECINITIALISE(f,err,error,*999)
+            CALL PETSC_VECINITIALISE(y,err,error,*999)
+            CALL PETSC_VECINITIALISE(w,err,error,*999)
+            CALL PETSC_VECINITIALISE(g,err,error,*999) 
+          ELSE
+            CALL Petsc_SnesLineSearchInitialise(lineSearch,err,error,*999)
+            CALL Petsc_SnesGetSnesLineSearch(snes,lineSearch,err,error,*999)
+            CALL PETSC_VECINITIALISE(x,err,error,*999)
+            CALL PETSC_VECINITIALISE(f,err,error,*999)
+            CALL PETSC_VECINITIALISE(y,err,error,*999)
+            CALL PETSC_VECINITIALISE(w,err,error,*999)
+            CALL PETSC_VECINITIALISE(g,err,error,*999) 
+            CALL Petsc_SnesLineSearchGetVecs(lineSearch,x,f,y,w,g,err,error,*999)
+            CALL Petsc_VecNorm(f,PETSC_NORM_2,funcNorm,err,error,*999)  
+            CALL PETSC_VECGETSIZE(g,vecSize,err,error,*999)
+            ALLOCATE(vecValues(vecSize),STAT=err)
+            IF(ERR/=0) CALL FLAG_ERROR("Could not allocate vector values.",err,error,*999)
+            ALLOCATE(vecInd(vecSize),STAT=err)
+            IF(ERR/=0) CALL FLAG_ERROR("Could not allocate vector indices.",err,error,*999)    
+            DO dofIdx=1,vecSize
+              vecInd(dofIdx)=dofIdx-1
+            ENDDO !dofIdx
+            IF(iterationNumber==1) THEN
+              IF(ABS(funcNorm)<ZERO_TOLERANCE) THEN
+                reason=PETSC_SNES_CONVERGED_FNORM_ABS
+              ELSE
+                IF(.NOT. ALLOCATED(newtonSolver%convergenceTest%residualFirstIter)) THEN
+                  ALLOCATE(newtonSolver%convergenceTest%residualFirstIter(vecSize),STAT=err)
+                  IF(ERR/=0) CALL FLAG_ERROR("Could not allocate first iteration residual vector values.",err,error,*999)
+                ENDIF
+                ! get the vector value
+                CALL PETSC_VECGETVALUES(g,vecSize,vecInd,newtonSolver%convergenceTest%residualFirstIter,err,error,*999)
+              ENDIF !converged at 1st iteration
+            ELSE
+              CALL PETSC_VECGETVALUES(g,vecSize,vecInd,vecValues,err,error,*999)
+              DO dofIdx=1,vecSize
+                vecValues(dofIdx)=vecValues(dofIdx)/newtonSolver%convergenceTest%residualFirstIter(dofIdx)
+              ENDDO !dofIdx
+              functionRatio=SQRT(SUM(vecValues*vecValues,1))
+              IF(ABS(functionRatio)<newtonSolver%ABSOLUTE_TOLERANCE) THEN
+                reason=PETSC_SNES_CONVERGED_FNORM_ABS
+              ENDIF 
+              CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"*********************************************",err,error,*999)
+              CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"Differentiated ratio norm = ",functionRatio,err,error,*999)
+              CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"*********************************************",err,error,*999)
+            ENDIF !iterationNumber==1                 
+          ENDIF !iterationNumber>0
         CASE DEFAULT
           localError="The specified convergence test type of "//TRIM(NUMBER_TO_VSTRING( &
             & newtonSolver%convergenceTestType,"*",err,error))//" is invalid."
