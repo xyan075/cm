@@ -1559,7 +1559,7 @@ CONTAINS
             !Data reprojection and update points connectivity information with the projection results
             dataProjection=>dataPoints%DATA_PROJECTIONS(projectionBodyIdx+1)%PTR !projectionBodyIdx+1 since the first projection is for interface
 !            CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"ProjectedBodyDataProjectionLabel",ERR,ERROR,*999)
-            CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,dataProjection%label,ERR,ERROR,*999)
+!            CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,dataProjection%label,ERR,ERROR,*999)
             IF(ASSOCIATED(dataProjection)) THEN
               dependentFieldProjection=>interfaceCondition%DEPENDENT%FIELD_VARIABLES(projectionBodyIdx)%PTR%FIELD
               IF(ASSOCIATED(dependentFieldProjection)) THEN

@@ -1662,7 +1662,8 @@ CONTAINS
                               !#####################################################################################################  
                               
                               !Multiply by the scale factor
-                              matrixValue=(forceTerm+geometricTerm)*rowDofScaleFactor*colDofScaleFactor
+                              matrixValue=(forceTerm+geometricTerm)*rowDofScaleFactor*colDofScaleFactor* &
+                                & contactPointMetrics%Jacobian*interface%DATA_POINTS%DATA_POINTS(globalDataPointNum)%WEIGHTS(1)
 !                              matrixValue=(forceTerm+geometricTerm)
 
                               !Multiply by scale factors
@@ -2048,7 +2049,8 @@ CONTAINS
                           elemParameterNo=domainFace%BASIS%ELEMENT_PARAMETER_INDEX(faceDerivative,localFaceNodeIdx)
                           !Multiply the contribution by scale factor
                           residualValue=residualValue*equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)% &
-                            & PTR%SCALE_FACTORS(elemParameterNo,fieldComponent)
+                            & PTR%SCALE_FACTORS(elemParameterNo,fieldComponent)*contactPointMetrics%Jacobian* &
+                            & interface%DATA_POINTS%DATA_POINTS(globalDataPointNum)%WEIGHTS(1)
                           CALL DISTRIBUTED_VECTOR_VALUES_ADD(nonlinearMatrices%RESIDUAL,dofIdx,residualValue,err,error,*999)
                         ENDDO !faceDerivative
                       ENDDO !localFaceNodeIdx
@@ -4288,7 +4290,7 @@ CONTAINS
           pointsConnectivity=>interface%pointsConnectivity
           interfaceDatapoints=>interface%DATA_POINTS
           IF(ASSOCIATED(pointsConnectivity)) THEN
-            DO bodyidx=1,2
+           DO bodyidx=1,2
               filenameOutput=directory//"PointsConnectivity"//TRIM(NUMBER_TO_VSTRING(bodyidx,"*",err,error))// &
                 & "_solveCall"//TRIM(NUMBER_TO_VSTRING(solve_call,"*",err,error))// &
                 & "_load"//TRIM(NUMBER_TO_VSTRING(load_step,"*",err,error))// &
@@ -4296,13 +4298,19 @@ CONTAINS
               OPEN(UNIT=IUNIT,FILE=filenameOutput,STATUS="UNKNOWN",ACTION="WRITE",IOSTAT=ERR)
               groupname="PointsConnectivity"//TRIM(NUMBER_TO_VSTRING(bodyidx,"*",err,error))
               WRITE(IUNIT,'( '' Group name: '',A)') groupname
-              WRITE(IUNIT,'(1X,''#Fields=2'')')
+              WRITE(IUNIT,'(1X,''#Fields=4'')')
               WRITE(IUNIT,'(1X,''1) coordinates, coordinate, rectangular cartesian, #Components=3'')')
               WRITE(IUNIT,'(1X,''  x.  Value index= 1, #Derivatives=0'')')
               WRITE(IUNIT,'(1X,''  y.  Value index= 2, #Derivatives=0'')')
               WRITE(IUNIT,'(1X,''  z.  Value index= 3, #Derivatives=0'')')
               WRITE(IUNIT,'(1X,''2) exitTag, field, rectangular cartesian, #Components=1'')')
               WRITE(IUNIT,'(1X,''  tag.  Value index= 4, #Derivatives=0'')')
+              WRITE(IUNIT,'(1X,''3) normal, field, rectangular cartesian, #Components=3'')')
+              WRITE(IUNIT,'(1X,''  x.  Value index= 5, #Derivatives=0'')')
+              WRITE(IUNIT,'(1X,''  y.  Value index= 6, #Derivatives=0'')')
+              WRITE(IUNIT,'(1X,''  z.  Value index= 7, #Derivatives=0'')')
+              WRITE(IUNIT,'(1X,''4) contactForce, field, rectangular cartesian, #Components=1'')')
+              WRITE(IUNIT,'(1X,''  x.  Value index= 8, #Derivatives=0'')')
               dependentField=>interfaceCondition%DEPENDENT%EQUATIONS_SETS(bodyidx)%PTR% &
                 & DEPENDENT%DEPENDENT_FIELD
               NULLIFY(interpolationParameters)
@@ -4326,8 +4334,25 @@ CONTAINS
                 DO component=1,3
                   WRITE(IUNIT,'(1X,3E25.15)') interpolatedPoint%VALUES(component,NO_PART_DERIV)
                 ENDDO !component
-                WRITE(IUNIT,'(1X,I2)') dataProjection%DATA_PROJECTION_RESULTS(globalDataPointNum)%EXIT_TAG
-              ENDDO !dataPointIdx
+                IF(interfaceCondition%interfaceContactMetrics%inContact(globalDataPointNum)) THEN
+                  WRITE(IUNIT,'(1X,I2)') 1
+                  !normal of the contact point
+                  DO component=1,3
+                    WRITE(IUNIT,'(1X,3E25.15)') interfaceCondition%interfaceContactMetrics% &
+                      & contactPointMetrics(globalDataPointNum)%normal(component)
+                  ENDDO !component
+                  ! contact force
+                  WRITE(IUNIT,'(1X,3E25.15)') interfaceCondition%interfaceContactMetrics% &
+                    & contactPointMetrics(globalDataPointNum)%contactForce
+                ELSE
+                  WRITE(IUNIT,'(1X,I2)') 2
+                  !no normal calculated if not in contact
+                  DO component=1,3
+                    WRITE(IUNIT,'(1X,3E25.15)') 0.0_DP
+                  ENDDO !component
+                  WRITE(IUNIT,'(1X,3E25.15)') 0.0_DP
+                ENDIF
+              ENDDO !globalDataPointNum
               CALL FIELD_INTERPOLATION_PARAMETERS_FINALISE(interpolationParameters,err,error,*999)
               CALL FIELD_INTERPOLATED_POINTS_FINALISE(interpolatedPoints,err,error,*999)
               OPEN(UNIT=IUNIT)

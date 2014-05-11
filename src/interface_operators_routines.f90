@@ -1142,6 +1142,7 @@ CONTAINS
                   IF((iterationNumber>=contactMetrics%iterationGeometricTerm) .AND. (contactMetrics%iterationGeometricTerm>0)) THEN
                     IF(interfaceCondition%operator==INTERFACE_CONDITION_FLS_CONTACT_REPROJECT_OPERATOR) THEN
                       contactMetrics%addGeometricTerm=.TRUE.
+                      CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"******************* Add Geom Term ********************",err,error,*999)
                     ENDIF 
                   ENDIF
 
