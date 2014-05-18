@@ -904,6 +904,7 @@ CONTAINS
     contactPointMetrics%contactStiffness=0.0_DP
     contactPointMetrics%signedGapNormal=0.0_DP
     contactPointMetrics%contactForce=0.0_DP
+    contactPointMetrics%Jacobian=0.0_DP
     ALLOCATE(contactPointMetrics%tangentDerivatives(numberOfDimensions,numberOfDimensions, &
       & numberOfGeometricComp),STAT=err)
     IF(err/=0) CALL FLAG_ERROR("Could not allocate interface contact metrics - tangent derivatives.",err,error,*999)
@@ -1109,14 +1110,14 @@ CONTAINS
     TYPE(InterfacePointsConnectivityType), POINTER :: pointsConnectivity !<A pointer to the interface points connectivity
     TYPE(InterfaceContactMetricsType), POINTER :: contactMetrics 
     TYPE(InterfaceContactPointMetricsType), POINTER :: contactPointMetrics
-    TYPE(FIELD_TYPE), POINTER :: projectedDependentField,penaltyField
-    TYPE(FIELD_INTERPOLATION_PARAMETERS_PTR_TYPE), POINTER :: interpolationParameters(:)
-    TYPE(FIELD_INTERPOLATED_POINT_PTR_TYPE), POINTER :: interpolatedPoints(:)
-    TYPE(FIELD_INTERPOLATED_POINT_METRICS_PTR_TYPE), POINTER :: interpolatedPointsMetrics(:)
-    TYPE(FIELD_INTERPOLATED_POINT_TYPE), POINTER :: interpolatedPoint
+    TYPE(FIELD_TYPE), POINTER :: projectedDependentField,penaltyField,slaveGeometricField
+    TYPE(FIELD_INTERPOLATION_PARAMETERS_PTR_TYPE), POINTER :: interpolationParametersMaster(:),interpolationParametersSlave(:)
+    TYPE(FIELD_INTERPOLATED_POINT_PTR_TYPE), POINTER :: interpolatedPointsMaster(:),interpolatedPointsSlave(:)
+    TYPE(FIELD_INTERPOLATED_POINT_METRICS_PTR_TYPE), POINTER :: interpolatedPointsMetricsMaster(:),interpolatedPointsMetricsSlave(:)
+    TYPE(FIELD_INTERPOLATED_POINT_TYPE), POINTER :: interpolatedPointMaster,interpolatedPointSlave
     
     INTEGER(INTG) :: projectedMeshIdx,noGeoComp,noXi,localElementNumber,localFaceLineNumber,normalStiffnessComp,penaltyPtDof, &
-      & ContPtElementNum
+      & ContPtElementNum,slaveMeshIdx
     INTEGER(INTG) :: contactPtIdx,xiIdx,i,j
     REAL(DP) :: gapsComponents(3),junkPosition(3),tangents(3,2), A(2,2), detA
     LOGICAL :: reverseNormal
@@ -1156,14 +1157,28 @@ CONTAINS
                   noGeoComp=projectedDependentField%GEOMETRIC_FIELD%VARIABLE_TYPE_MAP(FIELD_U_VARIABLE_TYPE)% &
                     & PTR%NUMBER_OF_COMPONENTS
                   noXi=2
-                  NULLIFY(interpolationParameters)
-                  NULLIFY(interpolatedPoints)
-                  CALL FIELD_INTERPOLATION_PARAMETERS_INITIALISE(projectedDependentField,interpolationParameters,err,error, &
+                  NULLIFY(interpolationParametersMaster)
+                  NULLIFY(interpolatedPointsMaster)
+                  CALL FIELD_INTERPOLATION_PARAMETERS_INITIALISE(projectedDependentField,interpolationParametersMaster,err,error, &
                     & *999,FIELD_GEOMETRIC_COMPONENTS_TYPE)
-                  CALL FIELD_INTERPOLATED_POINTS_INITIALISE(interpolationParameters,interpolatedPoints,err,error,*999, &
+                  CALL FIELD_INTERPOLATED_POINTS_INITIALISE(interpolationParametersMaster,interpolatedPointsMaster,err,error,*999, &
                     & FIELD_GEOMETRIC_COMPONENTS_TYPE)
-                  CALL FIELD_INTERPOLATED_POINTS_METRICS_INITIALISE(interpolatedPoints,interpolatedPointsMetrics,err,error,*999)
-                  interpolatedPoint=>interpolatedPoints(FIELD_U_VARIABLE_TYPE)%PTR
+                  CALL FIELD_INTERPOLATED_POINTS_METRICS_INITIALISE(interpolatedPointsMaster,interpolatedPointsMetricsMaster, &
+                    & err,error,*999)
+                  interpolatedPointMaster=>interpolatedPointsMaster(FIELD_U_VARIABLE_TYPE)%PTR
+                  
+                  slaveMeshIdx=1; 
+                  
+                  ! Gete geometric field for the slave
+                  slaveGeometricField=>interfaceCondition%DEPENDENT%FIELD_VARIABLES(slaveMeshIdx)%PTR%FIELD%GEOMETRIC_FIELD !slave
+                  
+                  NULLIFY(interpolationParametersSlave)
+                  NULLIFY(interpolatedPointsSlave)
+                  CALL FIELD_INTERPOLATION_PARAMETERS_INITIALISE(slaveGeometricField,interpolationParametersSlave,err,error,*999)
+                  CALL FIELD_INTERPOLATED_POINTS_INITIALISE(interpolationParametersSlave,interpolatedPointsSlave,err,error,*999)
+                  CALL FIELD_INTERPOLATED_POINTS_METRICS_INITIALISE(interpolatedPointsSlave,interpolatedPointsMetricsSlave, &
+                    & err,error,*999)
+                  interpolatedPointSlave=>interpolatedPointsSlave(FIELD_U_VARIABLE_TYPE)%PTR
                 
                   !#################################################################################################################
                   
@@ -1210,7 +1225,7 @@ CONTAINS
                   
                     IF(contactMetrics%orthogonallyProjected(contactPtIdx)) THEN !Only calculate metrics if orthogonally projected
                     
-                      !###################################################################################################################
+                      !#############################################################################################################
                       
                       ! Get the local element of the master where this point is projected on
                       localElementNumber=pointsConnectivity%pointsConnectivity(contactPtIdx,projectedMeshIdx)% &
@@ -1220,13 +1235,30 @@ CONTAINS
                         & ELEMENT_FACES(pointsConnectivity%pointsConnectivity(contactPtIdx,projectedMeshIdx)%elementLineFaceNumber)
                       ! Get the interpolation parameter for evaluation of projected contact points on the master
                       CALL FIELD_INTERPOLATION_PARAMETERS_FACE_GET(FIELD_VALUES_SET_TYPE,localFaceLineNumber, &
-                        & interpolationParameters(FIELD_U_VARIABLE_TYPE)%PTR,err,error,*999,FIELD_GEOMETRIC_COMPONENTS_TYPE)
+                        & interpolationParametersMaster(FIELD_U_VARIABLE_TYPE)%PTR,err,error,*999,FIELD_GEOMETRIC_COMPONENTS_TYPE)
                       ! Evaluate the projected data points on the master surface
                       CALL FIELD_INTERPOLATE_XI(SECOND_PART_DERIV,pointsConnectivity%pointsConnectivity(contactPtIdx, &
-                        & projectedMeshIdx)%reducedXi(:),interpolatedPoint,err,error,*999,FIELD_GEOMETRIC_COMPONENTS_TYPE)
+                        & projectedMeshIdx)%reducedXi(:),interpolatedPointMaster,err,error,*999,FIELD_GEOMETRIC_COMPONENTS_TYPE)
                       ! Calculate gap vector
                       gapsComponents(1:noGeoComp)=-dataPoints%DATA_POINTS(contactPtIdx)%position(1:noGeoComp)+ &
-                        & interpolatedPoint%VALUES(1:noGeoComp,NO_PART_DERIV)
+                        & interpolatedPointMaster%VALUES(1:noGeoComp,NO_PART_DERIV)
+                      
+                      !#############################################################################################################
+                      
+                      ! Get the local element of the slave where this point is defined
+                      localElementNumber=pointsConnectivity%pointsConnectivity(contactPtIdx,slaveMeshIdx)%coupledMeshElementNumber
+                      ! Get the local face number of the slave
+                      localFaceLineNumber=slaveGeometricField%DECOMPOSITION%TOPOLOGY%ELEMENTS%ELEMENTS(localElementNumber)% &
+                        & ELEMENT_FACES(pointsConnectivity%pointsConnectivity(contactPtIdx,slaveMeshIdx)%elementLineFaceNumber)
+                      ! Get the interpolation parameter for evaluation of contact points on the slave
+                      CALL FIELD_INTERPOLATION_PARAMETERS_FACE_GET(FIELD_VALUES_SET_TYPE,localFaceLineNumber, &
+                        & interpolationParametersSlave(FIELD_U_VARIABLE_TYPE)%PTR,err,error,*999)
+                      ! Evaluate contact data point on the slave surface
+                      CALL FIELD_INTERPOLATE_XI(FIRST_PART_DERIV,pointsConnectivity%pointsConnectivity(contactPtIdx, &
+                        & slaveMeshIdx)%reducedXi(:),interpolatedPointSlave,err,error,*999)
+                      CALL FIELD_INTERPOLATED_POINT_METRICS_CALCULATE(2,interpolatedPointsMetricsSlave &
+                        & (FIELD_U_VARIABLE_TYPE)%PTR,err,error,*999) !2=COORDINATE_JACOBIAN_AREA_TYPE
+                      contactPointMetrics%Jacobian=interpolatedPointsMetricsSlave(FIELD_U_VARIABLE_TYPE)%PTR%JACOBIAN
                       
                       !#############################################################################################################
                       
@@ -1238,9 +1270,9 @@ CONTAINS
                       CASE(2,4,6)
                         reverseNormal=.TRUE.
                       END SELECT
-                      CALL FIELD_INTERPOLATED_POINT_METRICS_CALCULATE(noGeoComp,interpolatedPointsMetrics &
+                      CALL FIELD_INTERPOLATED_POINT_METRICS_CALCULATE(2,interpolatedPointsMetricsMaster &
                         & (FIELD_U_VARIABLE_TYPE)%PTR,err,error,*999)
-                      CALL FIELD_POSITION_NORMAL_TANGENTS_CALCULATE_INT_PT_METRIC(interpolatedPointsMetrics &
+                      CALL FIELD_POSITION_NORMAL_TANGENTS_CALCULATE_INT_PT_METRIC(interpolatedPointsMetricsMaster &
                         & (FIELD_U_VARIABLE_TYPE)%PTR,reverseNormal,junkPosition, &
                         & contactPointMetrics%normal,tangents,err,error,*999)
                       ! Calculate signed gap
@@ -1252,18 +1284,18 @@ CONTAINS
                       ! These terms are only required if geometric term is added to the contact stiffness matrix
                       IF((contactMetrics%addGeometricTerm) .AND. (contactMetrics%inContact(contactPtIdx))) THEN
                         ! Store the second derivative information
-                        contactPointMetrics%tangentDerivatives(1,1,:)=interpolatedPoint%VALUES(1:noGeoComp,PART_DERIV_S1_S1)
-                        contactPointMetrics%tangentDerivatives(1,2,:)=interpolatedPoint%VALUES(1:noGeoComp,PART_DERIV_S1_S2)
+                        contactPointMetrics%tangentDerivatives(1,1,:)=interpolatedPointMaster%VALUES(1:noGeoComp,PART_DERIV_S1_S1)
+                        contactPointMetrics%tangentDerivatives(1,2,:)=interpolatedPointMaster%VALUES(1:noGeoComp,PART_DERIV_S1_S2)
                         contactPointMetrics%tangentDerivatives(2,1,:)=contactPointMetrics%tangentDerivatives(1,2,:)
-                        contactPointMetrics%tangentDerivatives(2,2,:)=interpolatedPoint%VALUES(1:noGeoComp,PART_DERIV_S2_S2)
+                        contactPointMetrics%tangentDerivatives(2,2,:)=interpolatedPointMaster%VALUES(1:noGeoComp,PART_DERIV_S2_S2)
                         
                         ! Re-populate tangent vectors into the appropriate format
                         contactPointMetrics%tangents(1,1:noGeoComp)=tangents(1:noGeoComp,1)
                         contactPointMetrics%tangents(2,1:noGeoComp)=tangents(1:noGeoComp,2)
                         ! Store the covariant and contravariant information
-                        contactPointMetrics%covariantMetricTensor=interpolatedPointsMetrics(FIELD_U_VARIABLE_TYPE)%PTR% &
+                        contactPointMetrics%covariantMetricTensor=interpolatedPointsMetricsMaster(FIELD_U_VARIABLE_TYPE)%PTR% &
                           & GL(1:noXi,1:noXi)
-                        contactPointMetrics%contravariantMetricTensor=interpolatedPointsMetrics(FIELD_U_VARIABLE_TYPE)%PTR% &
+                        contactPointMetrics%contravariantMetricTensor=interpolatedPointsMetricsMaster(FIELD_U_VARIABLE_TYPE)%PTR% &
                           & GU(1:noXi,1:noXi)
                         
                         ! Calculate inverse A
@@ -1280,9 +1312,12 @@ CONTAINS
                       !#############################################################################################################
                     ENDIF !orthogonally projected
                   ENDDO !contactPtIdx
-                  CALL FIELD_INTERPOLATED_POINTS_METRICS_FINALISE(interpolatedPointsMetrics,err,error,*999)
-                  CALL FIELD_INTERPOLATION_PARAMETERS_FINALISE(interpolationParameters,err,error,*999)
-                  CALL FIELD_INTERPOLATED_POINTS_FINALISE(interpolatedPoints,err,error,*999)
+                  CALL FIELD_INTERPOLATED_POINTS_METRICS_FINALISE(interpolatedPointsMetricsMaster,err,error,*999)
+                  CALL FIELD_INTERPOLATION_PARAMETERS_FINALISE(interpolationParametersMaster,err,error,*999)
+                  CALL FIELD_INTERPOLATED_POINTS_FINALISE(interpolatedPointsMaster,err,error,*999)
+                  CALL FIELD_INTERPOLATED_POINTS_METRICS_FINALISE(interpolatedPointsMetricsSlave,err,error,*999)
+                  CALL FIELD_INTERPOLATION_PARAMETERS_FINALISE(interpolationParametersSlave,err,error,*999)
+                  CALL FIELD_INTERPOLATED_POINTS_FINALISE(interpolatedPointsSlave,err,error,*999)
                 ELSE
                   CALL FLAG_ERROR("Interface penalty field is not associated.",err,error,*999)
                 ENDIF

@@ -1662,8 +1662,10 @@ CONTAINS
                               !#####################################################################################################  
                               
                               !Multiply by the scale factor
-                              matrixValue=(forceTerm+geometricTerm)*rowDofScaleFactor*colDofScaleFactor* &
-                                & contactPointMetrics%Jacobian*interface%DATA_POINTS%DATA_POINTS(globalDataPointNum)%WEIGHTS(1)
+                              matrixValue=(forceTerm+geometricTerm)
+                              matrixValue=matrixValue*rowDofScaleFactor*colDofScaleFactor
+!                              matrixValue=matrixValue*contactPointMetrics%Jacobian*interface%DATA_POINTS% &
+!                                & DATA_POINTS(globalDataPointNum)%WEIGHTS(1)
 !                              matrixValue=(forceTerm+geometricTerm)
 
                               !Multiply by scale factors
@@ -1950,8 +1952,8 @@ CONTAINS
     INTEGER(INTG) :: globalDataPointNum,elementNum,connectedFace,fieldComponent,meshComp, &
       & decompositionFaceNumber,localFaceNodeIdx,faceLocalElemNode,globalNode,faceDerivative,derivative,versionNumber, &
       & residualVariableIdx,dofIdx
-    INTEGER(INTG) :: coefficient,contactStiffness,ContPtElementNum,penaltyPtDof,previousFaceNo,elemParameterNo
-    REAL(DP) :: residualValue,phi,contactForce
+    INTEGER(INTG) :: contactStiffness,ContPtElementNum,penaltyPtDof,previousFaceNo,elemParameterNo
+    REAL(DP) :: residualValue,phi,contactForce,coefficient
     REAL(DP) :: xi(2) !\todo generalise xi allocations for 1D,2D and 3D points connectivity
 
     CALL ENTERS("EQUATIONS_SET_RESIDUAL_CONTACT_UPDATE_STATIC_FEM",ERR,ERROR,*999)
@@ -1990,9 +1992,9 @@ CONTAINS
                 ! Residual is +ve for body 1 and -ve for body 2  
                 SELECT CASE(bodyIdx)
                 CASE(1)
-                  coefficient=1;
+                  coefficient=1.0;
                 CASE(2)
-                  coefficient=-1;
+                  coefficient=-1.0;
                 CASE DEFAULT
                   CALL FLAG_ERROR("Contact for 3 or more bodies is not implemented",err,error,*999)
                 END SELECT 
@@ -2049,8 +2051,9 @@ CONTAINS
                           elemParameterNo=domainFace%BASIS%ELEMENT_PARAMETER_INDEX(faceDerivative,localFaceNodeIdx)
                           !Multiply the contribution by scale factor
                           residualValue=residualValue*equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)% &
-                            & PTR%SCALE_FACTORS(elemParameterNo,fieldComponent)*contactPointMetrics%Jacobian* &
-                            & interface%DATA_POINTS%DATA_POINTS(globalDataPointNum)%WEIGHTS(1)
+                            & PTR%SCALE_FACTORS(elemParameterNo,fieldComponent)
+!                          residualValue=residualValue*contactPointMetrics%Jacobian*interface%DATA_POINTS% &
+!                            & DATA_POINTS(globalDataPointNum)%WEIGHTS(1)
                           CALL DISTRIBUTED_VECTOR_VALUES_ADD(nonlinearMatrices%RESIDUAL,dofIdx,residualValue,err,error,*999)
                         ENDDO !faceDerivative
                       ENDDO !localFaceNodeIdx
@@ -4309,8 +4312,12 @@ CONTAINS
               WRITE(IUNIT,'(1X,''  x.  Value index= 5, #Derivatives=0'')')
               WRITE(IUNIT,'(1X,''  y.  Value index= 6, #Derivatives=0'')')
               WRITE(IUNIT,'(1X,''  z.  Value index= 7, #Derivatives=0'')')
-              WRITE(IUNIT,'(1X,''4) contactForce, field, rectangular cartesian, #Components=1'')')
-              WRITE(IUNIT,'(1X,''  x.  Value index= 8, #Derivatives=0'')')
+              WRITE(IUNIT,'(1X,''4) contactGap, field, rectangular cartesian, #Components=1'')')
+              WRITE(IUNIT,'(1X,''  gap.  Value index= 8, #Derivatives=0'')')
+              WRITE(IUNIT,'(1X,''5) contactForce, field, rectangular cartesian, #Components=1'')')
+              WRITE(IUNIT,'(1X,''  pressure.  Value index=9 , #Derivatives=0'')')
+              WRITE(IUNIT,'(1X,''6) Jacobian, field, rectangular cartesian, #Components=1'')')
+              WRITE(IUNIT,'(1X,''  Jacobian.  Value index=10 , #Derivatives=0'')')
               dependentField=>interfaceCondition%DEPENDENT%EQUATIONS_SETS(bodyidx)%PTR% &
                 & DEPENDENT%DEPENDENT_FIELD
               NULLIFY(interpolationParameters)
@@ -4341,16 +4348,30 @@ CONTAINS
                     WRITE(IUNIT,'(1X,3E25.15)') interfaceCondition%interfaceContactMetrics% &
                       & contactPointMetrics(globalDataPointNum)%normal(component)
                   ENDDO !component
+                  ! contact gap function
+                  WRITE(IUNIT,'(1X,3E25.15)') interfaceCondition%interfaceContactMetrics% &
+                    & contactPointMetrics(globalDataPointNum)%signedGapNormal
                   ! contact force
                   WRITE(IUNIT,'(1X,3E25.15)') interfaceCondition%interfaceContactMetrics% &
                     & contactPointMetrics(globalDataPointNum)%contactForce
+                  ! Jacobian (area)
+                  WRITE(IUNIT,'(1X,3E25.15)') interfaceCondition%interfaceContactMetrics% &
+                    & contactPointMetrics(globalDataPointNum)%Jacobian
                 ELSE
                   WRITE(IUNIT,'(1X,I2)') 2
-                  !no normal calculated if not in contact
+                  ! Normal on the master surface
                   DO component=1,3
-                    WRITE(IUNIT,'(1X,3E25.15)') 0.0_DP
+                    WRITE(IUNIT,'(1X,3E25.15)') interfaceCondition%interfaceContactMetrics% &
+                      & contactPointMetrics(globalDataPointNum)%normal(component)
                   ENDDO !component
+                  ! contact gap function
+                  WRITE(IUNIT,'(1X,3E25.15)') interfaceCondition%interfaceContactMetrics% &
+                    & contactPointMetrics(globalDataPointNum)%signedGapNormal
+                  !no contact force calculated if not in contact
                   WRITE(IUNIT,'(1X,3E25.15)') 0.0_DP
+                  ! Jacobian (area)
+                  WRITE(IUNIT,'(1X,3E25.15)') interfaceCondition%interfaceContactMetrics% &
+                    & contactPointMetrics(globalDataPointNum)%Jacobian
                 ENDIF
               ENDDO !globalDataPointNum
               CALL FIELD_INTERPOLATION_PARAMETERS_FINALISE(interpolationParameters,err,error,*999)

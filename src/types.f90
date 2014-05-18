@@ -2142,6 +2142,7 @@ END TYPE GENERATED_MESH_ELLIPSOID_TYPE
     REAL(DP) :: contactStiffness(3) !1-normal contact stiffness, 2-tangent contact stiffness 1, 3-tangent contact stiffness 2
     REAL(DP) :: signedGapNormal !<signedGapNormal. signed scalar gap in the normal direction at each contact point
     REAL(DP) :: contactForce !< current estimate of contact force = contact stiffness * signedGapNormal
+    REAL(DP) :: Jacobian !< The Jacobian of transformation for the undeformed geometry, used for evaluating contact residual and stiffness
     REAL(DP), ALLOCATABLE :: tangentDerivatives(:,:,:) !<tangentDerivatives(xiIdxTangent,xiIdxDerivative,CoordinateIdx). del(tau)/del(xi) at each contact point
     REAL(DP), ALLOCATABLE :: covariantMetricTensor(:,:) !<covariantMetricTensor(xiIdx1,xiIdx2). Covariant metric tensor at each contact point
     REAL(DP), ALLOCATABLE :: contravariantMetricTensor(:,:) !<contravariantMetricTensor(xiIdx1,xiIdx2). Contravariant metric tensor at each contact point
