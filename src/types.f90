@@ -1485,6 +1485,7 @@ END TYPE GENERATED_MESH_ELLIPSOID_TYPE
     LOGICAL :: UPDATE_RESIDUAL !<Is .TRUE. if the equtions residual vector is to be updated
     LOGICAL :: FIRST_ASSEMBLY !<Is .TRUE. if this residual vector has not been assembled
     TYPE(DISTRIBUTED_VECTOR_TYPE), POINTER :: RESIDUAL !<A pointer to the distributed residual vector for nonlinear equations
+    TYPE(DISTRIBUTED_VECTOR_TYPE), POINTER :: contactResidual !<A pointer to the distributed contact residual vector for debugging purpose
     TYPE(ELEMENT_VECTOR_TYPE) :: ELEMENT_RESIDUAL !<The element residual information for nonlinear equations. Old CMISS name RE1
     TYPE(NodalVectorType) :: NodalResidual !<The nodal residual information for nonlinear equations.
     INTEGER(INTG) :: NodalResidualCalculated !<The number of the nodal the residual is calculated for, or zero if it isn't calculated

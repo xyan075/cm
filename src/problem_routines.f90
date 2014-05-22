@@ -2055,6 +2055,7 @@ CONTAINS
 !                          residualValue=residualValue*contactPointMetrics%Jacobian*interface%DATA_POINTS% &
 !                            & DATA_POINTS(globalDataPointNum)%WEIGHTS(1)
                           CALL DISTRIBUTED_VECTOR_VALUES_ADD(nonlinearMatrices%RESIDUAL,dofIdx,residualValue,err,error,*999)
+                          CALL DISTRIBUTED_VECTOR_VALUES_ADD(nonlinearMatrices%contactResidual,dofIdx,residualValue,err,error,*999)
                         ENDDO !faceDerivative
                       ENDDO !localFaceNodeIdx
                     ENDDO !fieldComponent
@@ -4088,7 +4089,7 @@ CONTAINS
     TYPE(VARYING_STRING) :: fileName,method,directory
     
     INTEGER(INTG) :: interfaceConditionIdx, interfaceElementNumber, dataPointIdx, globalDataPointNum, elementNum, &
-      & coupledMeshFaceLineNumber, coupledMeshIdx,component
+      & coupledMeshFaceLineNumber, coupledMeshIdx,component, dofIdx
     TYPE(INTERFACE_TYPE), POINTER :: interface !<A pointer to the interface 
     TYPE(INTERFACE_CONDITION_TYPE), POINTER :: interfaceCondition
     TYPE(InterfacePointsConnectivityType), POINTER :: pointsConnectivity !<A pointer to the interface points connectivity
@@ -4099,6 +4100,7 @@ CONTAINS
     TYPE(DecompositionElementDataPointsType), POINTER :: decompositionElementData !<A pointer to the decomposition data point topology
     TYPE(DATA_POINTS_TYPE), POINTER :: interfaceDatapoints
     TYPE(DATA_PROJECTION_TYPE), POINTER :: dataProjection
+    TYPE(EQUATIONS_MATRICES_NONLINEAR_TYPE), POINTER :: nonlinearMatrices
 
     TYPE(PROBLEM_TYPE), POINTER :: problem
 
@@ -4112,7 +4114,7 @@ CONTAINS
     !\todo Temporarily added the variables below to allow the interface condition to be used in the single region contact problem
     !to be manually specified. Need to Generalise.
     INTEGER(INTG) :: equationsSetGlobalNumber,interfaceGlobalNumber,interfaceConditionGlobalNumber,connectedFace,bodyidx
-    REAL(DP) :: xi(2)
+    REAL(DP) :: xi(2), residualValue
 
     CALL ENTERS("Problem_SolverNewtonFieldsOutput",err,error,*999)
     
@@ -4379,7 +4381,27 @@ CONTAINS
               OPEN(UNIT=IUNIT)
             ENDDO !bodyidx
           ENDIF
-
+          
+          !output contact residual for debugging purpose
+          !\todo Needs to be generalised.
+          IUNIT = 300
+          filenameOutput=directory//"contactResidual"// &
+            & "_solveCall"//TRIM(NUMBER_TO_VSTRING(solve_call,"*",err,error))// &
+            & "_load"//TRIM(NUMBER_TO_VSTRING(load_step,"*",err,error))// &
+            & "_iter"//TRIM(NUMBER_TO_VSTRING(iterationNumber,"*",err,error))//".exdata"
+          OPEN(UNIT=IUNIT,FILE=filenameOutput,STATUS="UNKNOWN",ACTION="WRITE",IOSTAT=ERR)
+          nonlinearMatrices=>solverMapping%EQUATIONS_SETS(equationsSetGlobalNumber)%PTR%EQUATIONS%EQUATIONS_MATRICES% &
+            & NONLINEAR_MATRICES
+          DO dofIdx=1,nonlinearMatrices%contactResidual%CMISS%DATA_SIZE
+            CALL DISTRIBUTED_VECTOR_VALUES_GET(nonlinearMatrices%contactResidual,dofIdx,residualValue,err,error,*999)
+            WRITE(IUNIT,'(1X,3E25.15)') residualValue
+          ENDDO !dofIdx
+          
+          
+          
+          
+          OPEN(UNIT=IUNIT)
+          
         CASE DEFAULT
           localError="The problem type of "//TRIM(NUMBER_TO_VSTRING(problem%TYPE,"*",err,error))//" &
             & is invalid."
