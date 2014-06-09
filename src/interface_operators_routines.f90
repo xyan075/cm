@@ -1274,7 +1274,7 @@ CONTAINS
                         & (FIELD_U_VARIABLE_TYPE)%PTR,err,error,*999)
                       CALL FIELD_POSITION_NORMAL_TANGENTS_CALCULATE_INT_PT_METRIC(interpolatedPointsMetricsMaster &
                         & (FIELD_U_VARIABLE_TYPE)%PTR,reverseNormal,junkPosition, &
-                        & contactPointMetrics%normal,tangents,err,error,*999)
+                        & contactPointMetrics%normal,tangents,err,error,*999,.TRUE.)
                       ! Calculate signed gap
                       contactPointMetrics%signedGapNormal=DOT_PRODUCT(gapsComponents,contactPointMetrics%normal)
                       IF(contactPointMetrics%signedGapNormal>ZERO_TOLERANCE) contactMetrics%inContact(contactPtIdx)=.TRUE.
@@ -1282,7 +1282,7 @@ CONTAINS
                       !#############################################################################################################
                       
                       ! These terms are only required if geometric term is added to the contact stiffness matrix
-                      IF((contactMetrics%addGeometricTerm) .AND. (contactMetrics%inContact(contactPtIdx))) THEN
+!                      IF((contactMetrics%addGeometricTerm) .AND. (contactMetrics%inContact(contactPtIdx))) THEN
                         ! Store the second derivative information
                         contactPointMetrics%tangentDerivatives(1,1,:)=interpolatedPointMaster%VALUES(1:noGeoComp,PART_DERIV_S1_S1)
                         contactPointMetrics%tangentDerivatives(1,2,:)=interpolatedPointMaster%VALUES(1:noGeoComp,PART_DERIV_S1_S2)
@@ -1308,7 +1308,7 @@ CONTAINS
                           ENDDO
                         ENDDO
                         CALL INVERT(A,contactPointMetrics%inverseA,detA,ERR,ERROR,*999)
-                      ENDIF !add geometric term
+!                      ENDIF !add geometric term
                       !#############################################################################################################
                     ENDIF !orthogonally projected
                   ENDDO !contactPtIdx

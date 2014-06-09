@@ -6613,7 +6613,7 @@ CONTAINS
 
   !>Computes the geometric position, normal and tangent vectors at a interpolated point metrics in a field. 
   SUBROUTINE FIELD_POSITION_NORMAL_TANGENTS_CALCULATE_INT_PT_METRIC(INTERPOLATED_POINT_METRICS,reverseNormal, &
-    & POSITION,NORMAL,TANGENTS,ERR,ERROR,*)
+    & POSITION,NORMAL,TANGENTS,ERR,ERROR,*,contact)
 
     !Argument variables
     TYPE(FIELD_INTERPOLATED_POINT_METRICS_TYPE), POINTER, INTENT(IN) :: INTERPOLATED_POINT_METRICS !<A pointer to the interpolated point metric information to calculate the position etc. for
@@ -6623,6 +6623,7 @@ CONTAINS
     REAL(DP), INTENT(OUT) :: TANGENTS(:,:) !<TANGENTS(coordinate_idx,tangent_idx), on exit the tangent vectors for the tangent_idx'th tangent at the node. There are number_of_xi-1 tangent vectors.
     INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
     TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
+    LOGICAL, OPTIONAL, INTENT(IN) :: contact !<If tangents and normal are calculated for contact mechanics
     !Local Variables
     INTEGER(INTG) :: dimension_idx,xi_idx
     TYPE(FIELD_INTERPOLATED_POINT_TYPE), POINTER :: INTERPOLATED_POINT
@@ -6656,12 +6657,20 @@ CONTAINS
                     DO dimension_idx=1,INTERPOLATED_POINT_METRICS%NUMBER_OF_X_DIMENSIONS
                       TANGENTS(dimension_idx,xi_idx)=INTERPOLATED_POINT_METRICS%DX_DXI(dimension_idx,xi_idx)
                     ENDDO !dimension_idx
-                    TANGENTS(1:INTERPOLATED_POINT_METRICS%NUMBER_OF_X_DIMENSIONS,xi_idx)= &
-                      & NORMALISE(TANGENTS(1:INTERPOLATED_POINT_METRICS%NUMBER_OF_X_DIMENSIONS,xi_idx),ERR,ERROR)
+                    ! Normalise tangent vectors if not for contact mechanics
+                    IF(PRESENT(contact)) THEN
+                      IF(.NOT.contact) TANGENTS(1:INTERPOLATED_POINT_METRICS%NUMBER_OF_X_DIMENSIONS,xi_idx)= &
+                         & NORMALISE(TANGENTS(1:INTERPOLATED_POINT_METRICS%NUMBER_OF_X_DIMENSIONS,xi_idx),ERR,ERROR)
+                    ELSE
+                      TANGENTS(1:INTERPOLATED_POINT_METRICS%NUMBER_OF_X_DIMENSIONS,xi_idx)= &
+                        & NORMALISE(TANGENTS(1:INTERPOLATED_POINT_METRICS%NUMBER_OF_X_DIMENSIONS,xi_idx),ERR,ERROR)
+                    ENDIF
                     IF(ERR/=0) GOTO 999
                   ENDDO !xi_idx
                   CALL CROSS_PRODUCT(TANGENTS(1:INTERPOLATED_POINT_METRICS%NUMBER_OF_X_DIMENSIONS,1), &
                     & TANGENTS(1:INTERPOLATED_POINT_METRICS%NUMBER_OF_X_DIMENSIONS,2),NORMAL,ERR,ERROR,*999)
+                  NORMAL(1:INTERPOLATED_POINT_METRICS%NUMBER_OF_X_DIMENSIONS)= &
+                    & NORMALISE(NORMAL(1:INTERPOLATED_POINT_METRICS%NUMBER_OF_X_DIMENSIONS),ERR,ERROR)
                   IF(reverseNormal) NORMAL=-NORMAL
                 CASE DEFAULT
                   LOCAL_ERROR="The interpolated metrics must be for lines/faces, dimension of " &
