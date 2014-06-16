@@ -1848,9 +1848,9 @@ CONTAINS
                   rowDomainFaceBasis=>rowDomainFace%BASIS
                   !Only interpolate for the first field component and when face number changes
 !                  IF((rowFieldComp==1) .AND. (rowDecompositionFaceNumber/=rowPreviousFaceNo)) THEN
-                    CALL FIELD_INTERPOLATION_PARAMETERS_SCALE_FACTORS_FACE_GET(rowDecompositionFaceNumber, &
-                      & equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)
-                    rowPreviousFaceNo=rowDecompositionFaceNumber
+!                    CALL FIELD_INTERPOLATION_PARAMETERS_SCALE_FACTORS_FACE_GET(rowDecompositionFaceNumber, &
+!                      & equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)
+!                    rowPreviousFaceNo=rowDecompositionFaceNumber
 !                  ENDIF
                   DO rowLocalFaceNodeIdx=1,rowDependentBasis%NUMBER_OF_NODES_IN_LOCAL_FACE(defConnectedFace)
                     rowFaceLocalElemNode=rowDependentBasis%NODE_NUMBERS_IN_LOCAL_FACE(rowLocalFaceNodeIdx,defConnectedFace)
@@ -1862,9 +1862,16 @@ CONTAINS
                       rowVersion=defDepField%DECOMPOSITION%DOMAIN(rowMeshComp)%PTR%TOPOLOGY% &
                         & ELEMENTS%ELEMENTS(defElementNum)%elementVersions(rowDerivative,rowFaceLocalElemNode)
                       !Find the face parameter's element parameter index 
-                      rowElemParameterNo=rowDomainFaceBasis%ELEMENT_PARAMETER_INDEX(rowFaceDerivative,rowLocalFaceNodeIdx)
+!                      rowElemParameterNo=rowDomainFaceBasis%ELEMENT_PARAMETER_INDEX(rowFaceDerivative,rowLocalFaceNodeIdx)
+!                      rowDofScaleFactor=equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)% PTR% &
+!                        & SCALE_FACTORS(rowElemParameterNo,rowFieldComp)
+                      
+                      rowElemParameterNo=rowDependentBasis%ELEMENT_PARAMETER_INDEX(rowDerivative,rowFaceLocalElemNode)
+                      CALL FIELD_INTERPOLATION_PARAMETERS_SCALE_FACTORS_ELEM_GET(defElementNum, &
+                        & equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)
                       rowDofScaleFactor=equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)% PTR% &
                         & SCALE_FACTORS(rowElemParameterNo,rowFieldComp)
+                          
                       !Find dof associated with this particular field, component, node, derivative and version.
                       rowIdx=defDepVariable%components(rowFieldComp)%PARAM_TO_DOF_MAP%NODE_PARAM2DOF_MAP%NODES( &
                         & rowGlobalNode)%DERIVATIVES(rowDerivative)%VERSIONS(rowVersion)
@@ -1887,9 +1894,9 @@ CONTAINS
                         colDomainFaceBasis=>colDomainFace%BASIS
                         !Only interpolate for the first field component and when face number changes
 !                        IF((colFieldComp==1) .AND. (colDecompositionFaceNumber/=colPreviousFaceNo)) THEN
-                          CALL FIELD_INTERPOLATION_PARAMETERS_SCALE_FACTORS_FACE_GET(colDecompositionFaceNumber, &
-                            & equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)
-                          colPreviousFaceNo=colDecompositionFaceNumber
+!                          CALL FIELD_INTERPOLATION_PARAMETERS_SCALE_FACTORS_FACE_GET(colDecompositionFaceNumber, &
+!                            & equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)
+!                          colPreviousFaceNo=colDecompositionFaceNumber
 !                        ENDIF
                         DO colLocalFaceNodeIdx=1,colDependentBasis%NUMBER_OF_NODES_IN_LOCAL_FACE(defConnectedFace)
                           colFaceLocalElemNode=colDependentBasis%NODE_NUMBERS_IN_LOCAL_FACE(colLocalFaceNodeIdx,defConnectedFace)
@@ -1901,9 +1908,16 @@ CONTAINS
                             colVersion=defDepField%DECOMPOSITION%DOMAIN(colMeshComp)%PTR%TOPOLOGY% &
                               & ELEMENTS%ELEMENTS(defElementNum)%elementVersions(colDerivative,colFaceLocalElemNode)
                             !Find the face parameter's element parameter index 
-                            colElemParameterNo=colDomainFaceBasis%ELEMENT_PARAMETER_INDEX(colFaceDerivative,colLocalFaceNodeIdx)
+!                            colElemParameterNo=colDomainFaceBasis%ELEMENT_PARAMETER_INDEX(colFaceDerivative,colLocalFaceNodeIdx)
+!                            colDofScaleFactor=equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)% PTR% &
+!                              & SCALE_FACTORS(colElemParameterNo,colFieldComp)
+
+                            colElemParameterNo=colDependentBasis%ELEMENT_PARAMETER_INDEX(colDerivative,colFaceLocalElemNode)
+                            CALL FIELD_INTERPOLATION_PARAMETERS_SCALE_FACTORS_ELEM_GET(defElementNum, &
+                             & equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)
                             colDofScaleFactor=equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)% PTR% &
                               & SCALE_FACTORS(colElemParameterNo,colFieldComp)
+                              
                             !Find dof associated with this particular field, component, node, derivative and version.
                             colIdx=defDepVariable%components(colFieldComp)%PARAM_TO_DOF_MAP%NODE_PARAM2DOF_MAP%NODES( &
                               & colGlobalNode)%DERIVATIVES(colDerivative)%VERSIONS(colVersion)
@@ -1954,11 +1968,11 @@ CONTAINS
                     & FACES%FACES(rowDecompositionFaceNumber)
                   rowDomainFaceBasis=>rowDomainFace%BASIS
                   !Only interpolate for the first field component and when face number changes
-                  IF((rowFieldComp==1) .AND. (rowDecompositionFaceNumber/=rowPreviousFaceNo)) THEN
-                    CALL FIELD_INTERPOLATION_PARAMETERS_SCALE_FACTORS_FACE_GET(rowDecompositionFaceNumber, &
-                      & equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)
-                    rowPreviousFaceNo=rowDecompositionFaceNumber
-                  ENDIF
+!                  IF((rowFieldComp==1) .AND. (rowDecompositionFaceNumber/=rowPreviousFaceNo)) THEN
+!                    CALL FIELD_INTERPOLATION_PARAMETERS_SCALE_FACTORS_FACE_GET(rowDecompositionFaceNumber, &
+!                      & equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)
+!                    rowPreviousFaceNo=rowDecompositionFaceNumber
+!                  ENDIF
                   DO rowLocalFaceNodeIdx=1,rowDependentBasis%NUMBER_OF_NODES_IN_LOCAL_FACE(defConnectedFace)
                     rowFaceLocalElemNode=rowDependentBasis%NODE_NUMBERS_IN_LOCAL_FACE(rowLocalFaceNodeIdx,defConnectedFace)
                     rowGlobalNode=defDepField%DECOMPOSITION%DOMAIN(rowMeshComp)%PTR%TOPOLOGY% &
@@ -1969,9 +1983,16 @@ CONTAINS
                       rowVersion=defDepField%DECOMPOSITION%DOMAIN(rowMeshComp)%PTR%TOPOLOGY% &
                         & ELEMENTS%ELEMENTS(defElementNum)%elementVersions(rowDerivative,rowFaceLocalElemNode)
                       !Find the face parameter's element parameter index 
-                      rowElemParameterNo=rowDomainFaceBasis%ELEMENT_PARAMETER_INDEX(rowFaceDerivative,rowLocalFaceNodeIdx)
+!                      rowElemParameterNo=rowDomainFaceBasis%ELEMENT_PARAMETER_INDEX(rowFaceDerivative,rowLocalFaceNodeIdx)
+!                      rowDofScaleFactor=equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)% PTR% &
+!                        & SCALE_FACTORS(rowElemParameterNo,rowFieldComp)
+                        
+                      rowElemParameterNo=rowDependentBasis%ELEMENT_PARAMETER_INDEX(rowDerivative,rowFaceLocalElemNode)
+                      CALL FIELD_INTERPOLATION_PARAMETERS_SCALE_FACTORS_ELEM_GET(defElementNum, &
+                        & equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)
                       rowDofScaleFactor=equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)% PTR% &
                         & SCALE_FACTORS(rowElemParameterNo,rowFieldComp)
+                        
                       !Find dof associated with this particular field, component, node, derivative and version.
                       rowIdx=defDepVariable%components(rowFieldComp)%PARAM_TO_DOF_MAP%NODE_PARAM2DOF_MAP%NODES( &
                         & rowGlobalNode)%DERIVATIVES(rowDerivative)%VERSIONS(rowVersion)
@@ -2818,9 +2839,9 @@ CONTAINS
                     
                     !Only interpolate for the first field component and when face number changes
 !                    IF((fieldComponent==1) .AND. (decompositionFaceNumber/=previousFaceNo)) THEN
-                      CALL FIELD_INTERPOLATION_PARAMETERS_SCALE_FACTORS_FACE_GET(decompositionFaceNumber, &
-                        & equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)
-                      previousFaceNo=decompositionFaceNumber
+!                      CALL FIELD_INTERPOLATION_PARAMETERS_SCALE_FACTORS_FACE_GET(decompositionFaceNumber, &
+!                        & equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)
+!                      previousFaceNo=decompositionFaceNumber
 !                    ENDIF
                     !\todo: connectedFace is the local face no the global face, need to check if face is on the current domain?
                     DO localFaceNodeIdx=1,dependentBasis%NUMBER_OF_NODES_IN_LOCAL_FACE(connectedFace)
@@ -2842,8 +2863,11 @@ CONTAINS
                           & contactPointMetrics%contactForce*contactPointMetrics%Jacobian*interface%DATA_POINTS% &
                           & DATA_POINTS(globalDataPointNum)%WEIGHTS(1)
                         !Get the face parameter index in the element
-                        elemParameterNo=domainFace%BASIS%ELEMENT_PARAMETER_INDEX(faceDerivative,localFaceNodeIdx)
+!                        elemParameterNo=domainFace%BASIS%ELEMENT_PARAMETER_INDEX(faceDerivative,localFaceNodeIdx)
+                        elemParameterNo=dependentBasis%ELEMENT_PARAMETER_INDEX(derivative,faceLocalElemNode)
                         !Multiply the contribution by scale factor
+                        CALL FIELD_INTERPOLATION_PARAMETERS_SCALE_FACTORS_ELEM_GET(elementNum, &
+                          & equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)
                         residualValue=residualValue*equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)% &
                           & PTR%SCALE_FACTORS(elemParameterNo,fieldComponent)
                         IF(perburbation) THEN
