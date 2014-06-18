@@ -113,7 +113,7 @@ MODULE INTERFACE_ROUTINES
   
   PUBLIC InterfacePointsConnectivity_PointXiGet,InterfacePointsConnectivity_PointXiSet
   
-  PUBLIC InterfacePointsConnectivity_UpdateFromProjection
+  PUBLIC InterfacePointsConnectivity_UpdateFromIntProjection,InterfacePointsConnectivity_UpdateFromProjection
   
 CONTAINS
 
@@ -1512,7 +1512,7 @@ CONTAINS
     TYPE(FIELD_INTERPOLATION_PARAMETERS_PTR_TYPE), POINTER :: interpolationParameters(:)
     INTEGER(INTG) :: fixedBodyIdx,projectionBodyIdx,dataPointIdx
     INTEGER(INTG) :: elementNumber,numberOfGeometricComponents
-    INTEGER(INTG) :: coupledMeshFaceLineNumber,component
+    INTEGER(INTG) :: coupledMeshFaceLineNumber,connectedFace,component
   
     CALL ENTERS("InterfacePointsConnectivity_DataReprojection",err,error,*999)
     
@@ -1529,7 +1529,7 @@ CONTAINS
           IF(ASSOCIATED(dataPoints)) THEN
 
             !Evaluate data points positions
-            dependentFieldFixed=>interfaceCondition%DEPENDENT%FIELD_VARIABLES(fixedBodyIdx)%PTR%FIELD
+            dependentFieldFixed=>interfaceCondition%DEPENDENT%FIELD_VARIABLES(fixedBodyIdx)%PTR%FIELD%GEOMETRIC_FIELD
             IF(ASSOCIATED(dependentFieldFixed)) THEN
               numberOfGeometricComponents=dependentFieldFixed%GEOMETRIC_FIELD%VARIABLES(1)%NUMBER_OF_COMPONENTS
               CALL FIELD_INTERPOLATION_PARAMETERS_INITIALISE(dependentFieldFixed,interpolationParameters,err,error,*999, &
@@ -1540,16 +1540,15 @@ CONTAINS
               DO dataPointIdx=1,dataPoints%NUMBER_OF_DATA_POINTS
                 elementNumber=interfacePointsConnectivity%pointsConnectivity(dataPointIdx,fixedBodyIdx)% &
                   & coupledMeshElementNumber
+                connectedFace=interfacePointsConnectivity%pointsConnectivity(dataPointIdx,fixedBodyIdx)%elementLineFaceNumber
                 coupledMeshFaceLineNumber=dependentFieldFixed%DECOMPOSITION%TOPOLOGY%ELEMENTS% &
-                  & ELEMENTS(elementNumber)% &
-                  & ELEMENT_FACES(interfacePointsConnectivity%pointsConnectivity(dataPointIdx,fixedBodyIdx)% &
-                  & elementLineFaceNumber)
+                  & ELEMENTS(elementNumber)%ELEMENT_FACES(connectedFace)
                 CALL FIELD_INTERPOLATION_PARAMETERS_FACE_GET(FIELD_VALUES_SET_TYPE,coupledMeshFaceLineNumber, &
                   & interpolationParameters(FIELD_U_VARIABLE_TYPE)%PTR,err,error,*999,FIELD_GEOMETRIC_COMPONENTS_TYPE)
                 CALL FIELD_INTERPOLATE_XI(NO_PART_DERIV,interfacePointsConnectivity%pointsConnectivity(dataPointIdx, &
                   & fixedBodyIdx)%reducedXi(:),interpolatedPoint,err,error,*999,FIELD_GEOMETRIC_COMPONENTS_TYPE) !Interpolate contact data points on each surface
                 DO component=1,numberOfGeometricComponents
-                  dataPoints%DATA_POINTS(dataPointIdx)%position(component) = interpolatedPoint%VALUES(component,NO_PART_DERIV)
+!                  dataPoints%DATA_POINTS(dataPointIdx)%position(component) = interpolatedPoint%VALUES(component,NO_PART_DERIV)
                 ENDDO !component
               ENDDO !dataPointIdx
             ELSE
@@ -2139,6 +2138,86 @@ CONTAINS
     RETURN 1
     
   END SUBROUTINE InterfacePointsConnectivity_PointXiSet
+  
+  !
+  !================================================================================================================================
+  !
+  
+  !>Update points connectivity with projection results
+  SUBROUTINE InterfacePointsConnectivity_UpdateFromIntProjection(InterfacePointsConnectivity,dataProjection, &
+      & coupledMeshIndex,elementUserNumber,localFaceLineNumbers,err,error,*) 
+  
+    !Argument variables
+    TYPE(InterfacePointsConnectivityType), POINTER :: InterfacePointsConnectivity !<A pointer to the interface points connectivity to finish creating
+    TYPE(DATA_PROJECTION_TYPE), POINTER :: dataProjection !<The data projection that points connectivity update with
+    INTEGER(INTG), INTENT(IN) :: coupledMeshIndex !<The mesh index of the the points connectivity to be updated
+    INTEGER(INTG), INTENT(IN) :: elementUserNumber(:) !<the user element numbers for interface element numbers
+    INTEGER(INTG), INTENT(IN) :: localFaceLineNumbers(:) !<the element face/line numbers for interface face numbers
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: error !<The error string
+    !Local Variables
+    INTEGER(INTG) :: dataPointIdx,interfaceGlobalElementNumber,globalCoupledElementNumber
+    INTEGER(INTG) :: meshComponentNumber=1; !\todo: need to generalise
+    TYPE(DATA_PROJECTION_RESULT_TYPE), POINTER :: dataProjectionResult
+    TYPE(MESH_TYPE), POINTER :: coupledMesh !<A pointer to the coupled mesh
+    LOGICAL :: elementExists
+    
+    CALL ENTERS("InterfacePointsConnectivity_UpdateFromIntProjection",err,error,*999)
+    
+    IF(ASSOCIATED(InterfacePointsConnectivity)) THEN
+      IF(ASSOCIATED(dataProjection)) THEN
+        IF(dataProjection%DATA_PROJECTION_FINISHED) THEN
+          IF(dataProjection%MESH%NUMBER_OF_ELEMENTS==SIZE(elementUserNumber,1)) THEN
+            IF(dataProjection%MESH%NUMBER_OF_ELEMENTS==SIZE(localFaceLineNumbers,1)) THEN
+              ! The coupled mesh projection index is the bodyIndex+1 since the 1st projection is for the interface 
+              coupledMesh=>dataProjection%DATA_POINTS%DATA_PROJECTIONS(coupledMeshIndex+1)%PTR%MESH
+              !Update reduced xi location, projection element number and element face/line number with projection result
+              DO dataPointIdx=1,SIZE(dataProjection%DATA_PROJECTION_RESULTS,1) 
+                dataProjectionResult=>dataProjection%DATA_PROJECTION_RESULTS(dataPointIdx)
+                ! Update xi location from the user defined interface projection results
+                InterfacePointsConnectivity%pointsConnectivity(dataPointIdx,coupledMeshIndex)%reducedXi(:)= &
+                  & dataProjectionResult%XI
+                ! Get the interface global element number
+                interfaceGlobalElementNumber=dataProjectionResult%ELEMENT_NUMBER
+                ! Get the corresponding coupled mesh element user number for the interface element number
+                CALL MESH_TOPOLOGY_ELEMENT_CHECK_EXISTS(coupledMesh,meshComponentNumber, &
+                  & elementUserNumber(interfaceGlobalElementNumber),elementExists,globalCoupledElementNumber,err,error,*999)   
+                ! Convert to global number and store it
+                IF(elementExists) InterfacePointsConnectivity%pointsConnectivity(dataPointIdx,coupledMeshIndex)% &
+                  & coupledMeshElementNumber=globalCoupledElementNumber
+                ! Update the element face number from input
+                IF(localFaceLineNumbers(interfaceGlobalElementNumber)/=0) InterfacePointsConnectivity% &
+                  & pointsConnectivity(dataPointIdx,coupledMeshIndex)%elementLineFaceNumber= &
+                  & localFaceLineNumbers(interfaceGlobalElementNumber)
+              ENDDO
+              CALL InterfacePointsConnectivity_FullXiCalculate(InterfacePointsConnectivity,coupledMeshIndex, &
+                & err,error,*999) 
+              !Update points connectivity coupledElement information
+              CALL InterfacePointsConnectivity_CoupledElementsCalculate(InterfacePointsConnectivity,coupledMeshIndex,err,error,*999)
+            ELSE
+              CALL FLAG_ERROR("Number of interface elements need to match that of the corresponding coupled mesh faces.", &
+                & err,error,*999)
+            ENDIF
+          ELSE
+            CALL FLAG_ERROR("Number of interface elements need to match that of the corresponding coupled mesh.",err,error,*999)
+          ENDIF 
+        ELSE
+          CALL FLAG_ERROR("Data projection is not finished.",err,error,*999)
+        ENDIF
+      ELSE
+        CALL FLAG_ERROR("Interface points connectivity is not associated.",err,error,*999)
+      ENDIF
+    ELSE
+      CALL FLAG_ERROR("Interface points connectivity is not associated.",err,error,*999)
+    ENDIF
+     
+    CALL EXITS("InterfacePointsConnectivity_UpdateFromIntProjection")
+    RETURN
+999 CALL ERRORS("InterfacePointsConnectivity_UpdateFromIntProjection",err,error)
+    CALL EXITS("InterfacePointsConnectivity_UpdateFromIntProjection")
+    RETURN 1
+    
+  END SUBROUTINE InterfacePointsConnectivity_UpdateFromIntProjection
   
   !
   !================================================================================================================================

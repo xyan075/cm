@@ -2103,6 +2103,7 @@ CONTAINS
                 !Loop over each data point and find the connected element and their dofs
                 previousFaceNo=0
                 DO globalDataPointNum=1,SIZE(pointsConnectivity%pointsConnectivity,1)
+                  contactPointMetrics%contactForce=0.0_DP
                   IF(contactMetrics%inContact(globalDataPointNum)) THEN
                     elementNum=pointsConnectivity%pointsConnectivity(globalDataPointNum,bodyIdx)%coupledMeshElementNumber
                     connectedFace=pointsConnectivity%pointsConnectivity(globalDataPointNum,bodyIdx)%elementLineFaceNumber
@@ -4433,9 +4434,9 @@ CONTAINS
                 WRITE(IUNIT,'(1X,''4) contactGap, field, rectangular cartesian, #Components=1'')')
                 WRITE(IUNIT,'(1X,''  gap.  Value index= 8, #Derivatives=0'')')
                 WRITE(IUNIT,'(1X,''5) contactForce, field, rectangular cartesian, #Components=1'')')
-                WRITE(IUNIT,'(1X,''  pressure.  Value index=9 , #Derivatives=0'')')
+                WRITE(IUNIT,'(1X,''  contactForce.  Value index= 9 , #Derivatives=0'')')
                 WRITE(IUNIT,'(1X,''6) Jacobian, field, rectangular cartesian, #Components=1'')')
-                WRITE(IUNIT,'(1X,''  Jacobian.  Value index=10 , #Derivatives=0'')')
+                WRITE(IUNIT,'(1X,''  Jacobian.  Value index= 10 , #Derivatives=0'')')
               ELSE
                 WRITE(IUNIT,'(1X,''#Fields=2'')')
                 WRITE(IUNIT,'(1X,''1) coordinates, coordinate, rectangular cartesian, #Components=3'')')
@@ -4468,6 +4469,7 @@ CONTAINS
                 CALL FIELD_INTERPOLATE_XI(NO_PART_DERIV,xi,interpolatedPoint,err,error,*999,FIELD_GEOMETRIC_COMPONENTS_TYPE) !Interpolate contact data points on each surface
                 DO component=1,3
                   WRITE(IUNIT,'(1X,3E25.15)') interpolatedPoint%VALUES(component,NO_PART_DERIV)
+!                  WRITE(IUNIT,'(1X,3E25.15)') interfaceDatapoints%DATA_POINTS(globalDataPointNum)%POSITION(component)
                 ENDDO !component
                 IF(bodyidx==2) THEN ! master body
                   IF(interfaceCondition%interfaceContactMetrics%inContact(globalDataPointNum)) THEN
@@ -4553,7 +4555,7 @@ CONTAINS
       CALL FLAG_ERROR("Solver equations is not associated.",err,error,*999)
     ENDIF
     
-!    CALL EXIT(0)
+    CALL EXIT(0)
     
     CALL EXITS("Problem_SolverNewtonFieldsOutput")
     RETURN
