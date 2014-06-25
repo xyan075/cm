@@ -1529,7 +1529,7 @@ CONTAINS
           IF(ASSOCIATED(dataPoints)) THEN
 
             !Evaluate data points positions
-            dependentFieldFixed=>interfaceCondition%DEPENDENT%FIELD_VARIABLES(fixedBodyIdx)%PTR%FIELD%GEOMETRIC_FIELD
+            dependentFieldFixed=>interfaceCondition%DEPENDENT%FIELD_VARIABLES(fixedBodyIdx)%PTR%FIELD
             IF(ASSOCIATED(dependentFieldFixed)) THEN
               numberOfGeometricComponents=dependentFieldFixed%GEOMETRIC_FIELD%VARIABLES(1)%NUMBER_OF_COMPONENTS
               CALL FIELD_INTERPOLATION_PARAMETERS_INITIALISE(dependentFieldFixed,interpolationParameters,err,error,*999, &
@@ -1548,7 +1548,7 @@ CONTAINS
                 CALL FIELD_INTERPOLATE_XI(NO_PART_DERIV,interfacePointsConnectivity%pointsConnectivity(dataPointIdx, &
                   & fixedBodyIdx)%reducedXi(:),interpolatedPoint,err,error,*999,FIELD_GEOMETRIC_COMPONENTS_TYPE) !Interpolate contact data points on each surface
                 DO component=1,numberOfGeometricComponents
-!                  dataPoints%DATA_POINTS(dataPointIdx)%position(component) = interpolatedPoint%VALUES(component,NO_PART_DERIV)
+                  dataPoints%DATA_POINTS(dataPointIdx)%position(component) = interpolatedPoint%VALUES(component,NO_PART_DERIV)
                 ENDDO !component
               ENDDO !dataPointIdx
             ELSE

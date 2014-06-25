@@ -1738,10 +1738,12 @@ CONTAINS
                               CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,rowIdx,colIdx,matrixValue,err,error,*999)
                               
 !                              IF(contactMetrics%inContact(globalDataPointNum)) THEN
+!                              IF(globalDataPointNum==291) THEN
 !                                WRITE(IUNIT,'('' GK(pt='',I4,'',m='',I1,'',n='',I1,'',v1='',I1,'',v2='',I1,'',n1='',I2, &
 !                                  & '',n2='',I2,'',d1='',I1,'',d2='',I1,''):'',E25.15)') &
 !                                  & globalDataPointNum,rowBodyIdx,colBodyIdx,rowFieldComp,colFieldComp,rowLocalFaceNodeIdx, &
 !                                  & colLocalFaceNodeIdx,rowFaceDerivative,colfaceDerivative,matrixValue
+!                              ENDIF
 !                              ELSE
 !                                WRITE(IUNIT,'('' GK(pt='',I4,'',m='',I1,'',n='',I1,'',v1='',I1,'',v2='',I1,'',n1='',I2, &
 !                                  & '',n2='',I2,'',d1='',I1,'',d2='',I1,''):''3E25.15)') &
@@ -1756,6 +1758,7 @@ CONTAINS
                     ENDDO !rowLocalFaceNodeIdx
                   ENDDO !rowFieldComp
                 ENDDO !subMatrix
+!                 WRITE(IUNIT,'(''pt='',I4)') globalDataPointNum
               ENDIF !inContact
             ENDDO !globalDataPointNum
 
@@ -2103,7 +2106,7 @@ CONTAINS
                 !Loop over each data point and find the connected element and their dofs
                 previousFaceNo=0
                 DO globalDataPointNum=1,SIZE(pointsConnectivity%pointsConnectivity,1)
-                  contactPointMetrics%contactForce=0.0_DP
+!                  contactPointMetrics%contactForce=0.0_DP
                   IF(contactMetrics%inContact(globalDataPointNum)) THEN
                     elementNum=pointsConnectivity%pointsConnectivity(globalDataPointNum,bodyIdx)%coupledMeshElementNumber
                     connectedFace=pointsConnectivity%pointsConnectivity(globalDataPointNum,bodyIdx)%elementLineFaceNumber
@@ -2153,10 +2156,17 @@ CONTAINS
 !                          elemParameterNo=domainFace%BASIS%ELEMENT_PARAMETER_INDEX(faceDerivative,localFaceNodeIdx)
                           elemParameterNo=dependentBasis%ELEMENT_PARAMETER_INDEX(derivative,faceLocalElemNode)
                           !Multiply the contribution by scale factor
+                          
+                          
+                          
                           residualValue=residualValue*equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)% &
                             & PTR%SCALE_FACTORS(elemParameterNo,fieldComponent)
                           residualValue=residualValue*contactPointMetrics%Jacobian*interface%DATA_POINTS% &
                             & DATA_POINTS(globalDataPointNum)%WEIGHTS(1)
+                            
+                            
+                            
+                            
                           CALL DISTRIBUTED_VECTOR_VALUES_ADD(nonlinearMatrices%RESIDUAL,dofIdx,residualValue,err,error,*999)
                           CALL DISTRIBUTED_VECTOR_VALUES_ADD(nonlinearMatrices%contactResidual,dofIdx,residualValue,err,error,*999)
                           
@@ -4527,8 +4537,8 @@ CONTAINS
           OPEN(UNIT=IUNIT,FILE=filenameOutput,STATUS="UNKNOWN",ACTION="WRITE",IOSTAT=ERR)
           nonlinearMatrices=>solverMapping%EQUATIONS_SETS(equationsSetGlobalNumber)%PTR%EQUATIONS%EQUATIONS_MATRICES% &
             & NONLINEAR_MATRICES
-          DO dofIdx=1,nonlinearMatrices%contactResidual%CMISS%DATA_SIZE
-            CALL DISTRIBUTED_VECTOR_VALUES_GET(nonlinearMatrices%contactResidual,dofIdx,residualValue,err,error,*999)
+          DO dofIdx=1,nonlinearMatrices%RESIDUAL%CMISS%DATA_SIZE
+            CALL DISTRIBUTED_VECTOR_VALUES_GET(nonlinearMatrices%RESIDUAL,dofIdx,residualValue,err,error,*999)
             WRITE(IUNIT,'(1X,3E25.15)') residualValue
           ENDDO !dofIdx
           
@@ -4555,7 +4565,7 @@ CONTAINS
       CALL FLAG_ERROR("Solver equations is not associated.",err,error,*999)
     ENDIF
     
-    CALL EXIT(0)
+!    CALL EXIT(0)
     
     CALL EXITS("Problem_SolverNewtonFieldsOutput")
     RETURN
