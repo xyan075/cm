@@ -117,6 +117,14 @@ MODULE MESH_ROUTINES
   
   PUBLIC DECOMPOSITION_TOPOLOGY_ELEMENT_CHECK_EXISTS,DecompositionTopology_DataPointCheckExists
   
+  PUBLIC DecompositionTopology_DataProjectionCalculate
+
+  PUBLIC DecompositionTopology_ElementDataPointLocalNumberGet
+
+  PUBLIC DecompositionTopology_ElementDataPointUserNumberGet
+
+  PUBLIC DecompositionTopology_NumberOfElementDataPointsGet
+  
   PUBLIC DECOMPOSITION_TYPE_GET,DECOMPOSITION_TYPE_SET
   
   PUBLIC DECOMPOSITION_USER_NUMBER_FIND, DECOMPOSITION_USER_NUMBER_TO_DECOMPOSITION
@@ -153,7 +161,7 @@ MODULE MESH_ROUTINES
 
   PUBLIC MESH_TOPOLOGY_ELEMENTS_ELEMENT_USER_NUMBER_GET,MESH_TOPOLOGY_ELEMENTS_ELEMENT_USER_NUMBER_SET
   
-  PUBLIC Mesh_TopologyElementsAllUserNumbersSet
+  PUBLIC Mesh_TopologyElementsUserNumbersAllSet
 
   PUBLIC Mesh_TopologyDataPointsCalculateProjection
 
@@ -1248,6 +1256,200 @@ CONTAINS
     CALL EXITS("DecompositionTopology_DataPointsCalculate")
     RETURN 1
   END SUBROUTINE DecompositionTopology_DataPointsCalculate
+
+  !
+  !================================================================================================================================
+  !
+
+  !>Calculates the decomposition element topology for a data projection (for data projections on fields).
+  SUBROUTINE DecompositionTopology_DataProjectionCalculate(decompositionTopology,err,error,*)
+
+    !Argument variables
+    TYPE(DECOMPOSITION_TOPOLOGY_TYPE), POINTER :: decompositionTopology !<A pointer to the decomposition topology to calculate the elements for
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: error !<The error string
+
+    CALL ENTERS("DecompositionTopology_DataProjectionCalculate",err,error,*999)
+
+    IF(ASSOCIATED(decompositionTopology)) THEN
+      CALL DECOMPOSITION_TOPOLOGY_DATA_POINTS_INITIALISE(decompositionTopology,err,error,*999)
+      CALL DecompositionTopology_DataPointsCalculate(decompositionTopology,err,error,*999)
+    ELSE
+      CALL FLAG_ERROR("Decomposition topology is not associated.",err,error,*999)
+    ENDIF
+    
+    CALL EXITS("DecompositionTopology_DataProjectionCalculate")
+    RETURN
+999 CALL ERRORS("DecompositionTopology_DataProjectionCalculate",err,error)
+    CALL EXITS("DecompositionTopology_DataProjectionCalculate")
+    RETURN 1
+  END SUBROUTINE DecompositionTopology_DataProjectionCalculate
+
+  !
+  !================================================================================================================================
+  !
+
+  !>Gets the local data point number for data points projected on an element
+  SUBROUTINE DecompositionTopology_ElementDataPointLocalNumberGet(decompositionTopology,elementNumber,dataPointIndex, &
+       & dataPointLocalNumber,err,error,*)
+
+    !Argument variables
+    TYPE(DECOMPOSITION_TOPOLOGY_TYPE), POINTER :: decompositionTopology !<A pointer to the decomposition topology to calculate the elements for
+    INTEGER(INTG), INTENT(IN) :: elementNumber !<The element number to get the data point for
+    INTEGER(INTG), INTENT(IN) :: dataPointIndex !<The data point index to get the number for
+    INTEGER(INTG), INTENT(OUT) :: dataPointLocalNumber !<The data point local number to return
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: error !<The error string
+    !Local variables
+    TYPE(DecompositionDataPointsType), POINTER :: decompositionData
+    INTEGER(INTG) :: numberOfDataPoints
+    TYPE(VARYING_STRING) :: localError
+
+    CALL ENTERS("DecompositionTopology_ElementDataPointLocalNumberGet",err,error,*999)
+
+    IF(ASSOCIATED(decompositionTopology)) THEN
+      decompositionData=>decompositionTopology%dataPoints
+      IF(ASSOCIATED(decompositionData)) THEN
+        numberOfDataPoints = decompositionData%elementDataPoint(elementNumber)%numberOfProjectedData
+        IF(dataPointIndex > 0 .AND. dataPointIndex <= numberOfDataPoints) THEN
+          dataPointLocalNumber = decompositionData%elementDataPoint(elementNumber)%dataIndices(dataPointIndex)%localNumber
+        ELSE
+          localError="Element data point index "//TRIM(NUMBER_TO_VSTRING(dataPointIndex,"*",ERR,ERROR))// &
+           & " out of range for element "//TRIM(NUMBER_TO_VSTRING(elementNumber,"*",ERR,ERROR))//"."
+          CALL FLAG_ERROR(localError,err,error,*999)
+        ENDIF
+      ELSE
+        CALL FLAG_ERROR("Decomposition topology data points are not associated.",err,error,*999)
+      ENDIF
+    ELSE
+      CALL FLAG_ERROR("Decomposition topology is not associated.",err,error,*999)
+    ENDIF
+    
+    CALL EXITS("DecompositionTopology_ElementDataPointLocalNumberGet")
+    RETURN
+999 CALL ERRORS("DecompositionTopology_ElementDataPointLocalNumberGet",err,error)
+    CALL EXITS("DecompositionTopology_ElementDataPointLocalNumberGet")
+    RETURN 1
+  END SUBROUTINE DecompositionTopology_ElementDataPointLocalNumberGet
+
+  !
+  !================================================================================================================================
+  !
+
+  !>Gets the user (global) data point number for data points projected on an element
+  SUBROUTINE DecompositionTopology_ElementDataPointUserNumberGet(decompositionTopology,userElementNumber,dataPointIndex, &
+       & dataPointUserNumber,err,error,*)
+
+    !Argument variables
+    TYPE(DECOMPOSITION_TOPOLOGY_TYPE), POINTER :: decompositionTopology !<A pointer to the decomposition topology to calculate the elements for
+    INTEGER(INTG), INTENT(IN) :: userElementNumber !<The element number to get the data point for
+    INTEGER(INTG), INTENT(IN) :: dataPointIndex !<The data point index to get the number for
+    INTEGER(INTG), INTENT(OUT) :: dataPointUserNumber !<The data point user number to return
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: error !<The error string
+    !Local variables
+    TYPE(DecompositionDataPointsType), POINTER :: decompositionData
+    INTEGER(INTG) :: numberOfDataPoints,decompositionLocalElementNumber
+    LOGICAL :: ghostElement,userElementExists
+    TYPE(VARYING_STRING) :: localError
+
+    CALL ENTERS("DecompositionTopology_ElementDataPointUserNumberGet",err,error,*999)
+
+    IF(ASSOCIATED(decompositionTopology)) THEN
+      decompositionData=>decompositionTopology%dataPoints
+      IF(ASSOCIATED(decompositionData)) THEN
+        CALL DECOMPOSITION_TOPOLOGY_ELEMENT_CHECK_EXISTS(decompositionTopology,userElementNumber, &
+          & userElementExists,decompositionLocalElementNumber,ghostElement,err,error,*999)
+        IF(userElementExists) THEN
+          IF(ghostElement) THEN
+            localError="Cannot update by data point for user element "// &
+              & TRIM(NUMBER_TO_VSTRING(userElementNumber,"*",err,error))//" as it is a ghost element."
+            CALL FLAG_ERROR(localError,err,error,*999)
+          ELSE
+            numberOfDataPoints = decompositionData%elementDataPoint(decompositionLocalElementNumber)%numberOfProjectedData
+            IF(dataPointIndex > 0 .AND. dataPointIndex <= numberOfDataPoints) THEN
+              dataPointUserNumber = decompositionData%elementDataPoint(decompositionLocalElementNumber)% &
+                & dataIndices(dataPointIndex)%userNumber
+            ELSE
+              localError="Element data point index "//TRIM(NUMBER_TO_VSTRING(dataPointIndex,"*",ERR,ERROR))// &
+               & " out of range for element "//TRIM(NUMBER_TO_VSTRING(userElementNumber,"*",ERR,ERROR))//"."
+              CALL FLAG_ERROR(localError,err,error,*999)
+            ENDIF
+          ENDIF
+        ELSE
+          localError="The specified user element number of "// &
+            & TRIM(NUMBER_TO_VSTRING(userElementNumber,"*",err,error))// &
+            & " does not exist."
+          CALL FLAG_ERROR(localError,err,error,*999)
+        ENDIF
+      ELSE
+        CALL FLAG_ERROR("Decomposition topology data points are not associated.",err,error,*999)
+      ENDIF
+    ELSE
+      CALL FLAG_ERROR("Decomposition topology is not associated.",err,error,*999)
+    ENDIF
+    
+    CALL EXITS("DecompositionTopology_ElementDataPointUserNumberGet")
+    RETURN
+999 CALL ERRORS("DecompositionTopology_ElementDataPointUserNumberGet",err,error)
+    CALL EXITS("DecompositionTopology_ElementDataPointUserNumberGet")
+    RETURN 1
+  END SUBROUTINE DecompositionTopology_ElementDataPointUserNumberGet
+
+  !
+  !================================================================================================================================
+  !
+
+  !>Gets the number of data points projected on an element
+  SUBROUTINE DecompositionTopology_NumberOfElementDataPointsGet(decompositionTopology,userElementNumber, &
+       & numberOfDataPoints,err,error,*)
+
+    !Argument variables
+    TYPE(DECOMPOSITION_TOPOLOGY_TYPE), POINTER :: decompositionTopology !<A pointer to the decomposition topology to calculate the elements for
+    INTEGER(INTG), INTENT(IN) :: userElementNumber !<The element number to get the data point for
+    INTEGER(INTG), INTENT(OUT) :: numberOfDataPoints !<The data point local number to return
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: error !<The error string
+    !Local variables
+    TYPE(DecompositionDataPointsType), POINTER :: decompositionData
+    INTEGER(INTG) :: decompositionLocalElementNumber
+    LOGICAL :: ghostElement,userElementExists
+    TYPE(VARYING_STRING) :: localError
+
+    CALL ENTERS("DecompositionTopology_NumberOfElementDataPointsGet",err,error,*999)
+
+    IF(ASSOCIATED(decompositionTopology)) THEN
+      decompositionData=>decompositionTopology%dataPoints
+      IF(ASSOCIATED(decompositionData)) THEN
+        CALL DECOMPOSITION_TOPOLOGY_ELEMENT_CHECK_EXISTS(decompositionTopology,userElementNumber, &
+          & userElementExists,decompositionLocalElementNumber,ghostElement,err,error,*999)
+        IF(userElementExists) THEN
+          IF(ghostElement) THEN
+            localError="Cannot update by data point for user element "// &
+              & TRIM(NUMBER_TO_VSTRING(userElementNumber,"*",err,error))//" as it is a ghost element."
+            CALL FLAG_ERROR(localError,err,error,*999)
+          ELSE
+            numberOfDataPoints = decompositionData%elementDataPoint(decompositionLocalElementNumber)%numberOfProjectedData
+          ENDIF
+        ELSE
+          localError="The specified user element number of "// &
+            & TRIM(NUMBER_TO_VSTRING(userElementNumber,"*",err,error))// &
+            & " does not exist."
+          CALL FLAG_ERROR(localError,err,error,*999)
+        ENDIF
+      ELSE
+        CALL FLAG_ERROR("Decomposition topology data points are not associated.",err,error,*999)
+      ENDIF
+    ELSE
+      CALL FLAG_ERROR("Decomposition topology is not associated.",err,error,*999)
+    ENDIF
+    
+    CALL EXITS("DecompositionTopology_NumberOfElementDataPointsGet")
+    RETURN
+999 CALL ERRORS("DecompositionTopology_NumberOfElementDataPointsGet",err,error)
+    CALL EXITS("DecompositionTopology_NumberOfElementDataPointsGet")
+    RETURN 1
+  END SUBROUTINE DecompositionTopology_NumberOfElementDataPointsGet
   
   !
   !================================================================================================================================
@@ -8134,59 +8336,67 @@ CONTAINS
   !
 
   !>Changes/sets the user numbers for all elements.
-  SUBROUTINE Mesh_TopologyElementsAllUserNumbersSet(elements,userNumbers,err,error,*)
+  SUBROUTINE Mesh_TopologyElementsUserNumbersAllSet(elements,userNumbers,err,error,*)
 
     !Argument variables
-    TYPE(MeshComponentElementsType), POINTER :: elements !<A pointer to the elements to set the user number for \todo This should be the first parameter.
+    TYPE(MeshComponentElementsType), POINTER :: elements !<A pointer to the elements to set all the user numbers for 
     INTEGER(INTG), INTENT(IN) :: userNumbers(:) !<The user numbers to set
     INTEGER(INTG), INTENT(OUT) :: err !<The error code
     TYPE(VARYING_STRING), INTENT(OUT) :: error !<The error string
     !Local Variables
     INTEGER(INTG) :: elementIdx,insertStatus
-!    TYPE(VARYING_STRING) :: localError
+    TYPE(TREE_TYPE), POINTER :: newElementsTree
+    TYPE(VARYING_STRING) :: localError
 
-    CALL ENTERS("Mesh_TopologyElementsAllUserNumbersSet",err,error,*999)
+    NULLIFY(newElementsTree)
+
+    CALL Enters("Mesh_TopologyElementsUserNumbersAllSet",err,error,*999)
 
     IF(ASSOCIATED(elements)) THEN
       IF(elements%ELEMENTS_FINISHED) THEN
-        CALL FLAG_ERROR("Elements have been finished.",err,error,*999)
+        CALL FlagError("Elements have been finished.",err,error,*999)
       ELSE
         IF(elements%NUMBER_OF_ELEMENTS==SIZE(userNumbers,1)) THEN
-          CALL TREE_DESTROY(elements%ELEMENTS_TREE,err,error,*999)
-          CALL TREE_CREATE_START(elements%ELEMENTS_TREE,err,error,*999)
-          CALL TREE_INSERT_TYPE_SET(elements%ELEMENTS_TREE,TREE_NO_DUPLICATES_ALLOWED,err,error,*999)
-          CALL TREE_CREATE_FINISH(elements%ELEMENTS_TREE,err,error,*999)
+          !Check the users numbers to ensure that there are no duplicates          
+          CALL TREE_CREATE_START(newElementsTree,err,error,*999)
+          CALL TREE_INSERT_TYPE_SET(newElementsTree,TREE_NO_DUPLICATES_ALLOWED,err,error,*999)
+          CALL TREE_CREATE_FINISH(newElementsTree,err,error,*999)
           DO elementIdx=1,elements%NUMBER_OF_ELEMENTS
-            IF(userNumbers(elementIdx)>0) THEN
-              elements%ELEMENTS(elementIdx)%GLOBAL_NUMBER=elementIdx
-              elements%ELEMENTS(elementIdx)%USER_NUMBER=userNumbers(elementIdx)
-              CALL TREE_ITEM_INSERT(elements%ELEMENTS_TREE,userNumbers(elementIdx),elementIdx,insertStatus,err,error,*999)
-              !\todo: constant for successful/unsuccessful tree insert status
-!              IF(insertStatus/=TREE_ELEMENT_INSERT_SUCESSFUL) THEN
-!                localError="The user number for global element of "//TRIM(NUMBER_TO_VSTRING(elementIdx,"*",err,error))// &
-!                  & " is duplicated. The user element numbers must be unique."
-!                CALL FLAG_ERROR(localError,err,error,*999)
-!              ENDIF
-              elements%ELEMENTS(elementIdx)%USER_NUMBER=userNumbers(elementIdx)
-            ELSE
-              CALL FLAG_ERROR("User element numbers cannot be negative.",err,error,*999)
+            CALL TREE_ITEM_INSERT(newElementsTree,userNumbers(elementIdx),elementIdx,insertStatus,err,error,*999)
+            IF(insertStatus/=TREE_NODE_INSERT_SUCESSFUL) THEN
+              localError="The specified user number of "//TRIM(NumberToVstring(userNumbers(elementIdx),"*",err,error))// &
+                & " for global element number "//TRIM(NUMBER_TO_VSTRING(elementIdx,"*",err,error))// &
+                & " is a duplicate. The user element numbers must be unique."
+              CALL FlagError(localError,err,error,*999)
             ENDIF
           ENDDO !elementIdx
+          CALL TREE_DESTROY(elements%ELEMENTS_TREE,err,error,*999)
+          elements%ELEMENTS_TREE=>newElementsTree
+          NULLIFY(newElementsTree)
+          DO elementIdx=1,elements%NUMBER_OF_ELEMENTS
+            elements%ELEMENTS(elementIdx)%GLOBAL_NUMBER=elementIdx
+            elements%ELEMENTS(elementIdx)%USER_NUMBER=userNumbers(elementIdx)
+          ENDDO !elementIdx
         ELSE
-          CALL FLAG_ERROR("Number of element user numbers input does not match number of elements.",err,error,*999)
+          localError="The number of specified element user numbers ("// &
+            TRIM(NumberToVstring(SIZE(userNumbers,1),"*",err,error))// &
+            ") does not match number of elements ("// &
+            TRIM(NumberToVstring(elements%NUMBER_OF_ELEMENTS,"*",err,error))//")."
+          CALL FlagError(localError,err,error,*999)
         ENDIF
       ENDIF
     ELSE
-      CALL FLAG_ERROR("Elements is not associated.",err,error,*999)
+      CALL FlagError("Elements is not associated.",err,error,*999)
     ENDIF
     
-    CALL EXITS("Mesh_TopologyElementsAllUserNumbersSet")
+    CALL Exits("Mesh_TopologyElementsUserNumbersAllSet")
     RETURN
-999 CALL ERRORS("Mesh_TopologyElementsAllUserNumbersSet",err,error)    
-    CALL EXITS("Mesh_TopologyElementsAllUserNumbersSet")
+999 IF(ASSOCIATED(newElementsTree)) CALL TREE_DESTROY(newElementsTree,err,error,*998)
+998 CALL Errors("Mesh_TopologyElementsUserNumbersAllSet",err,error)    
+    CALL Exits("Mesh_TopologyElementsUserNumbersAllSet")
     RETURN 1
    
-  END SUBROUTINE Mesh_TopologyElementsAllUserNumbersSet
+  END SUBROUTINE Mesh_TopologyElementsUserNumbersAllSet
   
   !
   !================================================================================================================================

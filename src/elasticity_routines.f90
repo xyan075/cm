@@ -733,9 +733,9 @@ CONTAINS
         SELECT CASE(controlLoop%LOOP_TYPE)
         CASE(PROBLEM_CONTROL_LOAD_INCREMENT_LOOP_TYPE)
           SELECT CASE(PROBLEM%TYPE)
-          CASE(PROBLEM_LINEAR_ELASTICITY_TYPE,PROBLEM_FINITE_ELASTICITY_TYPE,PROBLEM_LINEAR_ELASTICITY_CONTACT_TYPE)
+          CASE(PROBLEM_LINEAR_ELASTICITY_TYPE,PROBLEM_LINEAR_ELASTICITY_CONTACT_TYPE)
             !Do nothing
-          CASE(PROBLEM_FINITE_ELASTICITY_CONTACT_TYPE)
+          CASE(PROBLEM_FINITE_ELASTICITY_TYPE,PROBLEM_FINITE_ELASTICITY_CONTACT_TYPE)
             CALL FiniteElasticity_ControlLoadIncrementLoopPostLoop(controlLoop,err,error,*999)
           CASE DEFAULT
             localError="Problem type "//TRIM(NUMBER_TO_VSTRING(PROBLEM%TYPE,"*",err,error))// &
@@ -758,49 +758,6 @@ CONTAINS
     CALL EXITS("Elasticity_ControlLoopPostLoop")
     RETURN 1
   END SUBROUTINE Elasticity_ControlLoopPostLoop
-
-  !
-  !================================================================================================================================
-  !
-
-  !>Executes after each loop of a control loop
-  SUBROUTINE ELASTICITY_CONTROL_LOOP_POST_LOOP(CONTROL_LOOP,ERR,ERROR,*)
-
-    !Argument variables
-    TYPE(CONTROL_LOOP_TYPE), POINTER :: CONTROL_LOOP !<A pointer to the control loop to solve.
-    INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
-    TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
-    !Local Variables
-    TYPE(VARYING_STRING) :: LOCAL_ERROR
-
-    CALL ENTERS("ELASTICITY_CONTROL_LOOP_POST_LOOP",ERR,ERROR,*999)
-
-    IF(ASSOCIATED(CONTROL_LOOP%PROBLEM)) THEN
-      SELECT CASE(CONTROL_LOOP%LOOP_TYPE)
-      CASE(PROBLEM_CONTROL_LOAD_INCREMENT_LOOP_TYPE)
-        SELECT CASE(CONTROL_LOOP%PROBLEM%TYPE)
-        CASE(EQUATIONS_SET_LINEAR_ELASTICITY_TYPE)
-            !do nothing for now
-        CASE(EQUATIONS_SET_FINITE_ELASTICITY_TYPE)
-          CALL FINITE_ELASTICITY_CONTROL_INCREMENTED_POST_LOOP(CONTROL_LOOP,ERR,ERROR,*999)
-        CASE DEFAULT
-          LOCAL_ERROR="Problem type "//TRIM(NUMBER_TO_VSTRING(CONTROL_LOOP%PROBLEM%TYPE,"*",ERR,ERROR))// &
-            & " is not valid for an elasticity problem class."
-          CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
-        END SELECT
-      CASE DEFAULT
-        !do nothing
-      END SELECT
-    ELSE
-      CALL FLAG_ERROR("Problem is not associated.",ERR,ERROR,*999)
-    ENDIF
-
-    CALL EXITS("ELASTICITY_CONTROL_LOOP_POST_LOOP")
-    RETURN
-999 CALL ERRORS("ELASTICITY_CONTROL_LOOP_POST_LOOP",ERR,ERROR)
-    CALL EXITS("ELASTICITY_CONTROL_LOOP_POST_LOOP")
-    RETURN 1
-  END SUBROUTINE ELASTICITY_CONTROL_LOOP_POST_LOOP
 
   !
   !================================================================================================================================
