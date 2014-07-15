@@ -707,8 +707,8 @@ CONTAINS
       CALL SYSTEM(CHAR("mkdir "//directory))
     ENDIF
     
-    filenameOutput=directory//"FE.txt"
-    OPEN(UNIT=IUNIT,FILE=filenameOutput,STATUS="UNKNOWN",ACTION="WRITE",IOSTAT=ERR)
+!    filenameOutput=directory//"FE.txt"
+!    OPEN(UNIT=IUNIT,FILE=filenameOutput,STATUS="UNKNOWN",ACTION="WRITE",IOSTAT=ERR)
 
 
     CALL ENTERS("FINITE_ELASTICITY_FINITE_ELEMENT_RESIDUAL_EVALUATE",ERR,ERROR,*999)
@@ -896,9 +896,6 @@ CONTAINS
             CALL FiniteElasticityGaussDeformationGradientTensor(DEPENDENT_INTERPOLATED_POINT_METRICS, &
               & GEOMETRIC_INTERPOLATED_POINT_METRICS,FIBRE_INTERPOLATED_POINT,DZDNU,Jxxi,ERR,ERROR,*999)
               
-              
-            
-
             IF(DIAGNOSTICS1) THEN
               CALL WRITE_STRING_VALUE(DIAGNOSTIC_OUTPUT_TYPE,"  ELEMENT_NUMBER = ",ELEMENT_NUMBER,ERR,ERROR,*999)
               CALL WRITE_STRING_VALUE(DIAGNOSTIC_OUTPUT_TYPE,"  gauss_idx = ",gauss_idx,ERR,ERROR,*999)
@@ -908,11 +905,11 @@ CONTAINS
             CALL FINITE_ELASTICITY_GAUSS_CAUCHY_TENSOR(EQUATIONS_SET,DEPENDENT_INTERPOLATED_POINT, &
               & MATERIALS_INTERPOLATED_POINT,DARCY_DEPENDENT_INTERPOLATED_POINT, &
               & INDEPENDENT_INTERPOLATED_POINT,CAUCHY_TENSOR,Jznu,DZDNU,ELEMENT_NUMBER,gauss_idx,ERR,ERROR,*999)
+              
 !            IF(ELEMENT_NUMBER==2) THEN
 !              WRITE(IUNIT,'(3E25.15,/(3E25.15))') &
 !                & ((CAUCHY_TENSOR(i,j),j=1,3),i=1,3)
 !            ENDIF
-
 
             IF(EQUATIONS_SET%SUBTYPE==EQUATIONS_SET_INCOMPRESSIBLE_ELASTICITY_DRIVEN_DARCY_SUBTYPE) THEN
               !Parameters settings for coupled elasticity Darcy INRIA model:
@@ -960,8 +957,6 @@ CONTAINS
                         
             DO component_idx=1,NUMBER_OF_DIMENSIONS
             
-!              TGZG=CAUCHY_TENSOR(component_idx,1)+CAUCHY_TENSOR(component_idx,2)+CAUCHY_TENSOR(component_idx,3)
-              
               DEPENDENT_COMPONENT_INTERPOLATION_TYPE=DEPENDENT_FIELD%VARIABLES(var1)%COMPONENTS(component_idx)%INTERPOLATION_TYPE
               IF(DEPENDENT_COMPONENT_INTERPOLATION_TYPE==FIELD_NODE_BASED_INTERPOLATION) THEN !node based
                 DEPENDENT_BASIS=>DEPENDENT_FIELD%VARIABLES(var1)%COMPONENTS(component_idx)%DOMAIN%TOPOLOGY% &
@@ -971,64 +966,21 @@ CONTAINS
                   element_dof_idx=element_dof_idx+1
                   
                   ! XY residual calculation based on 2nd PK, total Lagrangian
-                  
-                  
-!                  AGE=(TG(1,1)*ZG(nhx,2)+TG(1,2)*ZG(nhx,4)+TG(1,3)*
-!     '          ZG(nhx,7))*PPGG(2)
-!     '          +(TG(2,1)*ZG(nhx,2)+TG(2,2)*ZG(nhx,4)+TG(2,3)*ZG(nhx,7))
-!     '          *PPGG(3)
-!     '          +(TG(3,1)*ZG(nhx,2)+TG(3,2)*ZG(nhx,4)+TG(3,3)*ZG(nhx,7))
-!     '          *PPGG(4)
-                  
-!                  AGE=TEMP(1,component_idx)+TEMP(2,component_idx)+TEMP(3,component_idx)
-                  
-!                  AGE=(CAUCHY_TENSOR(1,1)*DZDNU(component_idx,1)+CAUCHY_TENSOR(1,2)*DZDNU(component_idx,2)+ &
-!                    & CAUCHY_TENSOR(1,3)*DZDNU(component_idx,3))*DFDZ(parameter_idx,1)+ &
-!                    & CAUCHY_TENSOR(2,1)*DZDNU(component_idx,1)+CAUCHY_TENSOR(2,2)*DZDNU(component_idx,2)+ &
-!                    & CAUCHY_TENSOR(2,3)*DZDNU(component_idx,3)*DFDZ(parameter_idx,2)+ &
-!                    & CAUCHY_TENSOR(3,1)*DZDNU(component_idx,1)+CAUCHY_TENSOR(3,2)*DZDNU(component_idx,2)+ &
-!                    & CAUCHY_TENSOR(3,3)*DZDNU(component_idx,3)*DFDZ(parameter_idx,3)
-                    
-!                  AGE=(CAUCHY_TENSOR(1,1)*DZDNU(component_idx,1)+CAUCHY_TENSOR(1,2)*DZDNU(component_idx,2)+ &
-!                    & CAUCHY_TENSOR(1,3)*DZDNU(component_idx,3))+ &
-!                    & CAUCHY_TENSOR(2,1)*DZDNU(component_idx,1)+CAUCHY_TENSOR(2,2)*DZDNU(component_idx,2)+ &
-!                    & CAUCHY_TENSOR(2,3)*DZDNU(component_idx,3)+ &
-!                    & CAUCHY_TENSOR(3,1)*DZDNU(component_idx,1)+CAUCHY_TENSOR(3,2)*DZDNU(component_idx,2)+ &
-!                    & CAUCHY_TENSOR(3,3)*DZDNU(component_idx,3)
-                  
                   ! the final form
                   AGE=DFDXN(parameter_idx,1)*TEMP(1,component_idx)+DFDXN(parameter_idx,2)*TEMP(2,component_idx)+ &
                     & DFDXN(parameter_idx,3)*TEMP(3,component_idx)
                   
-                    
                   NONLINEAR_MATRICES%ELEMENT_RESIDUAL%VECTOR(element_dof_idx)= &
                     & NONLINEAR_MATRICES%ELEMENT_RESIDUAL%VECTOR(element_dof_idx)+ &
-                    &GAUSS_WEIGHT*Jxxi*AGE
+                    &GAUSS_WEIGHT*Jxxi*AGE ! JXxi is the undeformed volume
                   DO component_idx2=1,NUMBER_OF_DIMENSIONS
-                    
+                  
+                    ! XY residual calculation based on Cauchy stress, Eulerian
                     
 !                    NONLINEAR_MATRICES%ELEMENT_RESIDUAL%VECTOR(element_dof_idx)= &
 !                      & NONLINEAR_MATRICES%ELEMENT_RESIDUAL%VECTOR(element_dof_idx)+ &
 !                      & GAUSS_WEIGHT*Jxxi*Jznu*THICKNESS*CAUCHY_TENSOR(component_idx,component_idx2)* &
 !                      & DFDZ(parameter_idx,component_idx2)
-                    
-!                    TGZG=0.0_DP
-!                    DO component_idx3=1,NUMBER_OF_DIMENSIONS
-!!                      TGZG=TGZG+CAUCHY_TENSOR(component_idx2,component_idx3)*DZDNU(component_idx,component_idx2)
-!                      TGZG=TGZG+CAUCHY_TENSOR(component_idx2,component_idx3)
-!                    ENDDO
-!                      
-!                    NONLINEAR_MATRICES%ELEMENT_RESIDUAL%VECTOR(element_dof_idx)= &
-!                      & NONLINEAR_MATRICES%ELEMENT_RESIDUAL%VECTOR(element_dof_idx)+ &
-!                      & GAUSS_WEIGHT*Jxxi
-                      
-                      
-!                    NONLINEAR_MATRICES%ELEMENT_RESIDUAL%VECTOR(element_dof_idx)= &
-!                      & NONLINEAR_MATRICES%ELEMENT_RESIDUAL%VECTOR(element_dof_idx)+ &
-!                      & DFDZ(parameter_idx,component_idx)
-                      
-                      
-                      
                       
                   ENDDO ! component_idx2 (inner component index)
                 ENDDO ! parameter_idx (residual vector loop)

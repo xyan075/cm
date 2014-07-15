@@ -1424,14 +1424,14 @@ CONTAINS
   
     CALL ENTERS("EQUATIONS_SET_JACOBIAN_CONTACT_UPDATE_STATIC_FEM",ERR,ERROR,*999)
     
-    directory="results_iter/"
-    INQUIRE(FILE=CHAR(directory),EXIST=dirExists)
-    IF(.NOT.dirExists) THEN
-      CALL SYSTEM(CHAR("mkdir "//directory))
-    ENDIF
-    
-    filenameOutput=directory//"stiffnessMatrix.exdata"
-    OPEN(UNIT=IUNIT,FILE=filenameOutput,STATUS="UNKNOWN",ACTION="WRITE",IOSTAT=ERR)
+!    directory="results_iter/"
+!    INQUIRE(FILE=CHAR(directory),EXIST=dirExists)
+!    IF(.NOT.dirExists) THEN
+!      CALL SYSTEM(CHAR("mkdir "//directory))
+!    ENDIF
+!    
+!    filenameOutput=directory//"stiffnessMatrix.exdata"
+!    OPEN(UNIT=IUNIT,FILE=filenameOutput,STATUS="UNKNOWN",ACTION="WRITE",IOSTAT=ERR)
     
 
     IF(ASSOCIATED(EQUATIONS_SET)) THEN
@@ -1739,17 +1739,15 @@ CONTAINS
                               CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,rowIdx,colIdx,matrixValue,err,error,*999)
                               
 !                              IF(contactMetrics%inContact(globalDataPointNum)) THEN
-!                              IF(globalDataPointNum==291) THEN
 !                                WRITE(IUNIT,'('' GK(pt='',I4,'',m='',I1,'',n='',I1,'',v1='',I1,'',v2='',I1,'',n1='',I2, &
 !                                  & '',n2='',I2,'',d1='',I1,'',d2='',I1,''):'',E25.15)') &
 !                                  & globalDataPointNum,rowBodyIdx,colBodyIdx,rowFieldComp,colFieldComp,rowLocalFaceNodeIdx, &
 !                                  & colLocalFaceNodeIdx,rowFaceDerivative,colfaceDerivative,matrixValue
-!                              ENDIF
 !                              ELSE
-!                                WRITE(IUNIT,'('' GK(pt='',I4,'',m='',I1,'',n='',I1,'',v1='',I1,'',v2='',I1,'',n1='',I2, &
-!                                  & '',n2='',I2,'',d1='',I1,'',d2='',I1,''):''3E25.15)') &
-!                                  & globalDataPointNum,rowBodyIdx,colBodyIdx,rowFieldComp,colFieldComp,rowLocalFaceNodeIdx, &
-!                                  & colLocalFaceNodeIdx,rowFaceDerivative,colfaceDerivative,0.0_DP
+!!                                WRITE(IUNIT,'('' GK(pt='',I4,'',m='',I1,'',n='',I1,'',v1='',I1,'',v2='',I1,'',n1='',I2, &
+!!                                  & '',n2='',I2,'',d1='',I1,'',d2='',I1,''):''3E25.15)') &
+!!                                  & globalDataPointNum,rowBodyIdx,colBodyIdx,rowFieldComp,colFieldComp,rowLocalFaceNodeIdx, &
+!!                                  & colLocalFaceNodeIdx,rowFaceDerivative,colfaceDerivative,0.0_DP
 !                              ENDIF
 !                              
                             ENDDO !colFaceDerivative
@@ -2047,14 +2045,14 @@ CONTAINS
 
     CALL ENTERS("EQUATIONS_SET_RESIDUAL_CONTACT_UPDATE_STATIC_FEM",ERR,ERROR,*999)
     
-    directory="results_iter/"
-    INQUIRE(FILE=CHAR(directory),EXIST=dirExists)
-    IF(.NOT.dirExists) THEN
-      CALL SYSTEM(CHAR("mkdir "//directory))
-    ENDIF
-    
-    filenameOutput=directory//"phi.exdata"
-    OPEN(UNIT=IUNIT,FILE=filenameOutput,STATUS="UNKNOWN",ACTION="WRITE",IOSTAT=ERR)
+!    directory="results_iter/"
+!    INQUIRE(FILE=CHAR(directory),EXIST=dirExists)
+!    IF(.NOT.dirExists) THEN
+!      CALL SYSTEM(CHAR("mkdir "//directory))
+!    ENDIF
+!    
+!    filenameOutput=directory//"phi.exdata"
+!    OPEN(UNIT=IUNIT,FILE=filenameOutput,STATUS="UNKNOWN",ACTION="WRITE",IOSTAT=ERR)
     
     
 
