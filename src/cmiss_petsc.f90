@@ -205,6 +205,13 @@ MODULE CMISS_PETSC
 #if ( PETSC_VERSION_MAJOR == 2 )
   MatType, PARAMETER :: PETSC_AIJMUMPS = MATAIJMUMPS
 #endif
+
+  !Vector norm types
+  NormType, PARAMETER :: PETSC_NORM_1=NORM_1
+  NormType, PARAMETER :: PETSC_NORM_2=NORM_2
+  NormType, PARAMETER :: PETSC_NORM_FROBENIUS=NORM_FROBENIUS
+  NormType, PARAMETER :: PETSC_NORM_INFINITY=NORM_INFINITY
+  NormType, PARAMETER :: PETSC_NORM_1_AND_2=NORM_1_AND_2
   
   !PC types
   PCType, PARAMETER ::  PETSC_PCNONE = PCNONE
@@ -916,6 +923,13 @@ MODULE CMISS_PETSC
       SNES snes
       PetscInt ierr
     END SUBROUTINE SNESCreate
+    
+    SUBROUTINE SNESComputeFunction(snes,x,y,ierr)
+      SNES snes
+      Vec x
+      Vec y
+      PetscInt ierr
+    END SUBROUTINE SNESComputeFunction
 
     SUBROUTINE SNESDestroy(snes,ierr)
       SNES snes
@@ -970,6 +984,14 @@ MODULE CMISS_PETSC
       PetscReal ynorm
       PetscInt ierr
     END SUBROUTINE SnesLineSearchGetNorms
+    
+    SUBROUTINE SNESLineSearchShellSetUserFunc(linesearch,LSFunction,ctx,ierr)
+      USE TYPES
+      SNESLineSearch linesearch
+      EXTERNAL LSfunction
+      TYPE(SOLVER_TYPE), POINTER :: ctx
+      PetscInt ierr
+    END SUBROUTINE SNESLineSearchShellSetUserFunc
 
     SUBROUTINE SNESGetIterationNumber(snes,iter,ierr)
       SNES snes
@@ -1255,6 +1277,13 @@ MODULE CMISS_PETSC
       Vec x
       PetscInt ierr
     END SUBROUTINE VecAssemblyEnd
+    
+    SUBROUTINE VecAXPY(y,alpha,x,ierr)
+      Vec y
+      PetscScalar alpha
+      Vec x
+      PetscInt ierr
+    END SUBROUTINE VecAXPY
 
     SUBROUTINE VecCopy(x,y,ierr)
       Vec x
@@ -1402,6 +1431,13 @@ MODULE CMISS_PETSC
       ScatterMode scattermode
       PetscInt ierr
     END SUBROUTINE VecGhostUpdateEnd
+    
+    SUBROUTINE VecNorm(x,normType,xNorm,ierr)
+      Vec x
+      NormType normType
+      PetscReal xNorm
+      PetscInt ierr
+    END SUBROUTINE VecNorm
 
     SUBROUTINE VecRestoreArray(x,vec_data,vec_offset,ierr)
       Vec x
@@ -1507,6 +1543,8 @@ MODULE CMISS_PETSC
 #if ( PETSC_VERSION_MAJOR == 2 )
   PUBLIC PETSC_AIJMUMPS
 #endif
+  
+  PUBLIC PETSC_NORM_1,PETSC_NORM_2,PETSC_NORM_FROBENIUS,PETSC_NORM_INFINITY,PETSC_NORM_1_AND_2
   
   PUBLIC PETSC_PCNONE,PETSC_PCJACOBI,PETSC_PCSOR,PETSC_PCLU,PETSC_PCSHELL,PETSC_PCBJACOBI,PETSC_PCMG,PETSC_PCEISENSTAT, &
     & PETSC_PCILU,PETSC_PCICC,PETSC_PCASM,PETSC_PCKSP,PETSC_PCCOMPOSITE,PETSC_PCREDUNDANT,PETSC_PCSPAI, &
@@ -1674,7 +1712,8 @@ MODULE CMISS_PETSC
     & PETSC_SNESGETITERATIONNUMBER,PETSC_SNESGETKSP,PETSC_SNESMONITORSET,PETSC_SNESSETFROMOPTIONS,PETSC_SNESSETFUNCTION, &
     & PETSC_SNESSETJACOBIAN,PETSC_SNESSETTOLERANCES,PETSC_SNESSETTRUSTREGIONTOLERANCE,PETSC_SNESSETTYPE,PETSC_SNESSOLVE, &
     & PETSC_SNESSETKSP,PETSC_SNESGETJACOBIAN,PETSC_SNESDEFAULTCOMPUTEJACOBIANCOLOR,PETSC_SNESDEFAULTCOMPUTEJACOBIAN, &
-    & PETSC_SNESSETCONVERGENCETEST,Petsc_SnesLineSearchGetVecs,PETSC_SNESSETNORMTYPE,Petsc_SnesGetSolutionUpdate
+    & PETSC_SNESSETCONVERGENCETEST,Petsc_SnesLineSearchGetVecs,PETSC_SNESSETNORMTYPE,Petsc_SnesGetSolutionUpdate, &
+    & Petsc_SNESComputeFunction
 #if ( PETSC_VERSION_MAJOR >= 3 && PETSC_VERSION_MINOR >= 2 )
   PUBLIC Petsc_SnesLineSearchSetMonitor
 #endif
@@ -1682,7 +1721,7 @@ MODULE CMISS_PETSC
   PUBLIC Petsc_SnesLineSearchFinalise,Petsc_SnesLineSearchInitialise
   PUBLIC Petsc_SnesGetSnesLineSearch,Petsc_SnesLineSearchSetComputeNorms,Petsc_SnesLineSearchComputeNorms, &
     & Petsc_SnesLineSearchSetOrder,Petsc_SnesLineSearchSetType, &
-    & Petsc_SnesLineSearchBTSetAlpha,Petsc_SnesLineSearchSetTolerances
+    & Petsc_SnesLineSearchBTSetAlpha,Petsc_SnesLineSearchSetTolerances,Petsc_SNESLineSearchShellSetUserFunc
 #else
   PUBLIC PETSC_SNESLINESEARCHSET,PETSC_SNESLINESEARCHSETPARAMS
 #endif
@@ -1693,7 +1732,7 @@ MODULE CMISS_PETSC
     & PETSC_VECGETLOCALSIZE,PETSC_VECGETOWNERSHIPRANGE,PETSC_VECGETSIZE,PETSC_VECGETVALUES,PETSC_VECGHOSTGETLOCALFORM, &
     & PETSC_VECGHOSTRESTORELOCALFORM,PETSC_VECGHOSTUPDATEBEGIN,PETSC_VECGHOSTUPDATEEND, &
     & PETSC_VECRESTOREARRAYF90,PETSC_VECSCALE,PETSC_VECSET,PETSC_VECSETFROMOPTIONS,PETSC_VECSETLOCALTOGLOBALMAPPING, &
-    & PETSC_VECSETSIZES,PETSC_VECSETVALUES,PETSC_VECSETVALUESLOCAL,PETSC_VECVIEW,Petsc_VecDot
+    & PETSC_VECSETSIZES,PETSC_VECSETVALUES,PETSC_VECSETVALUESLOCAL,PETSC_VECVIEW,Petsc_VecDot,Petsc_VecAXPY,Petsc_VecNorm
 
   PUBLIC PETSC_VIEWER_STDOUT_WORLD,PETSC_VIEWER_STDOUT_SELF,PETSC_VIEWER_DRAW_WORLD,PETSC_VIEWER_DRAW_SELF
 
@@ -4353,6 +4392,38 @@ CONTAINS
     CALL EXITS("PETSC_SNESCREATE")
     RETURN 1
   END SUBROUTINE PETSC_SNESCREATE
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Buffer routine to the PETSc SNESComputeFunction routine.
+  SUBROUTINE PETSC_SNESComputeFunction(snes_,x,y,err,error,*)
+
+    !Argument Variables
+    TYPE(PETSC_SNES_TYPE), INTENT(INOUT) :: snes_ !<The snes to compute the function for
+    TYPE(PETSC_VEC_TYPE), INTENT(IN) :: x !<The input vector
+    TYPE(PETSC_VEC_TYPE), INTENT(INOUT) :: y !<The function vector
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: error !<The error string
+    !Local Variables
+
+    CALL ENTERS("PETSC_SNESGETCONVERGEDREASON",ERR,ERROR,*999)
+
+    CALL SNESComputeFunction(snes_%SNES_,x%VEC,y%VEC,err)
+    IF(err/=0) THEN
+      IF(PETSC_HANDLE_ERROR) THEN
+        CHKERRQ(err)
+      ENDIF
+      CALL FLAG_ERROR("PETSc error in SNESComputeFunction",err,error,*999)
+    ENDIF
+    
+    CALL EXITS("PETSC_SNESComputeFunction")
+    RETURN
+999 CALL ERRORS("PETSC_SNESComputeFunction",err,error)
+    CALL EXITS("PETSC_SNESComputeFunction")
+    RETURN 1
+  END SUBROUTINE PETSC_SNESComputeFunction
     
   !
   !================================================================================================================================
@@ -5035,6 +5106,38 @@ CONTAINS
     RETURN 1
 
   END SUBROUTINE Petsc_SnesLineSearchSetTolerances
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Buffer routine to the PETSc SNESLineSearchShellSetUserFunc routine.
+  SUBROUTINE Petsc_SNESLineSearchShellSetUserFunc(lineSearch,LSFunction,ctx,err,error,*)
+
+    !Argument variables
+    TYPE(PetscSnesLineSearchType), INTENT(INOUT) :: lineSearch !<The SNES LineSearch to set the linesearch function for
+    EXTERNAL LSFunction !<The external function to call (OpenCMISS subroutine to linesearch step length)
+    TYPE(SOLVER_TYPE), POINTER :: ctx !<The solver data to pass to the convergence test function
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: error !<The error string
+
+    CALL Enters("Petsc_SNESLineSearchShellSetUserFunc",err,error,*999)
+
+    CALL SNESLineSearchShellSetUserFunc(lineSearch%snesLineSearch,LSFunction,ctx,err)
+    IF(err/=0) THEN
+      IF(PETSC_HANDLE_ERROR) THEN
+        CHKERRQ(err)
+      END IF
+      CALL FlagError("PETSc error in SNESLineSearchShellSetUserFunc",err,error,*999)
+    END IF
+
+    CALL Exits("Petsc_SNESLineSearchShellSetUserFunc")
+    RETURN
+999 CALL Errors("Petsc_SNESLineSearchShellSetUserFunc",err,error)
+    CALL Exits("Petsc_SNESLineSearchShellSetUserFunc")
+    RETURN 1
+
+  END SUBROUTINE Petsc_SNESLineSearchShellSetUserFunc
 #endif
 
   !
@@ -6214,6 +6317,40 @@ CONTAINS
     CALL EXITS("PETSC_VECASSEMBLYEND")
     RETURN 1
   END SUBROUTINE PETSC_VECASSEMBLYEND
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Buffer routine to the PETSc VecAXPY routine.
+  SUBROUTINE Petsc_VecAXPY(y,alpha,x,err,error,*)
+
+    !Argument Variables
+    TYPE(PETSC_VEC_TYPE), INTENT(INOUT) :: y !<The vector y
+    REAL(DP), INTENT(IN) :: alpha !<The scale factor alpha
+    TYPE(PETSC_VEC_TYPE), INTENT(IN) :: x !<The vector x
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: error !<The error string
+    !Local Variables
+    
+    CALL ENTERS("Petsc_VecAXPY",err,error,*999)
+    
+    CALL VecAXPY(y%VEC,alpha,x%VEC,err)
+
+    IF(err/=0) THEN
+      IF(PETSC_HANDLE_ERROR) THEN
+        CHKERRQ(err)
+      ENDIF
+      CALL FLAG_ERROR("PETSc error in VecAXPY",err,error,*999)
+    ENDIF
+
+    CALL EXITS("Petsc_VecAXPY")
+    RETURN
+999 CALL ERRORS("Petsc_VecAXPY",err,error)
+    CALL EXITS("Petsc_VecAXPY")
+    RETURN 1
+  END SUBROUTINE Petsc_VecAXPY
+
     
   !
   !================================================================================================================================
@@ -6700,7 +6837,7 @@ CONTAINS
       IF(PETSC_HANDLE_ERROR) THEN
         CHKERRQ(err)
       ENDIF
-      CALL FLAG_ERROR("PETSc error in SNESGetSolutionUpdate",err,error,*999)
+      CALL FLAG_ERROR("PETSc error in VecDot",err,error,*999)
     ENDIF
 
     CALL EXITS("Petsc_VecDot")
@@ -6900,6 +7037,39 @@ CONTAINS
     CALL EXITS("PETSC_VECGHOSTUPDATEEND")
     RETURN 1
   END SUBROUTINE PETSC_VECGHOSTUPDATEEND
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Buffer routine to the PETSc VecDot routine.
+  SUBROUTINE Petsc_VecNorm(x,normType,xNorm,err,error,*)
+
+    !Argument Variables
+    TYPE(PETSC_VEC_TYPE), INTENT(IN) :: x !<The vector x
+    NormType, INTENT(IN) :: normType !<The norm type
+    REAL(DP), INTENT(OUT) :: xNorm !<The dot product 
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: error !<The error string
+    !Local Variables
+    
+    CALL ENTERS("Petsc_VecNorm",err,error,*999)
+    
+    CALL VecNorm(x%VEC,normType,xNorm,err)
+
+    IF(err/=0) THEN
+      IF(PETSC_HANDLE_ERROR) THEN
+        CHKERRQ(err)
+      ENDIF
+      CALL FLAG_ERROR("PETSc error in VecNorm",err,error,*999)
+    ENDIF
+
+    CALL EXITS("Petsc_VecNorm")
+    RETURN
+999 CALL ERRORS("Petsc_VecNorm",err,error)
+    CALL EXITS("Petsc_VecNorm")
+    RETURN 1
+  END SUBROUTINE Petsc_VecNorm
     
   !
   !================================================================================================================================
