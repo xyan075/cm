@@ -5208,19 +5208,19 @@ SUBROUTINE ProblemSolver_ConvergenceTestPetsc(snes,iterationNumber,xnorm,gnorm,f
   REAL(DP), POINTER :: array(:)
   TYPE(VARYING_STRING) :: error,localError
   
-  TYPE(VARYING_STRING) :: directory
-  LOGICAL :: dirExists
-  INTEGER(INTG) :: IUNIT,i,j
-  CHARACTER(LEN=100) :: filenameOutput
+!  TYPE(VARYING_STRING) :: directory
+!  LOGICAL :: dirExists
+!  INTEGER(INTG) :: IUNIT,i,j
+!  CHARACTER(LEN=100) :: filenameOutput
 
-  directory="results_iter/"
-  INQUIRE(FILE=CHAR(directory),EXIST=dirExists)
-  IF(.NOT.dirExists) THEN
-    CALL SYSTEM(CHAR("mkdir "//directory))
-  ENDIF
-  
-  filenameOutput=directory//"linesearch.txt"
-  OPEN(UNIT=IUNIT,FILE=filenameOutput,STATUS="UNKNOWN",ACTION="WRITE",IOSTAT=ERR)
+!  directory="results_iter/"
+!  INQUIRE(FILE=CHAR(directory),EXIST=dirExists)
+!  IF(.NOT.dirExists) THEN
+!    CALL SYSTEM(CHAR("mkdir "//directory))
+!  ENDIF
+!  
+!  filenameOutput=directory//"linesearch.txt"
+!  OPEN(UNIT=IUNIT,FILE=filenameOutput,STATUS="UNKNOWN",ACTION="WRITE",IOSTAT=ERR)
 
   IF(ASSOCIATED(ctx)) THEN
     nonlinearSolver=>CTX%NONLINEAR_SOLVER
@@ -5249,14 +5249,14 @@ SUBROUTINE ProblemSolver_ConvergenceTestPetsc(snes,iterationNumber,xnorm,gnorm,f
             
             CALL PETSC_VECGETARRAYF90(x,array,err,error,*999)
             
-            DO i=1,SIZE(array,1)
-              WRITE(IUNIT,'(E25.15)') array(i)
-            ENDDO
+!            DO i=1,SIZE(array,1)
+!              WRITE(IUNIT,'(E25.15)') array(i)
+!            ENDDO
+!!            
+!            OPEN(UNIT=IUNIT)
 !            
-            OPEN(UNIT=IUNIT)
-            
-                   
-            CALL EXIT(0)
+!                   
+!            CALL EXIT(0)
 
             IF(iterationNumber==1) THEN
               IF(ABS(energy)<ZERO_TOLERANCE) THEN
