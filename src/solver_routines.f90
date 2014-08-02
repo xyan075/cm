@@ -17114,12 +17114,13 @@ CONTAINS
             CASE(SOLVER_NEWTON_LINESEARCH)
               linesearchSolver=>newtonSolver%LINESEARCH_SOLVER
               IF(ASSOCIATED(linesearchSolver)) THEN
-                CALL petsc_SnesLineSearchGetNorms(linesearchSolver%sneslinesearch,xnorm,fnorm,ynorm,err,error,*999)
-                CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"  Solution Norm    = ",xnorm,err,error,*999)
-                CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"  Solution Update Norm    = ",ynorm,err,error,*999)
-                CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"  Function Norm    = ",fnorm,err,error,*999)
-                CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"  Normalised Energy Norm    = ", &
-                  & newtonSolver%convergenceTest%normalisedEnergy,err,error,*999)
+                !XY comment out to make screen cleaner for debugging
+!                CALL petsc_SnesLineSearchGetNorms(linesearchSolver%sneslinesearch,xnorm,fnorm,ynorm,err,error,*999)
+!                CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"  Solution Norm    = ",xnorm,err,error,*999)
+!                CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"  Solution Update Norm    = ",ynorm,err,error,*999)
+!                CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"  Function Norm    = ",fnorm,err,error,*999)
+!                CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"  Normalised Energy Norm    = ", &
+!                  & newtonSolver%convergenceTest%normalisedEnergy,err,error,*999)
               ELSE
                 CALL FLAG_ERROR("Newton solver linesearch solver is not associated.",err,error,*999)
               ENDIF

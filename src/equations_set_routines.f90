@@ -3035,12 +3035,30 @@ CONTAINS
     TYPE(DISTRIBUTED_VECTOR_TYPE), POINTER :: parameters
     TYPE(FIELD_VARIABLE_TYPE), POINTER :: rowVariable,columnVariable
     TYPE(ELEMENT_VECTOR_TYPE) :: elementVector
+    TYPE(BOUNDARY_CONDITIONS_DIRICHLET_TYPE), POINTER :: dirichletBC
     INTEGER(INTG) :: componentIdx,localNy,version,derivativeIdx,derivative,nodeIdx,node,column
     INTEGER(INTG) :: componentInterpolationType
     INTEGER(INTG) :: numberOfRows
     REAL(DP) :: delta,origDepVar
+    
+    REAL(DP) :: scaleFactor
+    INTEGER(INTG) :: elemParameterNo
+    
+    TYPE(VARYING_STRING) :: directory
+    LOGICAL :: dirExists,foundDof,freeDof
+    INTEGER(INTG) :: IUNIT,i,j,countDof,noDofFixed
+    CHARACTER(LEN=100) :: filenameOutput
 
     CALL ENTERS("EquationsSet_FiniteElementJacobianEvaluateFD",err,error,*999)
+    
+!    directory="results_iter/"
+!    INQUIRE(FILE=CHAR(directory),EXIST=dirExists)
+!    IF(.NOT.dirExists) THEN
+!      CALL SYSTEM(CHAR("mkdir "//directory))
+!    ENDIF
+!    
+!    filenameOutput=directory//"elementResidual.exdata"
+!    OPEN(UNIT=IUNIT,FILE=filenameOutput,STATUS="UNKNOWN",ACTION="WRITE",IOSTAT=ERR)
 
     IF(ASSOCIATED(equationsSet)) THEN
       equations=>equationsSet%EQUATIONS
@@ -3070,9 +3088,29 @@ CONTAINS
           IF(numberOfRows/=nonlinearMatrices%ELEMENT_RESIDUAL%NUMBER_OF_ROWS) THEN
             CALL FlagError("Element matrix number of rows does not match element residual vector size.",err,error,*999)
           END IF
-          ! determine step size
+          
+          
+          
+          
+          
+          ! XY get sale factor for this elememt
+          CALL FIELD_INTERPOLATION_PARAMETERS_SCALE_FACTORS_ELEM_GET(elementNumber, &
+            & equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)
+            
+          ! XY get dirichlet BC
+          dirichletBC=>equationsSet%BOUNDARY_CONDITIONS%BOUNDARY_CONDITIONS_VARIABLES(1)%PTR%DIRICHLET_BOUNDARY_CONDITIONS
+          noDofFixed=equationsSet%BOUNDARY_CONDITIONS%BOUNDARY_CONDITIONS_VARIABLES(1)%PTR%NUMBER_OF_DIRICHLET_CONDITIONS
+            
+            
+            
+            
+            
+            
+            
+          ! determine step size XY comment out
           CALL DistributedVector_L2Norm(parameters,delta,err,error,*999)
           delta=(1.0_DP+delta)*1E-7_DP
+          delta=1E-4_DP
           ! the actual finite differencing algorithm is about 4 lines but since the parameters are all
           ! distributed out, have to use proper field accessing routines..
           ! so let's just loop over component, node/el, derivative
@@ -3090,15 +3128,60 @@ CONTAINS
                   version=elementsTopology%ELEMENTS(elementNumber)%elementVersions(derivativeIdx,nodeIdx)
                   localNy=columnVariable%COMPONENTS(componentIdx)%PARAM_TO_DOF_MAP%NODE_PARAM2DOF_MAP%NODES(node)% &
                     & DERIVATIVES(derivative)%VERSIONS(version)
-                  ! one-sided finite difference
-                  CALL DISTRIBUTED_VECTOR_VALUES_GET(parameters,localNy,origDepVar,err,error,*999)
-                  CALL DISTRIBUTED_VECTOR_VALUES_SET(parameters,localNy,origDepVar+delta,err,error,*999)
-                  nonlinearMatrices%ELEMENT_RESIDUAL%VECTOR=0.0_DP ! must remember to flush existing results, otherwise they're added
-                  CALL EQUATIONS_SET_FINITE_ELEMENT_RESIDUAL_EVALUATE(equationsSet,elementNumber,err,error,*999)
-                  CALL DISTRIBUTED_VECTOR_VALUES_SET(parameters,localNy,origDepVar,err,error,*999)
                   column=column+1
-                  nonlinearMatrices%JACOBIANS(jacobianNumber)%PTR%ELEMENT_JACOBIAN%MATRIX(1:numberOfRows,column)= &
-                      & (nonlinearMatrices%ELEMENT_RESIDUAL%VECTOR(1:numberOfRows)-elementVector%VECTOR(1:numberOfRows))/delta
+                  
+                  freeDof=.TRUE.
+                  countDof=1
+                  DO WHILE ((countDof<=noDofFixed) .AND. (freeDof))
+                    IF(dirichletBC%DIRICHLET_DOF_INDICES(countDof)==localNy) freeDof=.FALSE.
+                    countDof=countDof+1
+                  ENDDO
+                  
+                  ! XY only perturb free dofs
+                  IF((freeDof)) THEN  
+                    elemParameterNo=basis%ELEMENT_PARAMETER_INDEX(derivativeIdx,nodeIdx)  
+                    
+                    
+                    ! XY get the dof scale factor
+                    IF(componentIdx<4) THEN
+                      scaleFactor=equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)%PTR% &
+                        & SCALE_FACTORS(elemParameterNo,componentIdx)
+                    ELSE ! hydrostatic pressure
+                      scaleFactor=1.0_DP
+                    ENDIF
+
+                    ! one-sided finite difference
+                    CALL DISTRIBUTED_VECTOR_VALUES_GET(parameters,localNy,origDepVar,err,error,*999)
+                    CALL DISTRIBUTED_VECTOR_VALUES_SET(parameters,localNy,origDepVar+delta,err,error,*999)
+                    ! XY multiply delta by scale factor
+  !                  CALL DISTRIBUTED_VECTOR_VALUES_SET(parameters,localNy,origDepVar+delta*scaleFactor,err,error,*999)
+                    nonlinearMatrices%ELEMENT_RESIDUAL%VECTOR=0.0_DP ! must remember to flush existing results, otherwise they're added
+                    CALL EQUATIONS_SET_FINITE_ELEMENT_RESIDUAL_EVALUATE(equationsSet,elementNumber,err,error,*999)
+                    CALL DISTRIBUTED_VECTOR_VALUES_SET(parameters,localNy,origDepVar,err,error,*999)
+                    
+                    nonlinearMatrices%JACOBIANS(jacobianNumber)%PTR%ELEMENT_JACOBIAN%MATRIX(1:numberOfRows,column)= &
+                        & (nonlinearMatrices%ELEMENT_RESIDUAL%VECTOR(1:numberOfRows)-elementVector%VECTOR(1:numberOfRows))/delta
+                    
+                    !XY output perturbation dof    
+!                    IF(elementNumber==10) THEN
+!                    WRITE(IUNIT,'('' ******* ZE( '',I2,'','',I1,'')=   '',1X,E25.15,1X,''Perturbation='',E25.15)') &
+!                      & elemParameterNo,componentIdx,origDepVar*scaleFactor,delta*scaleFactor
+!                    ENDIF
+!                  
+                    ! XY output purturbed element residual
+!                    IF((elementNumber==5)) THEN
+!                      DO i=1,200
+!                        WRITE(IUNIT,'(1X,3E25.15)') nonlinearMatrices%ELEMENT_RESIDUAL%VECTOR(I)
+!                      ENDDO
+!                    ENDIF
+
+
+
+                  ENDIF !freeDof
+                  
+                  
+                  
+                  
                 ENDDO !derivativeIdx
               ENDDO !nodeIdx
             CASE (FIELD_ELEMENT_BASED_INTERPOLATION)
@@ -3116,6 +3199,27 @@ CONTAINS
               CALL FLAG_ERROR("Unsupported type of interpolation.",err,error,*999)
             END SELECT
           END DO
+          
+!          ! XY output reference element residual
+!          IF(elementNumber==5) THEN
+!            DO i=1,200
+!              WRITE(IUNIT,'(1X,3E25.15)') elementVector%VECTOR(i)
+!            ENDDO
+!          ENDIF
+
+          ! XY output element stiffness matrix
+!          IF(elementNumber==1) THEN
+!            DO i=1,nonlinearMatrices%JACOBIANS(jacobianNumber)%PTR%ELEMENT_JACOBIAN%NUMBER_OF_ROWS
+!              DO j=1,nonlinearMatrices%JACOBIANS(jacobianNumber)%PTR%ELEMENT_JACOBIAN%NUMBER_OF_COLUMNS
+!                WRITE(IUNIT,'(1X,3E25.15)') nonlinearMatrices%JACOBIANS(jacobianNumber)%PTR%ELEMENT_JACOBIAN%MATRIX(i,j)
+!              ENDDO !j
+!            ENDDO !i
+!          ENDIF
+!          
+!          
+!          
+!          OPEN(UNIT=IUNIT)
+          
           ! put the original residual back in
           nonlinearMatrices%ELEMENT_RESIDUAL=elementVector
         ELSE
@@ -3129,6 +3233,8 @@ CONTAINS
     ELSE
       CALL FLAG_ERROR("Equations set is not associated.",err,error,*999)
     END IF
+    
+!    CALL EXIT(0)
 
     CALL EXITS("EquationsSet_FiniteElementJacobianEvaluateFD")
     RETURN

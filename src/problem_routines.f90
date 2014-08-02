@@ -1419,7 +1419,7 @@ CONTAINS
     
     TYPE(VARYING_STRING) :: directory
     LOGICAL :: dirExists
-    INTEGER(INTG) :: IUNIT
+    INTEGER(INTG) :: IUNIT,i,j
     CHARACTER(LEN=100) :: filenameOutput
   
     CALL ENTERS("EQUATIONS_SET_JACOBIAN_CONTACT_UPDATE_STATIC_FEM",ERR,ERROR,*999)
@@ -1455,6 +1455,11 @@ CONTAINS
             jacobianNumber=1
             jacobian=>nonlinearMatrices%JACOBIANS(jacobianNumber)%PTR%JACOBIAN
             dependentVariable=>nonlinearMapping%JACOBIAN_TO_VAR_MAP(jacobianNumber)%VARIABLE
+            
+            
+!            CALL DISTRIBUTED_MATRIX_ALL_VALUES_SET(jacobian,0.0_DP,err,error,*999)
+            
+            
             !Setup pointer to the equation set of the coupled bodies which are setup in thier own separate regions
             !(note that these regions has not been added to the solver equations and are merely here for convinence if needed)
             !equationSetNumber=1
@@ -1751,7 +1756,7 @@ CONTAINS
 !                              ENDIF
 !                              
                             ENDDO !colFaceDerivative
-                          ENDDO !colLocalFaceNodeIdx
+                          ENDDO !colLocalFaceNodeIdxjacobian
                         ENDDO !colFieldComp
                       ENDDO !rowFaceDerivative
                     ENDDO !rowLocalFaceNodeIdx
@@ -1766,6 +1771,17 @@ CONTAINS
 
             CALL DISTRIBUTED_MATRIX_UPDATE_START(jacobian,err,error,*999)
             CALL DISTRIBUTED_MATRIX_UPDATE_FINISH(jacobian,err,error,*999)
+            
+            !write out stiffness matrx
+!            DO i=1,jacobian%CMISS%MATRIX%M
+!              DO j=1,jacobian%CMISS%MATRIX%N
+!                CALL DISTRIBUTED_MATRIX_VALUES_GET(jacobian,i,j,matrixValue,err,error,*999)
+!                WRITE(IUNIT,'(1X,3E25.15)') matrixValue
+!              ENDDO !j
+!            ENDDO !i
+!            
+!            OPEN(UNIT=IUNIT)
+            
 
             !Output equations matrices and RHS vector if required
             !\todo Uncomment below after EQUATIONS_SET_RESIDUAL_CONTACT_UPDATE_STATIC_FEM is moved to equations_set_routines.
@@ -4126,7 +4142,7 @@ CONTAINS
                             IF(interfaceCondition%integrationType==INTERFACE_CONDITION_DATA_POINTS_INTEGRATION) THEN !Only reproject for data point interpolated field
                               interface=>interfaceCondition%INTERFACE
                               IF(ASSOCIATED(interface)) THEN
-                                !CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"**************** Reproject! ****************",ERR,ERROR,*999)
+!                                CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"**************** Reproject! ****************",ERR,ERROR,*999)
                                 !CALL InterfacePointsConnectivity_DataReprojection(interface,interfaceCondition,err,error,*999)
                                 !CALL FrictionlessContact_contactMetricsCalculate(interfaceCondition,err,error,*999)
                                 !CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"************** Contact residual! ***********",ERR,ERROR,*999)
@@ -4441,7 +4457,7 @@ CONTAINS
               groupname="PointsConnectivity"//TRIM(NUMBER_TO_VSTRING(bodyidx,"*",err,error))
               WRITE(IUNIT,'( '' Group name: '',A)') groupname
               IF(bodyidx==2) THEN
-                WRITE(IUNIT,'(1X,''#Fields=6'')')
+                WRITE(IUNIT,'(1X,''#Fields=4'')')
                 WRITE(IUNIT,'(1X,''1) coordinates, coordinate, rectangular cartesian, #Components=3'')')
                 WRITE(IUNIT,'(1X,''  x.  Value index= 1, #Derivatives=0'')')
                 WRITE(IUNIT,'(1X,''  y.  Value index= 2, #Derivatives=0'')')
@@ -4454,10 +4470,10 @@ CONTAINS
                 WRITE(IUNIT,'(1X,''  z.  Value index= 7, #Derivatives=0'')')
                 WRITE(IUNIT,'(1X,''4) contactGap, field, rectangular cartesian, #Components=1'')')
                 WRITE(IUNIT,'(1X,''  gap.  Value index= 8, #Derivatives=0'')')
-                WRITE(IUNIT,'(1X,''5) contactForce, field, rectangular cartesian, #Components=1'')')
-                WRITE(IUNIT,'(1X,''  contactForce.  Value index= 9 , #Derivatives=0'')')
-                WRITE(IUNIT,'(1X,''6) Jacobian, field, rectangular cartesian, #Components=1'')')
-                WRITE(IUNIT,'(1X,''  Jacobian.  Value index= 10 , #Derivatives=0'')')
+!                WRITE(IUNIT,'(1X,''5) contactForce, field, rectangular cartesian, #Components=1'')')
+!                WRITE(IUNIT,'(1X,''  contactForce.  Value index= 9 , #Derivatives=0'')')
+!                WRITE(IUNIT,'(1X,''6) Jacobian, field, rectangular cartesian, #Components=1'')')
+!                WRITE(IUNIT,'(1X,''  Jacobian.  Value index= 10 , #Derivatives=0'')')
               ELSE
                 WRITE(IUNIT,'(1X,''#Fields=2'')')
                 WRITE(IUNIT,'(1X,''1) coordinates, coordinate, rectangular cartesian, #Components=3'')')
@@ -4504,11 +4520,11 @@ CONTAINS
                     WRITE(IUNIT,'(1X,3E25.15)') interfaceCondition%interfaceContactMetrics% &
                       & contactPointMetrics(globalDataPointNum)%signedGapNormal
                     ! contact force
-                    WRITE(IUNIT,'(1X,3E25.15)') interfaceCondition%interfaceContactMetrics% &
-                      & contactPointMetrics(globalDataPointNum)%contactForce
+!                    WRITE(IUNIT,'(1X,3E25.15)') interfaceCondition%interfaceContactMetrics% &
+!                      & contactPointMetrics(globalDataPointNum)%contactForce
                     ! Jacobian (area)
-                    WRITE(IUNIT,'(1X,3E25.15)') interfaceCondition%interfaceContactMetrics% &
-                      & contactPointMetrics(globalDataPointNum)%Jacobian
+!                    WRITE(IUNIT,'(1X,3E25.15)') interfaceCondition%interfaceContactMetrics% &
+!                      & contactPointMetrics(globalDataPointNum)%Jacobian
                   ELSE
                     WRITE(IUNIT,'(1X,I2)') 2
                     ! Normal on the master surface
@@ -4520,10 +4536,10 @@ CONTAINS
                     WRITE(IUNIT,'(1X,3E25.15)') interfaceCondition%interfaceContactMetrics% &
                       & contactPointMetrics(globalDataPointNum)%signedGapNormal
                     !no contact force calculated if not in contact
-                    WRITE(IUNIT,'(1X,3E25.15)') 0.0_DP
+!                    WRITE(IUNIT,'(1X,3E25.15)') 0.0_DP
                     ! Jacobian (area)
-                    WRITE(IUNIT,'(1X,3E25.15)') interfaceCondition%interfaceContactMetrics% &
-                      & contactPointMetrics(globalDataPointNum)%Jacobian
+!                    WRITE(IUNIT,'(1X,3E25.15)') interfaceCondition%interfaceContactMetrics% &
+!                      & contactPointMetrics(globalDataPointNum)%Jacobian
                   ENDIF
                 ELSE ! slave body
                   DO component=1,2
@@ -5184,12 +5200,27 @@ SUBROUTINE ProblemSolver_ConvergenceTestPetsc(snes,iterationNumber,xnorm,gnorm,f
   TYPE(SOLVER_TYPE), POINTER :: ctx !<The passed through context
   INTEGER(INTG), INTENT(INOUT) :: err !<The error code
   !Local Variables
-  TYPE(PETSC_VEC_TYPE) :: x,f,y,w,g
+  TYPE(PETSC_VEC_TYPE) :: x,f,y,w,g,solutionUpdate
   TYPE(NEWTON_SOLVER_TYPE), POINTER :: newtonSolver
   TYPE(NONLINEAR_SOLVER_TYPE), POINTER :: nonlinearSolver
   TYPE(PetscSnesLinesearchType) :: lineSearch
   REAL(DP) :: energy,normalisedEnergy
+  REAL(DP), POINTER :: array(:)
   TYPE(VARYING_STRING) :: error,localError
+  
+  TYPE(VARYING_STRING) :: directory
+  LOGICAL :: dirExists
+  INTEGER(INTG) :: IUNIT,i,j
+  CHARACTER(LEN=100) :: filenameOutput
+
+  directory="results_iter/"
+  INQUIRE(FILE=CHAR(directory),EXIST=dirExists)
+  IF(.NOT.dirExists) THEN
+    CALL SYSTEM(CHAR("mkdir "//directory))
+  ENDIF
+  
+  filenameOutput=directory//"linesearch.txt"
+  OPEN(UNIT=IUNIT,FILE=filenameOutput,STATUS="UNKNOWN",ACTION="WRITE",IOSTAT=ERR)
 
   IF(ASSOCIATED(ctx)) THEN
     nonlinearSolver=>CTX%NONLINEAR_SOLVER
@@ -5209,6 +5240,23 @@ SUBROUTINE ProblemSolver_ConvergenceTestPetsc(snes,iterationNumber,xnorm,gnorm,f
             CALL PETSC_VECINITIALISE(g,err,error,*999)
             CALL Petsc_SnesLineSearchGetVecs(lineSearch,x,f,y,w,g,err,error,*999)
             CALL Petsc_VecDot(y,g,energy,err,error,*999)
+            ! Get fortran90 array for search direction
+            
+            NULLIFY(array)
+            
+!            CALL Petsc_SnesGetSolutionUpdate(snes,solutionUpdate,err,error,*999)
+!            CALL PETSC_VECGETARRAYF90(solutionUpdate,array,err,error,*999)
+            
+            CALL PETSC_VECGETARRAYF90(x,array,err,error,*999)
+            
+            DO i=1,SIZE(array,1)
+              WRITE(IUNIT,'(E25.15)') array(i)
+            ENDDO
+!            
+            OPEN(UNIT=IUNIT)
+            
+                   
+            CALL EXIT(0)
             IF(iterationNumber==1) THEN
               IF(ABS(energy)<ZERO_TOLERANCE) THEN
                 reason=PETSC_SNES_CONVERGED_FNORM_ABS

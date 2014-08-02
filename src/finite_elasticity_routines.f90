@@ -695,18 +695,18 @@ CONTAINS
     INTEGER(INTG) :: component_idx3,xi_idx,derivative_idx
     
     
-    TYPE(VARYING_STRING) :: directory
-    LOGICAL :: dirExists
-    INTEGER(INTG) :: IUNIT,i,j
-    CHARACTER(LEN=100) :: filenameOutput
+!    TYPE(VARYING_STRING) :: directory
+!    LOGICAL :: dirExists
+!    INTEGER(INTG) :: IUNIT,i,j
+!    CHARACTER(LEN=100) :: filenameOutput
 
     
-    directory="results_iter/"
-    INQUIRE(FILE=CHAR(directory),EXIST=dirExists)
-    IF(.NOT.dirExists) THEN
-      CALL SYSTEM(CHAR("mkdir "//directory))
-    ENDIF
-    
+!    directory="results_iter/"
+!    INQUIRE(FILE=CHAR(directory),EXIST=dirExists)
+!    IF(.NOT.dirExists) THEN
+!      CALL SYSTEM(CHAR("mkdir "//directory))
+!    ENDIF
+!    
 !    filenameOutput=directory//"FE.txt"
 !    OPEN(UNIT=IUNIT,FILE=filenameOutput,STATUS="UNKNOWN",ACTION="WRITE",IOSTAT=ERR)
 
@@ -908,7 +908,7 @@ CONTAINS
               
 !            IF(ELEMENT_NUMBER==2) THEN
 !              WRITE(IUNIT,'(3E25.15,/(3E25.15))') &
-!                & ((CAUCHY_TENSOR(i,j),j=1,3),i=1,3)
+!                & ((DZDNU(i,j),j=1,3),i=1,3)
 !            ENDIF
 
             IF(EQUATIONS_SET%SUBTYPE==EQUATIONS_SET_INCOMPRESSIBLE_ELASTICITY_DRIVEN_DARCY_SUBTYPE) THEN
@@ -922,7 +922,7 @@ CONTAINS
 !            CALL FINITE_ELASTICITY_GAUSS_DFDZ(DEPENDENT_INTERPOLATED_POINT,ELEMENT_NUMBER,gauss_idx,NUMBER_OF_DIMENSIONS, &
 !              & NUMBER_OF_XI,DFDZ,ERR,ERROR,*999)
               
-            !XY Calculate dPhi/dXRC at athe gauss point for cm implementation
+            !XY Calculate dPhi/dXM at athe gauss point for cm implementation
             CALL FINITE_ELASTICITY_GAUSS_DFDXN(GEOMETRIC_INTERPOLATED_POINT,ELEMENT_NUMBER,gauss_idx,NUMBER_OF_DIMENSIONS, &
               & NUMBER_OF_XI,DFDXN,ERR,ERROR,*999)
             
@@ -973,6 +973,12 @@ CONTAINS
                   NONLINEAR_MATRICES%ELEMENT_RESIDUAL%VECTOR(element_dof_idx)= &
                     & NONLINEAR_MATRICES%ELEMENT_RESIDUAL%VECTOR(element_dof_idx)+ &
                     &GAUSS_WEIGHT*Jxxi*AGE ! JXxi is the undeformed volume
+                    
+!                  NONLINEAR_MATRICES%ELEMENT_RESIDUAL%VECTOR(element_dof_idx)= &
+!                    & NONLINEAR_MATRICES%ELEMENT_RESIDUAL%VECTOR(element_dof_idx)+ &
+!                    &GAUSS_WEIGHT*Jxxi
+                    
+                    
                   DO component_idx2=1,NUMBER_OF_DIMENSIONS
                   
                     ! XY residual calculation based on Cauchy stress, Eulerian
@@ -2422,6 +2428,16 @@ CONTAINS
           PIOLA_TENSOR(3,1)=PIOLA_TENSOR(1,3)
           PIOLA_TENSOR(3,2)=PIOLA_TENSOR(2,3)
           PIOLA_TENSOR(3,3)=2.0_DP*(C(1)+C(2)*(AZL(1,1)+AZL(2,2))+P*AZU(3,3))
+          
+          
+          !XY - checking parameters
+!          PIOLA_TENSOR(1,3)=2.0_DP*(       C(2)*(-AZL(3,1))        )
+!          PIOLA_TENSOR(2,3)=2.0_DP*(       C(2)*(-AZL(3,2))        )
+!          PIOLA_TENSOR(3,1)=PIOLA_TENSOR(1,3)
+!          PIOLA_TENSOR(3,2)=PIOLA_TENSOR(2,3)
+!          PIOLA_TENSOR(3,3)=2.0_DP*(C(2)*(AZL(1,1)+AZL(2,2)))
+          
+          
       ELSE
         ! Membrane Equations
         ! Assume incompressible => I3 = 1 => C33(C11 x C22 - C12*C21) = 1
@@ -2436,6 +2452,13 @@ CONTAINS
       PIOLA_TENSOR(1,2)=2.0_DP*(     C(2)*(-AZL(2,1))        +P*AZU(1,2))
       PIOLA_TENSOR(2,1)=PIOLA_TENSOR(1,2)
       PIOLA_TENSOR(2,2)=2.0_DP*(C(1)+C(2)*(AZL(3,3)+AZL(1,1))+P*AZU(2,2))
+      
+      !XY - checking parameters
+!      PIOLA_TENSOR(1,1)=2.0_DP*(C(2)*(AZL(2,2)+AZL(3,3)))
+!      PIOLA_TENSOR(1,2)=2.0_DP*(     C(2)*(-AZL(2,1))        )
+!      PIOLA_TENSOR(2,1)=PIOLA_TENSOR(1,2)
+!      PIOLA_TENSOR(2,2)=2.0_DP*(C(2)*(AZL(3,3)+AZL(1,1)))
+      
 
 
       IF(EQUATIONS_SET_SUBTYPE==EQUATIONS_SET_MOONEY_RIVLIN_ACTIVECONTRACTION_SUBTYPE) THEN
@@ -2915,6 +2938,10 @@ CONTAINS
     CAUCHY_TENSOR=CAUCHY_TENSOR/Jznu
     
     CAUCHY_TENSOR=PIOLA_TENSOR
+    
+    
+    
+!    CAUCHY_TENSOR=AZU
     
     
     
