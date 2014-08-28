@@ -147,6 +147,8 @@ MODULE PROBLEM_ROUTINES
   
   PUBLIC PROBLEM_USER_NUMBER_FIND
   
+  PUBLIC ProblemSolver_ConvergenceTest
+  
 CONTAINS
 
   !
@@ -4470,10 +4472,10 @@ CONTAINS
                 WRITE(IUNIT,'(1X,''  z.  Value index= 7, #Derivatives=0'')')
                 WRITE(IUNIT,'(1X,''4) contactGap, field, rectangular cartesian, #Components=1'')')
                 WRITE(IUNIT,'(1X,''  gap.  Value index= 8, #Derivatives=0'')')
-!                WRITE(IUNIT,'(1X,''5) contactForce, field, rectangular cartesian, #Components=1'')')
-!                WRITE(IUNIT,'(1X,''  contactForce.  Value index= 9 , #Derivatives=0'')')
-!                WRITE(IUNIT,'(1X,''6) Jacobian, field, rectangular cartesian, #Components=1'')')
-!                WRITE(IUNIT,'(1X,''  Jacobian.  Value index= 10 , #Derivatives=0'')')
+                WRITE(IUNIT,'(1X,''5) contactForce, field, rectangular cartesian, #Components=1'')')
+                WRITE(IUNIT,'(1X,''  contactForce.  Value index= 9 , #Derivatives=0'')')
+                WRITE(IUNIT,'(1X,''6) Jacobian, field, rectangular cartesian, #Components=1'')')
+                WRITE(IUNIT,'(1X,''  Jacobian.  Value index= 10 , #Derivatives=0'')')
               ELSE
                 WRITE(IUNIT,'(1X,''#Fields=2'')')
                 WRITE(IUNIT,'(1X,''1) coordinates, coordinate, rectangular cartesian, #Components=3'')')
@@ -4520,11 +4522,11 @@ CONTAINS
                     WRITE(IUNIT,'(1X,3E25.15)') interfaceCondition%interfaceContactMetrics% &
                       & contactPointMetrics(globalDataPointNum)%signedGapNormal
                     ! contact force
-!                    WRITE(IUNIT,'(1X,3E25.15)') interfaceCondition%interfaceContactMetrics% &
-!                      & contactPointMetrics(globalDataPointNum)%contactForce
+                    WRITE(IUNIT,'(1X,3E25.15)') interfaceCondition%interfaceContactMetrics% &
+                      & contactPointMetrics(globalDataPointNum)%contactForce
                     ! Jacobian (area)
-!                    WRITE(IUNIT,'(1X,3E25.15)') interfaceCondition%interfaceContactMetrics% &
-!                      & contactPointMetrics(globalDataPointNum)%Jacobian
+                    WRITE(IUNIT,'(1X,3E25.15)') interfaceCondition%interfaceContactMetrics% &
+                      & contactPointMetrics(globalDataPointNum)%Jacobian
                   ELSE
                     WRITE(IUNIT,'(1X,I2)') 2
                     ! Normal on the master surface
@@ -4536,10 +4538,10 @@ CONTAINS
                     WRITE(IUNIT,'(1X,3E25.15)') interfaceCondition%interfaceContactMetrics% &
                       & contactPointMetrics(globalDataPointNum)%signedGapNormal
                     !no contact force calculated if not in contact
-!                    WRITE(IUNIT,'(1X,3E25.15)') 0.0_DP
+                    WRITE(IUNIT,'(1X,3E25.15)') 0.0_DP
                     ! Jacobian (area)
-!                    WRITE(IUNIT,'(1X,3E25.15)') interfaceCondition%interfaceContactMetrics% &
-!                      & contactPointMetrics(globalDataPointNum)%Jacobian
+                    WRITE(IUNIT,'(1X,3E25.15)') interfaceCondition%interfaceContactMetrics% &
+                      & contactPointMetrics(globalDataPointNum)%Jacobian
                   ENDIF
                 ELSE ! slave body
                   DO component=1,2
@@ -4860,7 +4862,69 @@ CONTAINS
     RETURN 1
 
   END SUBROUTINE PROBLEM_CONTROL_LOOP_PREVIOUS_VALUES_UPDATE
+  
+  !
+  !================================================================================================================================
+  !
 
+  !>Convergence test called from user defined linesearch and convergence
+  SUBROUTINE ProblemSolver_ConvergenceTest(newtonSolver,iterationNumber,f,y,lambda,err,error,*)
+
+    !Argument variables
+    TYPE(NEWTON_SOLVER_TYPE), POINTER :: newtonSolver
+    INTEGER(INTG), INTENT(INOUT) :: iterationNumber !< The current iteration 
+    REAL(DP), POINTER :: f(:),y(:)
+    REAL(DP), INTENT(IN) :: lambda !< step size of line search
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: error !<The error string
+    !Local Variables
+    INTEGER(INTG) :: dofIdx
+    TYPE(NewtonSolverConvergenceTest), POINTER :: convergenceTest
+    TYPE(VARYING_STRING) :: localError
+
+    CALL ENTERS("ProblemSolver_ConvergenceTest",ERR,ERROR,*999)
+    
+    IF(ASSOCIATED(newtonSolver)) THEN 
+      SELECT CASE(newtonSolver%convergenceTestType)
+      CASE(SOLVER_NEWTON_CONVERGENCE_ENERGY_NORM) 
+        convergenceTest=>newtonSolver%convergenceTest
+        IF((iterationNumber==0) .OR. (convergenceTest%energyFirstIter==0.0_DP)) THEN
+          convergenceTest%energyFirstIter=0.0_DP
+          convergenceTest%normalisedEnergy=0.0_DP
+          convergenceTest%converged=.FALSE.
+          DO dofIdx=1,SIZE(f)
+            convergenceTest%energyFirstIter=convergenceTest%energyFirstIter+f(dofIdx)*y(dofIdx)
+          ENDDO
+          convergenceTest%energyFirstIter=ABS(convergenceTest%energyFirstIter*(-lambda))
+        ELSE  !At 1st iter linesearch
+          convergenceTest%normalisedEnergy=0.0_DP
+          DO dofIdx=1,SIZE(f)
+            convergenceTest%normalisedEnergy=convergenceTest%normalisedEnergy+f(dofIdx)*y(dofIdx)
+          ENDDO
+          convergenceTest%normalisedEnergy= &
+            & ABS(convergenceTest%normalisedEnergy*(-lambda))/convergenceTest%energyFirstIter
+          IF(convergenceTest%normalisedEnergy<newtonSolver%ABSOLUTE_TOLERANCE*newtonSolver%SOLUTION_TOLERANCE) &
+            & convergenceTest%converged=.TRUE.  
+        ENDIF
+      CASE(SOLVER_NEWTON_CONVERGENCE_DIFFERENTIATED_RATIO)
+        CALL FLAG_ERROR("Differentiated ratio convergence test not implemented.",err,error,*999)
+      CASE DEFAULT
+        localError="The specified convergence test type of "//TRIM(NUMBER_TO_VSTRING( &
+          & newtonSolver%convergenceTestType,"*",err,error))//" is invalid."
+        CALL FLAG_ERROR(localError,err,error,*999)
+      END SELECT
+    ELSE
+      CALL FLAG_ERROR("Nonlinear solver Newton solver is not associated.",err,error,*999)
+    ENDIF
+    
+    CALL EXITS("ProblemSolver_ConvergenceTest")
+    RETURN
+999 CALL ERRORS("ProblemSolver_ConvergenceTest",ERR,ERROR)
+    CALL EXITS("ProblemSolver_ConvergenceTest")
+    RETURN 1
+      
+  END SUBROUTINE ProblemSolver_ConvergenceTest
+  
   !
   !================================================================================================================================
   !
@@ -5204,8 +5268,9 @@ SUBROUTINE ProblemSolver_ConvergenceTestPetsc(snes,iterationNumber,xnorm,gnorm,f
   TYPE(NEWTON_SOLVER_TYPE), POINTER :: newtonSolver
   TYPE(NONLINEAR_SOLVER_TYPE), POINTER :: nonlinearSolver
   TYPE(PetscSnesLinesearchType) :: lineSearch
-  REAL(DP) :: energy,normalisedEnergy
-  REAL(DP), POINTER :: array(:)
+  REAL(DP), POINTER :: xArray(:),yArray(:),fArray(:)
+  REAL(DP) :: lambda
+
   TYPE(VARYING_STRING) :: error,localError
   
 !  TYPE(VARYING_STRING) :: directory
@@ -5230,55 +5295,53 @@ SUBROUTINE ProblemSolver_ConvergenceTestPetsc(snes,iterationNumber,xnorm,gnorm,f
         reason=PETSC_SNES_CONVERGED_ITERATING
         SELECT CASE(newtonSolver%convergenceTestType)
         CASE(SOLVER_NEWTON_CONVERGENCE_ENERGY_NORM) 
-          IF(iterationNumber>0) THEN
-            CALL Petsc_SnesLineSearchInitialise(lineSearch,err,error,*999)
-            CALL Petsc_SnesGetSnesLineSearch(snes,lineSearch,err,error,*999)
-            CALL PETSC_VECINITIALISE(x,err,error,*999)
-            CALL PETSC_VECINITIALISE(f,err,error,*999)
-            CALL PETSC_VECINITIALISE(y,err,error,*999)
-            CALL PETSC_VECINITIALISE(w,err,error,*999)
-            CALL PETSC_VECINITIALISE(g,err,error,*999)
-            CALL Petsc_SnesLineSearchGetVecs(lineSearch,x,f,y,w,g,err,error,*999)
-            CALL Petsc_VecDot(y,f,energy,err,error,*999)
-            ! Get fortran90 array for search direction
-            
-            NULLIFY(array)
-            
-!            CALL Petsc_SnesGetSolutionUpdate(snes,solutionUpdate,err,error,*999)
-!            CALL PETSC_VECGETARRAYF90(solutionUpdate,array,err,error,*999)
-            
-            CALL PETSC_VECGETARRAYF90(x,array,err,error,*999)
-            
-!            DO i=1,SIZE(array,1)
-!              WRITE(IUNIT,'(E25.15)') array(i)
-!            ENDDO
-!!            
-!            OPEN(UNIT=IUNIT)
-!            
-!                   
-!            CALL EXIT(0)
-
-            IF(iterationNumber==1) THEN
-              IF(ABS(energy)<ZERO_TOLERANCE) THEN
-                reason=PETSC_SNES_CONVERGED_FNORM_ABS
-              ELSE
-                newtonSolver%convergenceTest%energyFirstIter=energy
-              ENDIF
+          IF(iterationNumber>0) THEN ! always run for the first iteration
+            IF((newtonSolver%convergenceTest%converged).AND.(iterationNumber>1)) THEN ! check if converged from line search checks
+              reason=PETSC_SNES_CONVERGED_FNORM_ABS
+              newtonSolver%convergenceTest%energyFirstIter=0.0_DP
             ELSE
-              normalisedEnergy=energy/newtonSolver%convergenceTest%energyFirstIter
-              newtonSolver%convergenceTest%normalisedEnergy=normalisedEnergy
-              IF(ABS(normalisedEnergy)<newtonSolver%ABSOLUTE_TOLERANCE*newtonSolver%SOLUTION_TOLERANCE) THEN
-                reason=PETSC_SNES_CONVERGED_FNORM_ABS
+              CALL Petsc_SnesLineSearchInitialise(lineSearch,err,error,*999)
+              CALL Petsc_SnesGetSnesLineSearch(snes,lineSearch,err,error,*999)
+              CALL PETSC_VECINITIALISE(x,err,error,*999)
+              CALL PETSC_VECINITIALISE(f,err,error,*999)
+              CALL PETSC_VECINITIALISE(y,err,error,*999)
+              CALL PETSC_VECINITIALISE(w,err,error,*999)
+              CALL PETSC_VECINITIALISE(g,err,error,*999)
+              CALL Petsc_SnesLineSearchGetVecs(lineSearch,x,f,y,w,g,err,error,*999)
+              ! Get fortran90 arrays
+              NULLIFY(xArray)
+              NULLIFY(fArray)
+              NULLIFY(yArray)
+              CALL PETSC_VECGETARRAYF90(x,xArray,err,error,*999)
+              CALL PETSC_VECGETARRAYF90(f,fArray,err,error,*999)
+              CALL PETSC_VECGETARRAYF90(y,yArray,err,error,*999)
+              IF(newtonSolver%LINESEARCH_SOLVER%LINESEARCH_TYPE==SOLVER_NEWTON_LINESEARCH_BRENTS_GOLDENSECTION) THEN
+                ! lambda is 1.0 as y has already been modified by step size
+                CALL ProblemSolver_ConvergenceTest(newtonSolver,iterationNumber,fArray,yArray,1.0_DP,err,error,*999)
+              ELSE 
+                CALL Petsc_SnesLineSearchGetLambda(lineSearch,lambda,err,error,*999)
+                CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"  lambda = ",lambda,err,error,*999)
+                CALL ProblemSolver_ConvergenceTest(newtonSolver,iterationNumber,fArray,yArray,lambda,err,error,*999)
               ENDIF
-              CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"*********************************************",err,error,*999)
-              CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"Normalised energy = ",normalisedEnergy,err,error,*999)
-              CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"*********************************************",err,error,*999)
-            ENDIF
-            CALL Petsc_SnesLineSearchFinalise(lineSearch,err,error,*999)
-          ELSE
-            newtonSolver%convergenceTest%energyFirstIter=0.0_DP
-            newtonSolver%convergenceTest%normalisedEnergy=0.0_DP
-          ENDIF
+              
+              
+              
+              
+  !            DO i=1,SIZE(array,1)
+  !              WRITE(IUNIT,'(E25.15)') array(i)
+  !            ENDDO        
+  !            OPEN(UNIT=IUNIT)            
+  !            CALL EXIT(0)
+              IF(newtonSolver%convergenceTest%converged) THEN
+                reason=PETSC_SNES_CONVERGED_FNORM_ABS
+                newtonSolver%convergenceTest%energyFirstIter=0.0_DP
+              ENDIF
+            ENDIF !converged
+            CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"  Normalised energy = ", &
+              & newtonSolver%convergenceTest%normalisedEnergy,err,error,*999)
+            ELSE
+          ENDIF !iterationNumber>0
+          CALL Petsc_SnesLineSearchFinalise(lineSearch,err,error,*999)
         CASE(SOLVER_NEWTON_CONVERGENCE_DIFFERENTIATED_RATIO)
           CALL FLAG_ERROR("Differentiated ratio convergence test not implemented.",err,error,*999)
         CASE DEFAULT
@@ -5329,14 +5392,33 @@ SUBROUTINE ProblemSolver_ShellLineSearchPetsc(lineSearch,ctx,err)
   INTEGER(INTG), INTENT(INOUT) :: err !<The error code
   !Local Variables
 !  TYPE(PETSC_SNES_TYPE), INTENT(INOUT) :: snes !<The PETSc SNES type
-  TYPE(PETSC_VEC_TYPE) :: x,f,y,w,g
+  TYPE(PETSC_VEC_TYPE) :: xPetsc,fPetsc,yPetsc,wPetsc,gPetsc
   TYPE(NEWTON_SOLVER_TYPE), POINTER :: newtonSolver
   TYPE(NONLINEAR_SOLVER_TYPE), POINTER :: nonlinearSolver
   TYPE(NEWTON_LINESEARCH_SOLVER_TYPE), POINTER :: lineSearchSolver
-  REAL(DP) :: lambda,tau,a,b,c,FbNorm,FcNorm,FuNorm,FuNormPre,p,q,u,FTol,bm
-  INTEGER(INTG) :: i
+  REAL(DP) :: lambda,tau,a,b,c,FTol ! initial check parameters
+  REAL(DP) :: x,v,w,u,xm,f,fv,fw,fu,fx,p,q,r,tol1,tol2,d,e,eTemp,ratio ! Brent's method variables
+  REAL(DP) :: tol=1.0E-8_DP,cGold=0.381966011250_DP,zEps=1.0E-10_DP
+  REAL(DP), POINTER :: xArray(:),yArray(:),fArray(:)
+  INTEGER(INTG) :: iterationNumber,reason
+  INTEGER(INTG) :: i ! Brent's method variables
   LOGICAL :: parabolaFail
   TYPE(VARYING_STRING) :: error,localError
+  
+  TYPE(VARYING_STRING) :: directory
+  LOGICAL :: dirExists
+  INTEGER(INTG) :: IUNIT,j
+  CHARACTER(LEN=100) :: filenameOutput
+
+  directory="results_iter/"
+  INQUIRE(FILE=CHAR(directory),EXIST=dirExists)
+  IF(.NOT.dirExists) THEN
+    CALL SYSTEM(CHAR("mkdir "//directory))
+  ENDIF
+  
+  filenameOutput=directory//"linesearch.txt"
+  OPEN(UNIT=IUNIT,FILE=filenameOutput,STATUS="UNKNOWN",ACTION="WRITE",IOSTAT=ERR)
+
 
   IF(ASSOCIATED(ctx)) THEN
     nonlinearSolver=>CTX%NONLINEAR_SOLVER
@@ -5346,95 +5428,199 @@ SUBROUTINE ProblemSolver_ShellLineSearchPetsc(lineSearch,ctx,err)
         lineSearchSolver=>newtonSolver%LINESEARCH_SOLVER
         SELECT CASE(lineSearchSolver%LINESEARCH_TYPE)
         CASE(SOLVER_NEWTON_LINESEARCH_BRENTS_GOLDENSECTION) 
-          ! Get the vectors
-          CALL PETSC_VECINITIALISE(x,err,error,*999) ! current solution
-          CALL PETSC_VECINITIALISE(f,err,error,*999) ! residual function
-          CALL PETSC_VECINITIALISE(y,err,error,*999) ! current solution update
-          CALL PETSC_VECINITIALISE(w,err,error,*999) ! solution work vector
-          CALL PETSC_VECINITIALISE(g,err,error,*999) ! residual function work vector
-          CALL Petsc_SnesLineSearchGetVecs(lineSearch,x,f,y,w,g,err,error,*999)
-          
-          !---------------------------------------------------------------------------------------------------------------------
-          ! compute lambda
-          tau=0.5_DP*(3.0_DP-SQRT(5.0_DP))
-          a=0.0_DP
-          c=1.0_DP
-          b=a+tau*(c-a)
-          
-          !Evaluate the function residual norm from last solve
-          CALL PETSC_VECCOPY(x,w,ERR,ERROR,*999) !copy from x to w
-          CALL PETSC_SNESComputeFunction(lineSearchSolver%SNES,w,g,err,error,*999)
-          CALL Petsc_VecNorm(g,PETSC_NORM_2,FuNormPre,err,error,*999)
-          FTol=FuNormPre*0.5
-          !Evaluate the function residual by taking a full step
-          u=1.0_DP
-          CALL Petsc_VecAXPY(w,-u,y,err,error,*999)
-          CALL PETSC_SNESComputeFunction(lineSearchSolver%SNES,w,g,err,error,*999)
-          CALL Petsc_VecNorm(g,PETSC_NORM_2,FuNorm,err,error,*999)
-          
-          
-          i=1
-          parabolaFail=.FALSE.
-          DO WHILE ((FuNorm>FTol) .AND. (ABS((FuNormPre-FuNorm)/FuNormPre)>0.05_DP) .AND. (i<lineSearchSolver%LINESEARCH_MAXSTEP))
-            !F(b)
-            CALL PETSC_VECCOPY(x,w,ERR,ERROR,*999) !initialise w from x
-            CALL Petsc_VecAXPY(w,-b,y,err,error,*999)
-            CALL PETSC_SNESComputeFunction(lineSearchSolver%SNES,w,g,err,error,*999)
-            CALL Petsc_VecNorm(g,PETSC_NORM_2,FbNorm,err,error,*999)
-            !F(c)
-            CALL PETSC_VECCOPY(x,w,ERR,ERROR,*999) !initialise w from x
-            CALL Petsc_VecAXPY(w,-c,y,err,error,*999)
-            CALL PETSC_SNESComputeFunction(lineSearchSolver%SNES,w,g,err,error,*999)
-            CALL Petsc_VecNorm(g,PETSC_NORM_2,FcNorm,err,error,*999)
-            !u
-            IF(parabolaFail) THEN
-              bm=0.5*(a+c)
-              IF(b<bm) THEN
-                u=b+tau*(c-b)
-              ELSE
-                u=b+tau*(a-b)
-              ENDIF
+          SELECT CASE(newtonSolver%convergenceTestType)
+          CASE(SOLVER_NEWTON_CONVERGENCE_ENERGY_NORM) 
+            ! Get the vectors, ointers not a copy of the vector
+            NULLIFY(xArray)
+            NULLIFY(fArray)
+            NULLIFY(yArray)
+            CALL PETSC_VECINITIALISE(xPetsc,err,error,*999) ! current solution
+            CALL PETSC_VECINITIALISE(fPetsc,err,error,*999) ! residual function
+            CALL PETSC_VECINITIALISE(yPetsc,err,error,*999) ! current solution update
+            CALL PETSC_VECINITIALISE(wPetsc,err,error,*999) ! solution work vector
+            CALL PETSC_VECINITIALISE(gPetsc,err,error,*999) ! residual function work vector
+            CALL Petsc_SnesLineSearchGetVecs(lineSearch,xPetsc,fPetsc,yPetsc,wPetsc,gPetsc,err,error,*999)
+            ! get iteration number
+            CALL PETSC_SNESGETITERATIONNUMBER(lineSearchSolver%SNES,iterationNumber,err,error,*999)
+            IF(iterationNumber==0) THEN !compltete 0 iteration, i.e. 1st iteration
+              CALL PETSC_VECGETARRAYF90(xPetsc,xArray,err,error,*999)
+              CALL PETSC_VECGETARRAYF90(fPetsc,fArray,err,error,*999)
+              CALL PETSC_VECGETARRAYF90(yPetsc,yArray,err,error,*999)
+              lambda=1.0_DP
+              ! calculating initial energy
+              CALL ProblemSolver_ConvergenceTest(newtonSolver,iterationNumber,fArray,yArray,lambda,err,error,*999)
+              CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"initialE ",newtonSolver%convergenceTest%energyFirstIter,err,error,*999)  
+!              DO i=1,SIZE(yArray,1)
+!                WRITE(IUNIT,'(E25.15)') yArray(i)
+!              ENDDO
+!              OPEN(UNIT=IUNIT)
+!              CALL EXIT(0)   
             ELSE
-              p=(b-a)**2*(FbNorm-FcNorm)-(b-c)**2*(FbNorm-FcNorm)
-              q=(b-a)*(FbNorm-FcNorm)-(b-c)*(FbNorm-FcNorm)
-              u=b-(p/(2.0_DP*q))
-            ENDIF
-            !F(u)
-            CALL PETSC_VECCOPY(x,w,ERR,ERROR,*999) !initialise w from x
-            CALL Petsc_VecAXPY(w,-u,y,err,error,*999)
-            CALL PETSC_SNESComputeFunction(lineSearchSolver%SNES,w,g,err,error,*999)
-            CALL Petsc_VecNorm(g,PETSC_NORM_2,FuNorm,err,error,*999)
-            
-            IF(FuNorm>FbNorm) THEN
-              IF(u<b) THEN
-                a=u
-              ELSE !u>=b
-                c=u
-              ENDIF 
-            ELSE !FuNorm<=FbNorm
-              IF(u<b) THEN
-                c=b
-                b=u
-              ELSE !u>=b
-                a=b
-                b=u
-              ENDIF 
-            ENDIF
-            IF((u<a) .OR. (u>c)) parabolaFail=.TRUE.
-            i=i+1
-          END DO
-          
-          
-          
-          
-          lambda=u
-          !---------------------------------------------------------------------------------------------------------------------
-          ! compute the new solution vector from lambda
-          CALL Petsc_VecAXPY(x,-lambda,y,err,error,*999)
-          ! compute residual function
-          CALL PETSC_SNESComputeFunction(lineSearchSolver%SNES,x,f,err,error,*999)
-          CALL Petsc_VecNorm(f,PETSC_NORM_2,FuNorm,err,error,*999)
-          CALL Petsc_SnesLineSearchComputeNorms(lineSearch,err,error,*999)
+              CALL PETSC_VECGETARRAYF90(wPetsc,xArray,err,error,*999)
+              CALL PETSC_VECGETARRAYF90(gPetsc,fArray,err,error,*999)
+              CALL PETSC_VECGETARRAYF90(yPetsc,yArray,err,error,*999)
+              
+!              IF(iterationNumber==4) THEN
+!                CALL PETSC_VECCOPY(xPetsc,wPetsc,ERR,ERROR,*999) !initialise w from x
+!                CALL PETSC_VECCOPY(fPetsc,gPetsc,ERR,ERROR,*999) !initialise w from x
+!                DO i=1,SIZE(xArray,1)
+!                  WRITE(IUNIT,'(E25.15)') xArray(i)
+!                ENDDO
+!                OPEN(UNIT=IUNIT)
+!                CALL EXIT(0)
+!              ENDIF
+              
+              !---------------------------------------------------------------------------------------------------------------------
+              ! compute lambda
+              tau=0.5_DP*(3.0_DP-SQRT(5.0_DP))
+              a=0.0_DP
+              ! set the tolerance
+              FTol=newtonSolver%convergenceTest%normalisedEnergy*0.5
+              
+              c=1.0_DP
+              CALL PETSC_VECCOPY(xPetsc,wPetsc,ERR,ERROR,*999) !initialise w from x
+              CALL Petsc_VecAXPY(wPetsc,-c,yPetsc,err,error,*999) !w=w-cy
+              CALL PETSC_SNESComputeFunction(lineSearchSolver%SNES,wPetsc,gPetsc,err,error,*999) ! calculate g(residual) from w(solution)
+              
+              
+
+              ! calculate energy
+              CALL ProblemSolver_ConvergenceTest(newtonSolver,iterationNumber,fArray,yArray,c,err,error,*999)   
+              CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"FC ",newtonSolver%convergenceTest%normalisedEnergy,err,error,*999)     
+              ! check convergence
+              IF(newtonSolver%convergenceTest%normalisedEnergy<FTol) THEN
+                lambda=c
+                GOTO 3
+              ENDIF
+
+              
+              b=a+tau*(c-a)
+              CALL PETSC_VECCOPY(xPetsc,wPetsc,ERR,ERROR,*999) !initialise w from x
+              CALL Petsc_VecAXPY(wPetsc,-b,yPetsc,err,error,*999) !w=w-by
+              CALL PETSC_SNESComputeFunction(lineSearchSolver%SNES,wPetsc,gPetsc,err,error,*999) ! calculate g(residual) from w(solution)
+              ! calculate energy
+              CALL ProblemSolver_ConvergenceTest(newtonSolver,iterationNumber,fArray,yArray,b,err,error,*999)       
+              CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"FB ",newtonSolver%convergenceTest%normalisedEnergy,err,error,*999)     
+              ! check convergence
+              IF(newtonSolver%convergenceTest%normalisedEnergy<FTol) THEN
+                lambda=b
+                GOTO 3
+              ENDIF
+              
+              ! minimising using Brent's method
+              ! variable names chaned to be consistent with cm BRENT.f
+              v=b
+              w=v
+              x=v
+              b=c
+              e=0.0_DP
+              fx=newtonSolver%convergenceTest%normalisedEnergy
+              fv=fx
+              fw=fx
+              
+              
+              DO i=1,lineSearchSolver%LINESEARCH_MAXSTEP
+                xm=0.5_DP*(a+b)
+                tol1=tol*ABS(x)+zEps
+                tol2=2.0_DP*tol1
+                IF(ABS(x-xm)<=(tol2-0.5_DP*(b-a))) GOTO 3
+                IF(ABS(e)>tol1) THEN ! Is a parabolic possible
+                  r=(x-w)*(fx-fv) ! fit a parabola
+                  q=(x-v)*(fx-fw)
+                  p=(x-v)*q-(x-w)*r
+                  q=2.0_DP*(q-r)
+                  IF(q>0.0_DP) p=-p
+                  q=ABS(q)
+                  eTemp=e
+                  ! Is the parabola acceptable?
+                  IF(ABS(p)>=ABS(0.5_DP*q*eTemp) .OR. (p<=q*(a-x)) .OR. (p>=q*(b-x))) GOTO 1 ! not acceptable
+                  CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"************  parabola acceptable ***********",ERR,ERROR,*999) 
+                  d=p/q
+                  e=d
+                  u=x+d
+                  if((u-a)<tol2 .OR. (b-u)<tol2) d=DSIGN(tol1,xm-x) !f must not be evaluated too close to ax or bx
+                  GOTO 2
+                ENDIF! Is a parabolic possible
+1               if(x>=xm) THEN ! Not acceptable parabolic, must do a golden section step
+                  e=a-x
+                ELSE
+                  e=b-x
+                ENDIF ! golden section step
+                d=cGold*e
+2               IF(ABS(d)>=tol1) THEN
+                  u=x+d
+                ELSE
+                  u=x+DSIGN(tol1,d)
+                ENDIF
+                ! evaluate f(u)
+                CALL PETSC_VECCOPY(xPetsc,wPetsc,ERR,ERROR,*999) !initialise w from x
+                CALL Petsc_VecAXPY(wPetsc,-u,yPetsc,err,error,*999) !w=w-by
+                CALL PETSC_SNESComputeFunction(lineSearchSolver%SNES,wPetsc,gPetsc,err,error,*999) ! calculate g(residual) from w(solution)
+                ! calculate energy
+                CALL ProblemSolver_ConvergenceTest(newtonSolver,iterationNumber,fArray,yArray,u,err,error,*999)  
+                fu=newtonSolver%convergenceTest%normalisedEnergy
+                ! check convergence
+                IF(fu<FTol) THEN
+                  lambda=u
+                  GOTO 3
+                ENDIF
+                ratio=fu/fx
+                IF(fu<=fx) THEN
+                  IF(u>=x) THEN
+                   a=x
+                  ELSE !u<x
+                   b=x
+                  ENDIF
+                  v=w
+                  fv=fw
+                  w=x
+                  fw=fx
+                  x=u
+                  fx=fu
+                  IF(ratio > 0.95_DP) THEN ! Check if the residual is within 1% of the previous value
+                    lambda=x
+                    GOTO 3
+                  ENDIF
+                ELSE !fu>fx
+                  IF((ratio<1.05_DP) .AND. (x/=0.0_DP)) THEN ! Check if the residual is within 1% of the previous value
+                    lambda=x
+                    GOTO 3
+                  ENDIF
+                  IF(u<x) THEN
+                    a=u
+                  ELSE !u>x
+                    b=u
+                  ENDIF
+                  IF((fu<=fw).OR.(w==x)) THEN
+                    v=w
+                    fv=fw
+                    w=u
+                    fw=fu
+                  ELSE IF((fu<=fv) .OR. (v==x) .OR. (v==w)) THEN
+                    v=u
+                    fv=fu
+                  ENDIF
+                ENDIF
+              ENDDO
+                            
+            ENDIF !iterationNumber>1
+            !---------------------------------------------------------------------------------------------------------------------
+            ! compute the new solution vector from lambda
+3           CALL Petsc_VecAXPY(xPetsc,-lambda,yPetsc,err,error,*999)
+            ! update the search direction with line search step size
+            CALL PETSC_VECSCALE(yPetsc,lambda,err,error,*999)
+            ! compute residual function
+            CALL PETSC_SNESComputeFunction(lineSearchSolver%SNES,xPetsc,fPetsc,err,error,*999)
+            ! output 
+            CALL WRITE_STRING_TWO_VALUE(GENERAL_OUTPUT_TYPE,"x: ",lambda,' fx: ', &
+              & newtonSolver%convergenceTest%normalisedEnergy,err,error,*999)  
+          CASE(SOLVER_NEWTON_CONVERGENCE_DIFFERENTIATED_RATIO)
+            CALL FLAG_ERROR("Differentiated ratio convergence test not implemented.",err,error,*999)
+          CASE DEFAULT
+            localError="The specified convergence test type of "//TRIM(NUMBER_TO_VSTRING( &
+              & newtonSolver%convergenceTestType,"*",err,error))//" is invalid."
+            CALL FLAG_ERROR(localError,err,error,*999)
+          END SELECT
         CASE DEFAULT
           localError="The specified line search method type of "//TRIM(NUMBER_TO_VSTRING( &
             & lineSearchSolver%LINESEARCH_TYPE,"*",err,error))//" is invalid."
@@ -5452,7 +5638,7 @@ SUBROUTINE ProblemSolver_ShellLineSearchPetsc(lineSearch,ctx,err)
   
   RETURN
 999 CALL WRITE_ERROR(err,error,*998)
-998 CALL FLAG_WARNING("Error in convergence test.",err,error,*997)
+998 CALL FLAG_WARNING("Error in user defined line search.",err,error,*997)
 997 RETURN    
 
 END SUBROUTINE ProblemSolver_ShellLineSearchPetsc

@@ -1021,6 +1021,12 @@ MODULE CMISS_PETSC
 #endif
 
 #if ( PETSC_VERSION_MAJOR >= 3 && PETSC_VERSION_MINOR >= 3 )
+    SUBROUTINE SNESLineSearchGetLambda(linesearch,lambda,ierr)
+      SNESLineSearch linesearch
+      PetscReal lambda
+      PetscInt ierr
+    END SUBROUTINE SNESLineSearchGetLambda
+    
     SUBROUTINE SNESLineSearchSetComputeNorms(linesearch,flag,ierr)
       SNESLineSearch linesearch
       PetscBool flag
@@ -1072,6 +1078,12 @@ MODULE CMISS_PETSC
       SNESLineSearch linesearch
       PetscInt ierr
     END SUBROUTINE SNESGetSNESLineSearch
+    
+    SUBROUTINE SNESLineSearchGetSNES(linesearch,snes,ierr)
+      SNESLineSearch linesearch
+      SNES snes
+      PetscInt ierr
+    END SUBROUTINE SNESLineSearchGetSNES
 
     SUBROUTINE SNESLineSearchSetType(linesearch,linesearchtype,ierr)
       SNESLineSearch linesearch
@@ -1721,7 +1733,8 @@ MODULE CMISS_PETSC
   PUBLIC Petsc_SnesLineSearchFinalise,Petsc_SnesLineSearchInitialise
   PUBLIC Petsc_SnesGetSnesLineSearch,Petsc_SnesLineSearchSetComputeNorms,Petsc_SnesLineSearchComputeNorms, &
     & Petsc_SnesLineSearchSetOrder,Petsc_SnesLineSearchSetType, &
-    & Petsc_SnesLineSearchBTSetAlpha,Petsc_SnesLineSearchSetTolerances,Petsc_SNESLineSearchShellSetUserFunc
+    & Petsc_SnesLineSearchBTSetAlpha,Petsc_SnesLineSearchSetTolerances,Petsc_SNESLineSearchShellSetUserFunc,&
+    & Petsc_SnesLineSearchGetSnes,Petsc_SnesLineSearchGetLambda
 #else
   PUBLIC PETSC_SNESLINESEARCHSET,PETSC_SNESLINESEARCHSETPARAMS
 #endif
@@ -4738,6 +4751,37 @@ CONTAINS
     CALL Exits("Petsc_SnesGetSnesLineSearch")
     RETURN 1
   END SUBROUTINE Petsc_SnesGetSnesLineSearch
+  
+  !
+  !================================================================================================================================
+  !
+  
+  !>Buffer routine to the PETSc SNESLineSearchGetSNES routine.
+  SUBROUTINE Petsc_SnesLineSearchGetSnes(lineSearch,snes_,err,error,*)
+
+    !Argument Variables
+    TYPE(PetscSnesLinesearchType), INTENT(INOUT) :: lineSearch !<The SNES line search object
+    TYPE(PETSC_SNES_TYPE), INTENT(OUT) :: snes_ !<On return, the SNES 
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: error !<The error string
+
+    CALL Enters("Petsc_SnesLineSearchGetSnes",err,error,*999)
+
+    CALL SNESLineSearchGetSNES(lineSearch%snesLineSearch,snes_%snes_,err)
+    IF(err/=0) THEN
+      IF(PETSC_HANDLE_ERROR) THEN
+        CHKERRQ(err)
+      ENDIF
+      CALL FlagError("PETSc error in SnesLineSearchGetSnes",err,error,*999)
+    ENDIF
+
+    CALL Exits("Petsc_SnesLineSearchGetSnes")
+    RETURN
+999 CALL Errors("Petsc_SnesLineSearchGetSnes",err,error)
+    CALL Exits("Petsc_SnesLineSearchGetSnes")
+    RETURN 1
+  END SUBROUTINE Petsc_SnesLineSearchGetSnes
+  
 #endif
 
   !
@@ -5014,6 +5058,37 @@ CONTAINS
   !
   
 #if ( PETSC_VERSION_MAJOR >= 3 && PETSC_VERSION_MINOR >= 3 )
+
+  !>Buffer routine to the PETSc SNESLineSearchGetLambda routine.
+  SUBROUTINE Petsc_SnesLineSearchGetLambda(lineSearch,lambda,err,error,*)
+
+    !Argument variables
+    TYPE(PetscSnesLineSearchType), INTENT(INOUT) :: lineSearch !<The SNES back-tracking LineSearch to set alpha for
+    REAL(DP), INTENT(INOUT) :: lambda !<The linesearch steplength to get
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: error !<The error string
+
+    CALL Enters("Petsc_SnesLineSearchGetLambda",err,error,*999)
+
+    CALL SNESLineSearchGetLambda(lineSearch%snesLineSearch,lambda,err)
+    IF(err/=0) THEN
+      IF(PETSC_HANDLE_ERROR) THEN
+        CHKERRQ(err)
+      END IF
+      CALL FlagError("PETSc error in SNESLineSearchGetLambda",err,error,*999)
+    END IF
+
+    CALL Exits("Petsc_SnesLineSearchGetLambda")
+    RETURN
+999 CALL Errors("Petsc_SnesLineSearchGetLambda",err,error)
+    CALL Exits("Petsc_SnesLineSearchGetLambda")
+    RETURN 1
+  END SUBROUTINE Petsc_SnesLineSearchGetLambda
+  
+  !
+  !================================================================================================================================
+  !
+  
   !>Buffer routine to the PETSc SNESLineSearchSetType routine.
   SUBROUTINE Petsc_SnesLineSearchSetType(lineSearch,lineSearchType,err,error,*)
 

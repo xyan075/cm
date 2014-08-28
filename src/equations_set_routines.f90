@@ -3108,8 +3108,8 @@ CONTAINS
             
             
           ! determine step size XY comment out
-          CALL DistributedVector_L2Norm(parameters,delta,err,error,*999)
-          delta=(1.0_DP+delta)*1E-7_DP
+!          CALL DistributedVector_L2Norm(parameters,delta,err,error,*999)
+!          delta=(1.0_DP+delta)*1E-7_DP
           delta=1E-4_DP
           ! the actual finite differencing algorithm is about 4 lines but since the parameters are all
           ! distributed out, have to use proper field accessing routines..

@@ -700,7 +700,7 @@ CONTAINS
 !    INTEGER(INTG) :: IUNIT,i,j
 !    CHARACTER(LEN=100) :: filenameOutput
 
-    
+!    
 !    directory="results_iter/"
 !    INQUIRE(FILE=CHAR(directory),EXIST=dirExists)
 !    IF(.NOT.dirExists) THEN
@@ -896,6 +896,15 @@ CONTAINS
             CALL FiniteElasticityGaussDeformationGradientTensor(DEPENDENT_INTERPOLATED_POINT_METRICS, &
               & GEOMETRIC_INTERPOLATED_POINT_METRICS,FIBRE_INTERPOLATED_POINT,DZDNU,Jxxi,ERR,ERROR,*999)
               
+            IF(GEOMETRIC_INTERPOLATED_POINT_METRICS%JACOBIAN<ZERO_TOLERANCE) THEN
+              CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"WARNING: Negative voulume! --:",ERR,ERROR,*999)    
+              CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"  ELEMENT_NUMBER = ",ELEMENT_NUMBER,ERR,ERROR,*999)
+              CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"  gauss_idx = ",gauss_idx,ERR,ERROR,*999)
+!              WRITE(IUNIT,'(3E25.15,/(3E25.15))') &
+!                & ((GEOMETRIC_INTERPOLATED_POINT_METRICS%DX_DXI(i,j),j=1,3),i=1,3)
+!              OPEN(UNIT=IUNIT)
+            ENDIF
+              
             IF(DIAGNOSTICS1) THEN
               CALL WRITE_STRING_VALUE(DIAGNOSTIC_OUTPUT_TYPE,"  ELEMENT_NUMBER = ",ELEMENT_NUMBER,ERR,ERROR,*999)
               CALL WRITE_STRING_VALUE(DIAGNOSTIC_OUTPUT_TYPE,"  gauss_idx = ",gauss_idx,ERR,ERROR,*999)
@@ -906,10 +915,11 @@ CONTAINS
               & MATERIALS_INTERPOLATED_POINT,DARCY_DEPENDENT_INTERPOLATED_POINT, &
               & INDEPENDENT_INTERPOLATED_POINT,CAUCHY_TENSOR,Jznu,DZDNU,ELEMENT_NUMBER,gauss_idx,ERR,ERROR,*999)
               
-!            IF(ELEMENT_NUMBER==2) THEN
+!            IF(ELEMENT_NUMBER==64) THEN
 !              WRITE(IUNIT,'(3E25.15,/(3E25.15))') &
 !                & ((DZDNU(i,j),j=1,3),i=1,3)
 !            ENDIF
+!            OPEN(UNIT=IUNIT)
 
             IF(EQUATIONS_SET%SUBTYPE==EQUATIONS_SET_INCOMPRESSIBLE_ELASTICITY_DRIVEN_DARCY_SUBTYPE) THEN
               !Parameters settings for coupled elasticity Darcy INRIA model:
@@ -954,6 +964,9 @@ CONTAINS
             ! multiply 2nd PK stress with deformation gradient tensor F transpose
             CALL MATRIX_TRANSPOSE(DZDNU,DNUDZ,ERR,ERROR,*999)
             CALL MATRIX_PRODUCT(CAUCHY_TENSOR,DNUDZ,TEMP,ERR,ERROR,*999)
+            
+            !XY - write out Jacobian
+!            WRITE(IUNIT,'(1X,3E25.15)') GEOMETRIC_INTERPOLATED_POINT_METRICS%JACOBIAN
                         
             DO component_idx=1,NUMBER_OF_DIMENSIONS
             
@@ -972,7 +985,7 @@ CONTAINS
                   
                   NONLINEAR_MATRICES%ELEMENT_RESIDUAL%VECTOR(element_dof_idx)= &
                     & NONLINEAR_MATRICES%ELEMENT_RESIDUAL%VECTOR(element_dof_idx)+ &
-                    &GAUSS_WEIGHT*Jxxi*AGE ! JXxi is the undeformed volume
+                    &GAUSS_WEIGHT*GEOMETRIC_INTERPOLATED_POINT_METRICS%JACOBIAN*AGE 
                     
 !                  NONLINEAR_MATRICES%ELEMENT_RESIDUAL%VECTOR(element_dof_idx)= &
 !                    & NONLINEAR_MATRICES%ELEMENT_RESIDUAL%VECTOR(element_dof_idx)+ &
@@ -1027,8 +1040,8 @@ CONTAINS
                     & (Jznu-1.0_DP-DARCY_VOL_INCREASE)
                 ELSE
                   NONLINEAR_MATRICES%ELEMENT_RESIDUAL%VECTOR(element_dof_idx)= &
-                    & NONLINEAR_MATRICES%ELEMENT_RESIDUAL%VECTOR(element_dof_idx)+GAUSS_WEIGHT*Jxxi* &
-                    & (Jznu-1.0_DP)
+                    & NONLINEAR_MATRICES%ELEMENT_RESIDUAL%VECTOR(element_dof_idx)+GAUSS_WEIGHT* &
+                    & GEOMETRIC_INTERPOLATED_POINT_METRICS%JACOBIAN*(Jznu-1.0_DP)
                 ENDIF
               ENDIF
             ENDIF
