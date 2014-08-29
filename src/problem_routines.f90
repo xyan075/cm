@@ -6250,57 +6250,7 @@ SUBROUTINE ProblemSolver_ConvergenceTestPetsc(snes,iterationNumber,xnorm,gnorm,f
           ENDIF !iterationNumber>0
           CALL Petsc_SnesLineSearchFinalise(lineSearch,err,error,*999)
         CASE(SOLVER_NEWTON_CONVERGENCE_DIFFERENTIATED_RATIO)
-          IF(iterationNumber==0) THEN
-            CALL Petsc_SnesLineSearchInitialise(lineSearch,err,error,*999)
-            CALL Petsc_SnesGetSnesLineSearch(snes,lineSearch,err,error,*999)
-            CALL PETSC_VECINITIALISE(x,err,error,*999)
-            CALL PETSC_VECINITIALISE(f,err,error,*999)
-            CALL PETSC_VECINITIALISE(y,err,error,*999)
-            CALL PETSC_VECINITIALISE(w,err,error,*999)
-            CALL PETSC_VECINITIALISE(g,err,error,*999) 
-          ELSE
-            CALL Petsc_SnesLineSearchInitialise(lineSearch,err,error,*999)
-            CALL Petsc_SnesGetSnesLineSearch(snes,lineSearch,err,error,*999)
-            CALL PETSC_VECINITIALISE(x,err,error,*999)
-            CALL PETSC_VECINITIALISE(f,err,error,*999)
-            CALL PETSC_VECINITIALISE(y,err,error,*999)
-            CALL PETSC_VECINITIALISE(w,err,error,*999)
-            CALL PETSC_VECINITIALISE(g,err,error,*999) 
-            CALL Petsc_SnesLineSearchGetVecs(lineSearch,x,f,y,w,g,err,error,*999)
-            CALL Petsc_VecNorm(f,PETSC_NORM_2,funcNorm,err,error,*999)  
-            CALL PETSC_VECGETSIZE(g,vecSize,err,error,*999)
-            ALLOCATE(vecValues(vecSize),STAT=err)
-            IF(ERR/=0) CALL FLAG_ERROR("Could not allocate vector values.",err,error,*999)
-            ALLOCATE(vecInd(vecSize),STAT=err)
-            IF(ERR/=0) CALL FLAG_ERROR("Could not allocate vector indices.",err,error,*999)    
-            DO dofIdx=1,vecSize
-              vecInd(dofIdx)=dofIdx-1
-            ENDDO !dofIdx
-            IF(iterationNumber==1) THEN
-              IF(ABS(funcNorm)<ZERO_TOLERANCE) THEN
-                reason=PETSC_SNES_CONVERGED_FNORM_ABS
-              ELSE
-                IF(.NOT. ALLOCATED(newtonSolver%convergenceTest%residualFirstIter)) THEN
-                  ALLOCATE(newtonSolver%convergenceTest%residualFirstIter(vecSize),STAT=err)
-                  IF(ERR/=0) CALL FLAG_ERROR("Could not allocate first iteration residual vector values.",err,error,*999)
-                ENDIF
-                ! get the vector value
-                CALL PETSC_VECGETVALUES(g,vecSize,vecInd,newtonSolver%convergenceTest%residualFirstIter,err,error,*999)
-              ENDIF !converged at 1st iteration
-            ELSE
-              CALL PETSC_VECGETVALUES(g,vecSize,vecInd,vecValues,err,error,*999)
-              DO dofIdx=1,vecSize
-                vecValues(dofIdx)=vecValues(dofIdx)/newtonSolver%convergenceTest%residualFirstIter(dofIdx)
-              ENDDO !dofIdx
-              functionRatio=SQRT(SUM(vecValues*vecValues,1))
-              IF(ABS(functionRatio)<newtonSolver%ABSOLUTE_TOLERANCE) THEN
-                reason=PETSC_SNES_CONVERGED_FNORM_ABS
-              ENDIF 
-              CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"*********************************************",err,error,*999)
-              CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"Differentiated ratio norm = ",functionRatio,err,error,*999)
-              CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"*********************************************",err,error,*999)
-            ENDIF !iterationNumber==1                 
-          ENDIF !iterationNumber>0
+          CALL FLAG_ERROR("Differentiated ratio convergence test not implemented.",err,error,*999)
         CASE DEFAULT
           localError="The specified convergence test type of "//TRIM(NUMBER_TO_VSTRING( &
             & newtonSolver%convergenceTestType,"*",err,error))//" is invalid."
