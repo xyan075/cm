@@ -450,6 +450,15 @@ CONTAINS
                 CALL DISTRIBUTED_VECTOR_CREATE_FINISH(NONLINEAR_MATRICES%RESIDUAL,ERR,ERROR,*999)
                 !Initialise the residual vector to zero for time dependent problems so that the previous residual is set to zero
                 CALL DISTRIBUTED_VECTOR_ALL_VALUES_SET(NONLINEAR_MATRICES%RESIDUAL,0.0_DP,ERR,ERROR,*999)
+                
+                !Set up the contact residual vector                
+                CALL DISTRIBUTED_VECTOR_CREATE_START(ROW_DOMAIN_MAP,EQUATIONS_MATRICES%NONLINEAR_MATRICES%contactResidual, &
+                  & ERR,ERROR,*999)
+                CALL DISTRIBUTED_VECTOR_DATA_TYPE_SET(NONLINEAR_MATRICES%contactResidual,MATRIX_VECTOR_DP_TYPE,ERR,ERROR,*999)
+                CALL DISTRIBUTED_VECTOR_CREATE_FINISH(NONLINEAR_MATRICES%contactResidual,ERR,ERROR,*999)
+                !Initialise the residual vector to zero for time dependent problems so that the previous residual is set to zero
+                CALL DISTRIBUTED_VECTOR_ALL_VALUES_SET(NONLINEAR_MATRICES%contactResidual,0.0_DP,ERR,ERROR,*999)
+                
               ELSE
                 CALL FLAG_ERROR("Equations mapping nonlinear mapping is not associated.",ERR,ERROR,*999)
               ENDIF
@@ -3409,6 +3418,7 @@ CONTAINS
             EQUATIONS_MATRICES%NONLINEAR_MATRICES%UPDATE_RESIDUAL=.TRUE.
             EQUATIONS_MATRICES%NONLINEAR_MATRICES%FIRST_ASSEMBLY=.TRUE.
             NULLIFY(EQUATIONS_MATRICES%NONLINEAR_MATRICES%RESIDUAL)
+            NULLIFY(EQUATIONS_MATRICES%NONLINEAR_MATRICES%contactResidual)
             CALL EQUATIONS_MATRICES_ELEMENT_VECTOR_INITIALISE(EQUATIONS_MATRICES%NONLINEAR_MATRICES%ELEMENT_RESIDUAL,ERR,ERROR,*999)
             CALL EquationsMatrices_NodalVectorInitialise(EQUATIONS_MATRICES%NONLINEAR_MATRICES%NodalResidual,ERR,ERROR,*999)
             EQUATIONS_MATRICES%NONLINEAR_MATRICES%NUMBER_OF_JACOBIANS=NONLINEAR_MAPPING%NUMBER_OF_RESIDUAL_VARIABLES
@@ -3498,6 +3508,12 @@ CONTAINS
             CALL DISTRIBUTED_VECTOR_OUTPUT(ID,NONLINEAR_MATRICES%RESIDUAL,ERR,ERROR,*999)
           ELSE
             CALL FLAG_ERROR("Nonlinear matrices residual is not associated.",ERR,ERROR,*999)
+          ENDIF
+          IF(ASSOCIATED(NONLINEAR_MATRICES%contactResidual)) THEN
+            CALL WRITE_STRING(ID,"Contact residual vector:",ERR,ERROR,*999)
+            CALL DISTRIBUTED_VECTOR_OUTPUT(ID,NONLINEAR_MATRICES%contactResidual,ERR,ERROR,*999)
+          ELSE
+            CALL FLAG_ERROR("Nonlinear matrices contact residual is not associated.",ERR,ERROR,*999)
           ENDIF
         ENDIF
         RHS_VECTOR=>EQUATIONS_MATRICES%RHS_VECTOR
@@ -4454,6 +4470,7 @@ CONTAINS
         IF(ASSOCIATED(NONLINEAR_MATRICES)) THEN
           IF(NONLINEAR_MATRICES%UPDATE_RESIDUAL) THEN
             CALL DISTRIBUTED_VECTOR_ALL_VALUES_SET(NONLINEAR_MATRICES%RESIDUAL,VALUE,ERR,ERROR,*999)
+            CALL DISTRIBUTED_VECTOR_ALL_VALUES_SET(NONLINEAR_MATRICES%contactResidual,VALUE,ERR,ERROR,*999) !Initialise contact residual when initialising overall residual
           ENDIF
         ENDIF
       ENDIF

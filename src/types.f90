@@ -360,6 +360,7 @@ MODULE TYPES
     LOGICAL :: NODES_FINISHED !<Is .TRUE. if the nodes have finished being created, .FALSE. if not.
     INTEGER(INTG) :: NUMBER_OF_NODES !<The number of nodes defined on the region.
     TYPE(NODE_TYPE), ALLOCATABLE :: NODES(:) !<NODES(nodes_idx). The nodal information for the nodes_idx'th global node.
+    INTEGER(INTG), ALLOCATABLE :: COUPLED_NODES(:,:) !<Coupled meshes nodes numbers
     TYPE(TREE_TYPE), POINTER :: NODES_TREE !<The tree for user to global node mapping
   END TYPE NODES_TYPE
 
@@ -1348,7 +1349,7 @@ END TYPE GENERATED_MESH_ELLIPSOID_TYPE
     TYPE(FIELDS_TYPE), POINTER :: FIELDS !<A pointer to the fields for this region.
     TYPE(REGION_TYPE), POINTER :: REGION !<A pointer to the region containing the field. If the field are in an interface rather than a region then this pointer will be NULL and the interface pointer should be used.
     TYPE(INTERFACE_TYPE), POINTER :: INTERFACE!<A pointer to the interface containing the field. If the field are in a region rather than an interface then this pointer will be NULL and the interface pointer should be used.
-    INTEGER(INTG) :: TYPE !<The type of the field. \see FIELD_ROUTINES_FieldTypes
+    INTEGER(INTG) :: TYPE !<The type of the field. NOTE: this should be a field variable attribute as you may have a, say, geometric field variable and a general field variable bundled together in the same field. \see FIELD_ROUTINES_FieldTypes
     INTEGER(INTG) :: DEPENDENT_TYPE !<The dependent type of the field. \see FIELD_ROUTINES_DependentTypes
     TYPE(DECOMPOSITION_TYPE), POINTER :: DECOMPOSITION !<A pointer to the decomposition of the mesh for which the field is defined on.
     INTEGER(INTG) :: NUMBER_OF_VARIABLES !<The number of variable types in the field. Old CMISS name NCT(nr,nx)
@@ -1487,6 +1488,7 @@ END TYPE GENERATED_MESH_ELLIPSOID_TYPE
     LOGICAL :: UPDATE_RESIDUAL !<Is .TRUE. if the equtions residual vector is to be updated
     LOGICAL :: FIRST_ASSEMBLY !<Is .TRUE. if this residual vector has not been assembled
     TYPE(DISTRIBUTED_VECTOR_TYPE), POINTER :: RESIDUAL !<A pointer to the distributed residual vector for nonlinear equations
+    TYPE(DISTRIBUTED_VECTOR_TYPE), POINTER :: contactResidual !<A pointer to the distributed contact residual vector for debugging purpose
     TYPE(ELEMENT_VECTOR_TYPE) :: ELEMENT_RESIDUAL !<The element residual information for nonlinear equations. Old CMISS name RE1
     TYPE(NodalVectorType) :: NodalResidual !<The nodal residual information for nonlinear equations.
     INTEGER(INTG) :: NodalResidualCalculated !<The number of the nodal the residual is calculated for, or zero if it isn't calculated
@@ -1970,6 +1972,8 @@ END TYPE GENERATED_MESH_ELLIPSOID_TYPE
     INTEGER(INTG) :: STRUCTURE_TYPE !<The structure (sparsity) type for this matrix
     INTEGER(INTG) :: NUMBER_OF_ROWS !<The number of rows in this interface matrix
     INTEGER(INTG) :: TOTAL_NUMBER_OF_ROWS !<The number of rows in this interface matrix
+    INTEGER(INTG) :: INTERFACE_MATRIX_TIME_DEPENDENCE_TYPE !<Determines where the interface matrix is mapped to
+    INTEGER(INTG) :: INTERFACE_MATRIX_TRANSPOSE_TIME_DEPENDENCE_TYPE !<Determines where the transpose of the interface matrix is mapped to
     LOGICAL :: UPDATE_MATRIX !<Is .TRUE. if this interface matrix is to be updated
     LOGICAL :: FIRST_ASSEMBLY !<Is .TRUE. if this interface matrix has not been assembled
     LOGICAL :: HAS_TRANSPOSE !<Is .TRUE. if this interface matrix has has transpose
@@ -2502,6 +2506,7 @@ END TYPE GENERATED_MESH_ELLIPSOID_TYPE
     LOGICAL :: EXPLICIT !<Is .TRUE. if the dynamic scheme is an explicit scheme, .FALSE. if not.
     LOGICAL :: RESTART !<Is .TRUE. if the dynamic scheme is to be restarted (i.e., recalculate values at the current time step), .FALSE. if not.
     LOGICAL :: ALE !<Is .TRUE. if the dynamic scheme is an ALE scheme, .FALSE. if not.
+    LOGICAL :: FSI !<Is .TRUE. if the dynamic scheme is an FSI scheme and updates geometric fields, .FALSE. if not
     LOGICAL :: UPDATE_BC !<Is .TRUE. if the dynamic scheme has changing bc, .FALSE. if not.
     REAL(DP) :: CURRENT_TIME !<The current time value for the dynamic solver.
     REAL(DP) :: TIME_INCREMENT !<The time increment for the dynamic solver to solver for.
@@ -2657,6 +2662,7 @@ END TYPE GENERATED_MESH_ELLIPSOID_TYPE
     REAL(DP) :: normalisedEnergy !<The normalized energy for the subsequent iterations
     REAL(DP) :: previousFuncNorm !<The previous function norm
     REAL(DP), ALLOCATABLE ::  residualFirstIter(:) !<The residual for the first iteration
+    LOGICAL :: converged !<if the newton step converged
   END TYPE NewtonSolverConvergenceTest
 
   !>Contains information for a Newton nonlinear solver
@@ -3127,6 +3133,7 @@ END TYPE GENERATED_MESH_ELLIPSOID_TYPE
     INTEGER(INTG) :: MAXIMUM_NUMBER_OF_ITERATIONS
     REAL(DP), ALLOCATABLE :: increments(:) !increments(loadIncrementIdx), the percentage of load (boundary condition) at each load step
     LOGICAL :: WRITE_INTERMEDIATE_RESULTS
+    INTEGER(INTG) :: OUTPUT_NUMBER
   END TYPE CONTROL_LOOP_LOAD_INCREMENT_TYPE
 
   !>A buffer type to allow for an array of pointers to a CONTROL_LOOP_TYPE \see TYPES::CONTROL_LOOP_TYPE

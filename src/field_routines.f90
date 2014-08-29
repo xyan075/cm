@@ -6631,7 +6631,7 @@ CONTAINS
 
   !>Computes the geometric position, normal and tangent vectors at a interpolated point metrics in a field. 
   SUBROUTINE FIELD_POSITION_NORMAL_TANGENTS_CALCULATE_INT_PT_METRIC(INTERPOLATED_POINT_METRICS,reverseNormal, &
-    & POSITION,NORMAL,TANGENTS,ERR,ERROR,*)
+    & POSITION,NORMAL,TANGENTS,ERR,ERROR,*,contact)
 
     !Argument variables
     TYPE(FIELD_INTERPOLATED_POINT_METRICS_TYPE), POINTER, INTENT(IN) :: INTERPOLATED_POINT_METRICS !<A pointer to the interpolated point metric information to calculate the position etc. for
@@ -6641,6 +6641,7 @@ CONTAINS
     REAL(DP), INTENT(OUT) :: TANGENTS(:,:) !<TANGENTS(coordinate_idx,tangent_idx), on exit the tangent vectors for the tangent_idx'th tangent at the node. There are number_of_xi-1 tangent vectors.
     INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
     TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
+    LOGICAL, OPTIONAL, INTENT(IN) :: contact !<If tangents and normal are calculated for contact mechanics
     !Local Variables
     INTEGER(INTG) :: dimension_idx,xi_idx
     TYPE(FIELD_INTERPOLATED_POINT_TYPE), POINTER :: INTERPOLATED_POINT
@@ -6674,12 +6675,20 @@ CONTAINS
                     DO dimension_idx=1,INTERPOLATED_POINT_METRICS%NUMBER_OF_X_DIMENSIONS
                       TANGENTS(dimension_idx,xi_idx)=INTERPOLATED_POINT_METRICS%DX_DXI(dimension_idx,xi_idx)
                     ENDDO !dimension_idx
-                    TANGENTS(1:INTERPOLATED_POINT_METRICS%NUMBER_OF_X_DIMENSIONS,xi_idx)= &
-                      & NORMALISE(TANGENTS(1:INTERPOLATED_POINT_METRICS%NUMBER_OF_X_DIMENSIONS,xi_idx),ERR,ERROR)
+                    ! Normalise tangent vectors if not for contact mechanics
+                    IF(PRESENT(contact)) THEN
+                      IF(.NOT.contact) TANGENTS(1:INTERPOLATED_POINT_METRICS%NUMBER_OF_X_DIMENSIONS,xi_idx)= &
+                         & NORMALISE(TANGENTS(1:INTERPOLATED_POINT_METRICS%NUMBER_OF_X_DIMENSIONS,xi_idx),ERR,ERROR)
+                    ELSE
+                      TANGENTS(1:INTERPOLATED_POINT_METRICS%NUMBER_OF_X_DIMENSIONS,xi_idx)= &
+                        & NORMALISE(TANGENTS(1:INTERPOLATED_POINT_METRICS%NUMBER_OF_X_DIMENSIONS,xi_idx),ERR,ERROR)
+                    ENDIF
                     IF(ERR/=0) GOTO 999
                   ENDDO !xi_idx
                   CALL CROSS_PRODUCT(TANGENTS(1:INTERPOLATED_POINT_METRICS%NUMBER_OF_X_DIMENSIONS,1), &
                     & TANGENTS(1:INTERPOLATED_POINT_METRICS%NUMBER_OF_X_DIMENSIONS,2),NORMAL,ERR,ERROR,*999)
+                  NORMAL(1:INTERPOLATED_POINT_METRICS%NUMBER_OF_X_DIMENSIONS)= &
+                    & NORMALISE(NORMAL(1:INTERPOLATED_POINT_METRICS%NUMBER_OF_X_DIMENSIONS),ERR,ERROR)
                   IF(reverseNormal) NORMAL=-NORMAL
                 CASE DEFAULT
                   LOCAL_ERROR="The interpolated metrics must be for lines/faces, dimension of " &
@@ -7417,7 +7426,7 @@ CONTAINS
     INTEGER(INTG) :: NUMBER_OF_XI_DIMENSIONS,NUMBER_OF_X_DIMENSIONS
     INTEGER(INTG) :: DUMMY_ERR
     TYPE(COORDINATE_SYSTEM_TYPE), POINTER :: COORDINATE_SYSTEM
-    TYPE(VARYING_STRING) :: DUMMY_ERROR,LOCAL_ERROR
+    TYPE(VARYING_STRING) :: DUMMY_ERROR !,LOCAL_ERROR
 
     CALL ENTERS("FIELD_INTERPOLATED_POINT_METRICS_INITIALISE",ERR,ERROR,*999)
 
@@ -7452,11 +7461,13 @@ CONTAINS
           INTERPOLATED_POINT_METRICS%DXI_DX=0.0_DP
           INTERPOLATED_POINT_METRICS%JACOBIAN=0.0_DP
           INTERPOLATED_POINT_METRICS%JACOBIAN_TYPE=0
-        ELSE
-          LOCAL_ERROR="The number of coordinate dimensions ("//TRIM(NUMBER_TO_VSTRING(NUMBER_OF_X_DIMENSIONS,"*",ERR,ERROR))// &
-            & ") does not match the number of components of the interpolated point ("// &
-            & TRIM(NUMBER_TO_VSTRING(SIZE(INTERPOLATED_POINT%VALUES,1),"*",ERR,ERROR))//")."
-          CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*998)
+         !For now don't flag an error if the number of xi dimensions doesn't match the number of x dimensions.
+         !Simply do not allocate the metrics information.
+!        ELSE
+!          LOCAL_ERROR="The number of coordinate dimensions ("//TRIM(NUMBER_TO_VSTRING(NUMBER_OF_X_DIMENSIONS,"*",ERR,ERROR))// &
+!            & ") does not match the number of components of the interpolated point ("// &
+!            & TRIM(NUMBER_TO_VSTRING(SIZE(INTERPOLATED_POINT%VALUES,1),"*",ERR,ERROR))//")."
+!          CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*998)
         ENDIF
       ENDIF
     ELSE
@@ -7514,7 +7525,7 @@ CONTAINS
     INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
     TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
     !Local Variables
-    INTEGER(INTG) :: var_type_idx,DUMMY_ERR
+    INTEGER(INTG) :: variableTypeIdx,DUMMY_ERR
     TYPE(VARYING_STRING) :: DUMMY_ERROR
 
     CALL ENTERS("FIELD_INTERPOLATED_POINTS_METRICS_INITIALISE",ERR,ERROR,*999)
@@ -7525,16 +7536,18 @@ CONTAINS
       ELSE
         ALLOCATE(INTERPOLATED_POINTS_METRICS(FIELD_NUMBER_OF_VARIABLE_TYPES),STAT=ERR)
         IF(ERR/=0) CALL FLAG_ERROR("Could not allocate interpolated points metrics.",ERR,ERROR,*999)
-        DO var_type_idx=1,FIELD_NUMBER_OF_VARIABLE_TYPES
-          NULLIFY(INTERPOLATED_POINTS_METRICS(var_type_idx)%PTR)
-          IF(ASSOCIATED(INTERPOLATED_POINTS(var_type_idx)%PTR)) &
-            & CALL FIELD_INTERPOLATED_POINT_METRICS_INITIALISE(INTERPOLATED_POINTS(var_type_idx)%PTR, &
-            & INTERPOLATED_POINTS_METRICS(var_type_idx)%PTR,ERR,ERROR,*999)
-        ENDDO !var_type_idx
+        !Nullify all pointers first so that finalise does not fail on error condition half way through the next loop
+        DO variableTypeIdx=1,FIELD_NUMBER_OF_VARIABLE_TYPES
+          NULLIFY(INTERPOLATED_POINTS_METRICS(variableTypeIdx)%PTR)          
+        ENDDO !variableTypeIdx
+        DO variableTypeIdx=1,FIELD_NUMBER_OF_VARIABLE_TYPES
+          IF(ASSOCIATED(INTERPOLATED_POINTS(variableTypeIdx)%PTR)) &
+            & CALL FIELD_INTERPOLATED_POINT_METRICS_INITIALISE(INTERPOLATED_POINTS(variableTypeIdx)%PTR, &
+            & INTERPOLATED_POINTS_METRICS(variableTypeIdx)%PTR,ERR,ERROR,*999)
+        ENDDO !variableTypeIdx
       ENDIF
     ELSE
       CALL FLAG_ERROR("Interpolation points is not associated.",ERR,ERROR,*998)
-
     ENDIF
 
     CALL EXITS("FIELD_INTERPOLATED_POINTS_METRICS_INITIALISE")
@@ -12798,9 +12811,14 @@ CONTAINS
                     CALL DISTRIBUTED_VECTOR_COPY(FIELD_FROM_PARAMETER_SET%PARAMETERS,FIELD_TO_PARAMETER_SET%PARAMETERS, &
                       & ALPHA,ERR,ERROR,*999)
                   ELSE
-                    LOCAL_ERROR="The field to set type of "//TRIM(NUMBER_TO_VSTRING(FIELD_TO_SET_TYPE,"*",ERR,ERROR))// &
-                      & " has not been created on field number "//TRIM(NUMBER_TO_VSTRING(FIELD%USER_NUMBER,"*",ERR,ERROR))//"."
-                    CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
+                    ! CHECK what needs to be done here: LagrangeMultipliersField does not have SET_TYPE==PREVIOUS_VALUES
+                    IF(ASSOCIATED(FIELD%INTERFACE)) THEN
+                      !OK if LagrangeMultipliersField?
+                    ELSE
+                      LOCAL_ERROR="The field to set type of "//TRIM(NUMBER_TO_VSTRING(FIELD_TO_SET_TYPE,"*",ERR,ERROR))// &
+                        & " has not been created on field number "//TRIM(NUMBER_TO_VSTRING(FIELD%USER_NUMBER,"*",ERR,ERROR))//"."
+                      CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
+                    ENDIF
                   ENDIF
                 ELSE
                   LOCAL_ERROR="The field to set type of "//TRIM(NUMBER_TO_VSTRING(FIELD_TO_SET_TYPE,"*",ERR,ERROR))// &
