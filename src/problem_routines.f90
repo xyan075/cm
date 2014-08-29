@@ -2987,8 +2987,8 @@ CONTAINS
                     
                     !Only interpolate for the first field component and when face number changes
 !                    IF((fieldComponent==1) .AND. (decompositionFaceNumber/=previousFaceNo)) THEN
-!                      CALL FIELD_INTERPOLATION_PARAMETERS_SCALE_FACTORS_FACE_GET(decompositionFaceNumber, &
-!                        & equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)
+                      CALL FIELD_INTERPOLATION_PARAMETERS_SCALE_FACTORS_FACE_GET(decompositionFaceNumber, &
+                        & equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)
 !                      previousFaceNo=decompositionFaceNumber
 !                    ENDIF
                     !\todo: connectedFace is the local face no the global face, need to check if face is on the current domain?
@@ -3014,8 +3014,6 @@ CONTAINS
 !                        elemParameterNo=domainFace%BASIS%ELEMENT_PARAMETER_INDEX(faceDerivative,localFaceNodeIdx)
                         elemParameterNo=dependentBasis%ELEMENT_PARAMETER_INDEX(derivative,faceLocalElemNode)
                         !Multiply the contribution by scale factor
-                        CALL FIELD_INTERPOLATION_PARAMETERS_SCALE_FACTORS_ELEM_GET(elementNum, &
-                          & equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)
                         residualValue=residualValue*equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)% &
                           & PTR%SCALE_FACTORS(elemParameterNo,fieldComponent)
                         IF(perburbation) THEN
