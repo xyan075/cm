@@ -218,7 +218,7 @@ CONTAINS
       SELECT CASE(equationsType)
       CASE(EQUATIONS_SET_NO_TYPE)
         SELECT CASE(equationsType)
-        CASE(EQUATIONS_SET_NO_SUBTYPE)
+        CASE(EQUATIONS_SET_NO_SUBTYPE,EQUATIONS_SET_ISOTROPIC_EXPONENTIAL_SUBTYPE)
           equationsSet%CLASS=EQUATIONS_SET_RIGID_BODY_CLASS
           equationsSet%TYPE=equationsType
           equationsSet%SUBTYPE=equationsSubtype
@@ -672,11 +672,11 @@ CONTAINS
               
               !---------------------------------------------------------------------------------------------------------------------
               ! Centre of mass has been shift to a node for testing purpose, will need to be removed or done properly
-!              userNodeNumber=1107
-!              DO componentIdx=1,noGeoComp
-!                CALL FIELD_PARAMETER_SET_GET_NODE(geometricField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE,1,1, &
-!                  & userNodeNumber,componentIdx,centreOfMass(componentIdx),ERR,ERROR,*999)
-!              ENDDO !componentIdx
+              userNodeNumber=1107
+              DO componentIdx=1,noGeoComp
+                CALL FIELD_PARAMETER_SET_GET_NODE(geometricField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE,1,1, &
+                  & userNodeNumber,componentIdx,centreOfMass(componentIdx),ERR,ERROR,*999)
+              ENDDO !componentIdx
 !              
 !              CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"centre of mass(1) = ",centreOfMass(1),err,error,*999)
 !              CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"centre of mass(2) = ",centreOfMass(2),err,error,*999)
