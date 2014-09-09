@@ -2169,6 +2169,8 @@ CONTAINS
                             & contactPointMetrics%contactStiffness(1)
                           ! See Jae's thesis equation 4.34
                           residualValue=-coefficient*phi*contactPointMetrics%normal(fieldComponent)*contactPointMetrics%contactForce
+                          
+                          
                           !Get the face parameter index in the element
 !                          elemParameterNo=domainFace%BASIS%ELEMENT_PARAMETER_INDEX(faceDerivative,localFaceNodeIdx)
                           elemParameterNo=dependentBasis%ELEMENT_PARAMETER_INDEX(derivative,faceLocalElemNode)
@@ -4566,8 +4568,8 @@ CONTAINS
           OPEN(UNIT=IUNIT,FILE=filenameOutput,STATUS="UNKNOWN",ACTION="WRITE",IOSTAT=ERR)
           nonlinearMatrices=>solverMapping%EQUATIONS_SETS(equationsSetGlobalNumber)%PTR%EQUATIONS%EQUATIONS_MATRICES% &
             & NONLINEAR_MATRICES
-          DO dofIdx=1,nonlinearMatrices%RESIDUAL%CMISS%DATA_SIZE
-            CALL DISTRIBUTED_VECTOR_VALUES_GET(nonlinearMatrices%RESIDUAL,dofIdx,residualValue,err,error,*999)
+          DO dofIdx=1,nonlinearMatrices%contactRESIDUAL%CMISS%DATA_SIZE
+            CALL DISTRIBUTED_VECTOR_VALUES_GET(nonlinearMatrices%contactRESIDUAL,dofIdx,residualValue,err,error,*999)
             WRITE(IUNIT,'(1X,3E25.15)') residualValue
           ENDDO !dofIdx
           
@@ -5405,19 +5407,19 @@ SUBROUTINE ProblemSolver_ShellLineSearchPetsc(lineSearch,ctx,err)
   LOGICAL :: parabolaFail
   TYPE(VARYING_STRING) :: error,localError
   
-  TYPE(VARYING_STRING) :: directory
-  LOGICAL :: dirExists
-  INTEGER(INTG) :: IUNIT,j
-  CHARACTER(LEN=100) :: filenameOutput
+!  TYPE(VARYING_STRING) :: directory
+!  LOGICAL :: dirExists
+!  INTEGER(INTG) :: IUNIT,j
+!  CHARACTER(LEN=100) :: filenameOutput
 
-  directory="results_iter/"
-  INQUIRE(FILE=CHAR(directory),EXIST=dirExists)
-  IF(.NOT.dirExists) THEN
-    CALL SYSTEM(CHAR("mkdir "//directory))
-  ENDIF
-  
-  filenameOutput=directory//"linesearch.txt"
-  OPEN(UNIT=IUNIT,FILE=filenameOutput,STATUS="UNKNOWN",ACTION="WRITE",IOSTAT=ERR)
+!  directory="results_iter/"
+!  INQUIRE(FILE=CHAR(directory),EXIST=dirExists)
+!  IF(.NOT.dirExists) THEN
+!    CALL SYSTEM(CHAR("mkdir "//directory))
+!  ENDIF
+!  
+!  filenameOutput=directory//"linesearch.txt"
+!  OPEN(UNIT=IUNIT,FILE=filenameOutput,STATUS="UNKNOWN",ACTION="WRITE",IOSTAT=ERR)
 
 
   IF(ASSOCIATED(ctx)) THEN
