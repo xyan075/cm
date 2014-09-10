@@ -1358,7 +1358,7 @@ CONTAINS
                         & EQUATIONS_SET%TYPE==EQUATIONS_SET_FINITE_ELASTICITY_RIGID_BODY_TYPE) THEN
                       CALL PETSC_SNESGETITERATIONNUMBER(SOLVER%NONLINEAR_SOLVER%NEWTON_SOLVER%LINESEARCH_SOLVER%SNES, &
                         & iterationNumber,ERR,ERROR,*999)
-!                      CALL EquationsSet_JacobianRigidBodyContactUpdateStaticFEM(EQUATIONS_SET,iterationNumber,ERR,ERROR,*999)
+                      CALL EquationsSet_JacobianRigidBodyContactUpdateStaticFEM(EQUATIONS_SET,iterationNumber,ERR,ERROR,*999)
                       IF(iterationNumber>=interfaceCondition%interfaceContactMetrics%iterationGeometricTerm) THEN
                         CALL EquationsSet_JacobianRigidBodyContactPerturb(EQUATIONS_SET,ERR,ERROR,*999)
                       ENDIF
@@ -1844,6 +1844,7 @@ CONTAINS
   !
 
   !>Evaluates the Jacobian for a static equations set with rigid body contact using the finite element method
+  !> XY - this is the old Jacobian calculation (analytical/linearisation, i.e. no perturbation)
   SUBROUTINE EquationsSet_JacobianRigidBodyContactUpdateStaticFEM(equationsSet,iterationNumber,ERR,ERROR,*)
 
     !Argument variables
@@ -1874,7 +1875,7 @@ CONTAINS
       & colGlobalNode,colFaceDerivative,colDerivative,colVersion,colElemParameterNo
     INTEGER(INTG) :: defBodyIdx,rigidBodyIdx,globalDataPointNum,rigidBodyRowDofCompIdx,rigidBodyColDofCompIdx, &
       & rowIdx,colIdx,junkIdx,componentIdx,dummyCompIdx
-    REAL(DP) :: defXi(2),rigidXi(2),rigidBodyMatrix(3,3),contactPtPosition(3),forceTerm,rowDofScaleFactor,rowPhi, &
+    REAL(DP) :: defXi(3),rigidXi(3),rigidBodyMatrix(3,3),contactPtPosition(3),forceTerm,rowDofScaleFactor,rowPhi, &
       & colDofScaleFactor,colPhi,centreOfMass(3),theta(3),rigidBodyPhi(6)
     
     TYPE(VARYING_STRING) :: localError
@@ -1935,25 +1936,18 @@ CONTAINS
                 !                                         Contact subMatrix 11    
                 defElementNum=pointsConnectivity%pointsConnectivity(globalDataPointNum,defBodyIdx)%coupledMeshElementNumber
                 defConnectedFace=pointsConnectivity%pointsConnectivity(globalDataPointNum,defBodyIdx)%elementLineFaceNumber
-                defXi=pointsConnectivity%pointsConnectivity(globalDataPointNum,defBodyIdx)%reducedXi
+                defXi=pointsConnectivity%pointsConnectivity(globalDataPointNum,defBodyIdx)%xi
                 
-                rowPreviousFaceNo=0
                 DO rowFieldComp=1,3
                   rowMeshComp=defDepField%VARIABLE_TYPE_MAP(FIELD_U_VARIABLE_TYPE)%PTR% &
                     & COMPONENTS(rowFieldComp)%MESH_COMPONENT_NUMBER
+                  ! element based row dependent basis
                   rowDependentBasis=>defDepField%DECOMPOSITION%DOMAIN(rowMeshComp)%PTR% &
                     & TOPOLOGY%ELEMENTS%ELEMENTS(defElementNum)%BASIS
                   rowDecompositionFaceNumber=defDepField%DECOMPOSITION%TOPOLOGY% &
                     & ELEMENTS%ELEMENTS(defElementNum)%ELEMENT_FACES(defConnectedFace)
                   rowDomainFace=>defDepField%DECOMPOSITION%DOMAIN(rowMeshComp)%PTR%TOPOLOGY% &
                     & FACES%FACES(rowDecompositionFaceNumber)
-                  rowDomainFaceBasis=>rowDomainFace%BASIS
-                  !Only interpolate for the first field component and when face number changes
-!                  IF((rowFieldComp==1) .AND. (rowDecompositionFaceNumber/=rowPreviousFaceNo)) THEN
-!                    CALL FIELD_INTERPOLATION_PARAMETERS_SCALE_FACTORS_FACE_GET(rowDecompositionFaceNumber, &
-!                      & equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)
-!                    rowPreviousFaceNo=rowDecompositionFaceNumber
-!                  ENDIF
                   DO rowLocalFaceNodeIdx=1,rowDependentBasis%NUMBER_OF_NODES_IN_LOCAL_FACE(defConnectedFace)
                     rowFaceLocalElemNode=rowDependentBasis%NODE_NUMBERS_IN_LOCAL_FACE(rowLocalFaceNodeIdx,defConnectedFace)
                     rowGlobalNode=defDepField%DECOMPOSITION%DOMAIN(rowMeshComp)%PTR%TOPOLOGY% &
@@ -1964,11 +1958,8 @@ CONTAINS
                       rowVersion=defDepField%DECOMPOSITION%DOMAIN(rowMeshComp)%PTR%TOPOLOGY% &
                         & ELEMENTS%ELEMENTS(defElementNum)%elementVersions(rowDerivative,rowFaceLocalElemNode)
                       !Find the face parameter's element parameter index 
-!                      rowElemParameterNo=rowDomainFaceBasis%ELEMENT_PARAMETER_INDEX(rowFaceDerivative,rowLocalFaceNodeIdx)
-!                      rowDofScaleFactor=equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)% PTR% &
-!                        & SCALE_FACTORS(rowElemParameterNo,rowFieldComp)
-                      
                       rowElemParameterNo=rowDependentBasis%ELEMENT_PARAMETER_INDEX(rowDerivative,rowFaceLocalElemNode)
+                      ! Get the scale factor for the element
                       CALL FIELD_INTERPOLATION_PARAMETERS_SCALE_FACTORS_ELEM_GET(defElementNum, &
                         & equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)
                       rowDofScaleFactor=equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)% PTR% &
@@ -1978,54 +1969,36 @@ CONTAINS
                       rowIdx=defDepVariable%components(rowFieldComp)%PARAM_TO_DOF_MAP%NODE_PARAM2DOF_MAP%NODES( &
                         & rowGlobalNode)%DERIVATIVES(rowDerivative)%VERSIONS(rowVersion)
                       !Evaluate the basis at the projected/connected xi
-                      rowPhi=BASIS_EVALUATE_XI(rowDomainFaceBasis,rowDomainFaceBasis% &
-                        & ELEMENT_PARAMETER_INDEX(rowFaceDerivative,rowLocalFaceNodeIdx),NO_PART_DERIV,defXi,err,error)
+                      rowPhi=BASIS_EVALUATE_XI(rowDependentBasis,rowDependentBasis% &
+                        & ELEMENT_PARAMETER_INDEX(rowDerivative,rowFaceLocalElemNode),NO_PART_DERIV,defXi,err,error)
                       
-                      colPreviousFaceNo=0
-                      colFieldComp=rowFieldComp
                       DO colFieldComp=1,3
-                        !Find the col 
                         colMeshComp=defDepField%VARIABLE_TYPE_MAP(FIELD_U_VARIABLE_TYPE)%PTR% &
                           & COMPONENTS(colFieldComp)%MESH_COMPONENT_NUMBER
-                        colDependentBasis=>defDepField%DECOMPOSITION%DOMAIN(colMeshComp)%PTR% &
-                          & TOPOLOGY%ELEMENTS%ELEMENTS(defElementNum)%BASIS
-                        colDecompositionFaceNumber=defDepField%DECOMPOSITION%TOPOLOGY% &
-                          & ELEMENTS%ELEMENTS(defElementNum)%ELEMENT_FACES(defConnectedFace)
-                        colDomainFace=>defDepField%DECOMPOSITION%DOMAIN(colMeshComp)%PTR%TOPOLOGY% &
-                          & FACES%FACES(colDecompositionFaceNumber)
-                        colDomainFaceBasis=>colDomainFace%BASIS
-                        !Only interpolate for the first field component and when face number changes
-!                        IF((colFieldComp==1) .AND. (colDecompositionFaceNumber/=colPreviousFaceNo)) THEN
-!                          CALL FIELD_INTERPOLATION_PARAMETERS_SCALE_FACTORS_FACE_GET(colDecompositionFaceNumber, &
-!                            & equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)
-!                          colPreviousFaceNo=colDecompositionFaceNumber
-!                        ENDIF
-                        DO colLocalFaceNodeIdx=1,colDependentBasis%NUMBER_OF_NODES_IN_LOCAL_FACE(defConnectedFace)
-                          colFaceLocalElemNode=colDependentBasis%NODE_NUMBERS_IN_LOCAL_FACE(colLocalFaceNodeIdx,defConnectedFace)
+                        ! element based col dependent basis is the same as rowDependentBasis
+                        DO colLocalFaceNodeIdx=1,rowDependentBasis%NUMBER_OF_NODES_IN_LOCAL_FACE(defConnectedFace)
+                          colFaceLocalElemNode=rowDependentBasis%NODE_NUMBERS_IN_LOCAL_FACE(colLocalFaceNodeIdx,defConnectedFace)
                           colGlobalNode=defDepField%DECOMPOSITION%DOMAIN(colMeshComp)%PTR%TOPOLOGY% &
                             & ELEMENTS%ELEMENTS(defElementNum)%ELEMENT_NODES(colFaceLocalElemNode)
-                          DO colFaceDerivative=1,colDomainFace%BASIS%NUMBER_OF_DERIVATIVES(colLocalFaceNodeIdx)
-                            colDerivative=colDependentBasis% &
+                          DO colFaceDerivative=1,rowDomainFace%BASIS%NUMBER_OF_DERIVATIVES(colLocalFaceNodeIdx)
+                            colDerivative=rowDependentBasis% &
                               & DERIVATIVE_NUMBERS_IN_LOCAL_FACE(colFaceDerivative,colLocalFaceNodeIdx,defConnectedFace)
                             colVersion=defDepField%DECOMPOSITION%DOMAIN(colMeshComp)%PTR%TOPOLOGY% &
                               & ELEMENTS%ELEMENTS(defElementNum)%elementVersions(colDerivative,colFaceLocalElemNode)
                             !Find the face parameter's element parameter index 
-!                            colElemParameterNo=colDomainFaceBasis%ELEMENT_PARAMETER_INDEX(colFaceDerivative,colLocalFaceNodeIdx)
-!                            colDofScaleFactor=equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)% PTR% &
-!                              & SCALE_FACTORS(colElemParameterNo,colFieldComp)
-
-                            colElemParameterNo=colDependentBasis%ELEMENT_PARAMETER_INDEX(colDerivative,colFaceLocalElemNode)
+                            colElemParameterNo=rowDependentBasis%ELEMENT_PARAMETER_INDEX(colDerivative,colFaceLocalElemNode)
+                            ! Get the scale factor for the element
                             CALL FIELD_INTERPOLATION_PARAMETERS_SCALE_FACTORS_ELEM_GET(defElementNum, &
-                             & equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)
+                              & equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)
                             colDofScaleFactor=equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)% PTR% &
                               & SCALE_FACTORS(colElemParameterNo,colFieldComp)
-                              
+                                
                             !Find dof associated with this particular field, component, node, derivative and version.
                             colIdx=defDepVariable%components(colFieldComp)%PARAM_TO_DOF_MAP%NODE_PARAM2DOF_MAP%NODES( &
                               & colGlobalNode)%DERIVATIVES(colDerivative)%VERSIONS(colVersion)
                             !Evaluate the basis at the projected/connected xi
-                            colPhi=BASIS_EVALUATE_XI(colDomainFaceBasis,colDomainFaceBasis% &
-                              & ELEMENT_PARAMETER_INDEX(colFaceDerivative,colLocalFaceNodeIdx),NO_PART_DERIV,defXi,err,error)
+                            colPhi=BASIS_EVALUATE_XI(rowDependentBasis,rowDependentBasis% &
+                              & ELEMENT_PARAMETER_INDEX(colDerivative,colFaceLocalElemNode),NO_PART_DERIV,defXi,err,error)
                             
                             !Calculate the force term --idx 1 for frictionless, normal direction
                             forceTerm=rowPhi*contactPointMetrics%normal(rowFieldComp)* & 
@@ -2062,19 +2035,13 @@ CONTAINS
                 DO rowFieldComp=1,3
                   rowMeshComp=defDepField%VARIABLE_TYPE_MAP(FIELD_U_VARIABLE_TYPE)%PTR% &
                     & COMPONENTS(rowFieldComp)%MESH_COMPONENT_NUMBER
+                  ! element based row dependent basis
                   rowDependentBasis=>defDepField%DECOMPOSITION%DOMAIN(rowMeshComp)%PTR% &
                     & TOPOLOGY%ELEMENTS%ELEMENTS(defElementNum)%BASIS
                   rowDecompositionFaceNumber=defDepField%DECOMPOSITION%TOPOLOGY% &
                     & ELEMENTS%ELEMENTS(defElementNum)%ELEMENT_FACES(defConnectedFace)
                   rowDomainFace=>defDepField%DECOMPOSITION%DOMAIN(rowMeshComp)%PTR%TOPOLOGY% &
                     & FACES%FACES(rowDecompositionFaceNumber)
-                  rowDomainFaceBasis=>rowDomainFace%BASIS
-                  !Only interpolate for the first field component and when face number changes
-!                  IF((rowFieldComp==1) .AND. (rowDecompositionFaceNumber/=rowPreviousFaceNo)) THEN
-!                    CALL FIELD_INTERPOLATION_PARAMETERS_SCALE_FACTORS_FACE_GET(rowDecompositionFaceNumber, &
-!                      & equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)
-!                    rowPreviousFaceNo=rowDecompositionFaceNumber
-!                  ENDIF
                   DO rowLocalFaceNodeIdx=1,rowDependentBasis%NUMBER_OF_NODES_IN_LOCAL_FACE(defConnectedFace)
                     rowFaceLocalElemNode=rowDependentBasis%NODE_NUMBERS_IN_LOCAL_FACE(rowLocalFaceNodeIdx,defConnectedFace)
                     rowGlobalNode=defDepField%DECOMPOSITION%DOMAIN(rowMeshComp)%PTR%TOPOLOGY% &
@@ -2085,42 +2052,20 @@ CONTAINS
                       rowVersion=defDepField%DECOMPOSITION%DOMAIN(rowMeshComp)%PTR%TOPOLOGY% &
                         & ELEMENTS%ELEMENTS(defElementNum)%elementVersions(rowDerivative,rowFaceLocalElemNode)
                       !Find the face parameter's element parameter index 
-!                      rowElemParameterNo=rowDomainFaceBasis%ELEMENT_PARAMETER_INDEX(rowFaceDerivative,rowLocalFaceNodeIdx)
-!                      rowDofScaleFactor=equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)% PTR% &
-!                        & SCALE_FACTORS(rowElemParameterNo,rowFieldComp)
-                        
                       rowElemParameterNo=rowDependentBasis%ELEMENT_PARAMETER_INDEX(rowDerivative,rowFaceLocalElemNode)
+                      ! Get the scale factor for the element
                       CALL FIELD_INTERPOLATION_PARAMETERS_SCALE_FACTORS_ELEM_GET(defElementNum, &
                         & equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)%PTR,ERR,ERROR,*999)
                       rowDofScaleFactor=equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)% PTR% &
                         & SCALE_FACTORS(rowElemParameterNo,rowFieldComp)
-                        
+                          
                       !Find dof associated with this particular field, component, node, derivative and version.
                       rowIdx=defDepVariable%components(rowFieldComp)%PARAM_TO_DOF_MAP%NODE_PARAM2DOF_MAP%NODES( &
                         & rowGlobalNode)%DERIVATIVES(rowDerivative)%VERSIONS(rowVersion)
                       !Evaluate the basis at the projected/connected xi
-                      rowPhi=BASIS_EVALUATE_XI(rowDomainFaceBasis,rowDomainFaceBasis% &
-                        & ELEMENT_PARAMETER_INDEX(rowFaceDerivative,rowLocalFaceNodeIdx),NO_PART_DERIV,defXi,err,error)
+                      rowPhi=BASIS_EVALUATE_XI(rowDependentBasis,rowDependentBasis% &
+                        & ELEMENT_PARAMETER_INDEX(rowDerivative,rowFaceLocalElemNode),NO_PART_DERIV,defXi,err,error)
                       !\todo: generalise the offset for deformable body components, i.e. 4
-                      colFieldComp=rowFieldComp
-!                      DO colFieldComp=1,3
-!                        DO rigidBodyColDofCompIdx=1,6
-!                          colPhi=rigidBodyMatrix(colFieldComp,rigidBodyColDofCompIdx)
-!                          colIdx=defDepVariable%components(rigidBodyColDofCompIdx+4)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP 
-!                          forceTerm=coefficient*rowPhi*contactPointMetrics%normal(rowFieldComp)* & 
-!                            & colPhi*contactPointMetrics%normal(colFieldComp)*contactPointMetrics%contactStiffness(1)* &
-!                            & rowDofScaleFactor*contactPointMetrics%Jacobian*interface%DATA_POINTS% &
-!                            & DATA_POINTS(globalDataPointNum)%WEIGHTS(1)
-!                          CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,colIdx,rowIdx,forceTerm,err,error,*999)
-!                          IF (iterationNumber<contactMetrics%iterationGeometricTerm) THEN
-!                            CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,rowIdx,colIdx,forceTerm,err,error,*999)
-!                          ELSE
-!                            IF (rigidBodyColDofCompIdx<4)  &
-!                              & CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,rowIdx,colIdx,forceTerm,err,error,*999)
-!                          ENDIF
-!                        ENDDO !dofIdx
-!                      ENDDO !colFieldComp
-
                       rigidBodyPhi=0.0_DP !rigidBodyPhi=[nornal;rotationMatrix*normal]
                       DO colFieldComp=1,3
                         colIdx=defDepVariable%components(4+colFieldComp)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
