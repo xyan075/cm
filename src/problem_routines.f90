@@ -1344,7 +1344,7 @@ CONTAINS
 !                  EQUATIONS_SET%EQUATIONS%EQUATIONS_MAPPING%NONLINEAR_MAPPING%RESIDUAL_VARIABLES(1)%PTR%NUMBER_OF_COMPONENTS= &
 !                    & noComp-6
                   !Assemble the equations for linear problems
-!                  CALL EQUATIONS_SET_JACOBIAN_EVALUATE(EQUATIONS_SET,ERR,ERROR,*999)
+                  CALL EQUATIONS_SET_JACOBIAN_EVALUATE(EQUATIONS_SET,ERR,ERROR,*999)
                   !\todo: XY rigid-deformable contact, restore number of components
 !                  EQUATIONS_SET%EQUATIONS%EQUATIONS_MAPPING%NONLINEAR_MAPPING%RESIDUAL_VARIABLES(1)%PTR%NUMBER_OF_COMPONENTS=noComp
                   !\todo: XY -Modify Jacobian for contact
@@ -1915,13 +1915,13 @@ CONTAINS
                 & theta(componentIdx),err,error,*999)
             ENDDO !componentIdx
             
-            CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"centre of mass(1) = ",centreOfMass(1),err,error,*999)
-            CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"centre of mass(2) = ",centreOfMass(2),err,error,*999)
-            CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"centre of mass(3) = ",centreOfMass(3),err,error,*999)
-            
-            CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"theta(1) = ",theta(1),err,error,*999)
-            CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"theta(2) = ",theta(2),err,error,*999)
-            CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"theta(3) = ",theta(3),err,error,*999)
+!            CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"centre of mass(1) = ",centreOfMass(1),err,error,*999)
+!            CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"centre of mass(2) = ",centreOfMass(2),err,error,*999)
+!            CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"centre of mass(3) = ",centreOfMass(3),err,error,*999)
+!            
+!            CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"theta(1) = ",theta(1),err,error,*999)
+!            CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"theta(2) = ",theta(2),err,error,*999)
+!            CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"theta(3) = ",theta(3),err,error,*999)
             
             
             !Loop over each data point and find the connected element and their dofs
@@ -3043,13 +3043,13 @@ CONTAINS
                 ENDIF !inContact
               ENDDO !globalDataPointNum
               
-              CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"******************** torque ******************",ERR,ERROR,*999)
-              DO fieldComponent=1,3
-                dofIdx=residualVariable%components(7+fieldComponent)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
-                CALL DISTRIBUTED_VECTOR_VALUES_GET(nonlinearMatrices%RESIDUAL,dofIdx,residualValue,err,error,*999)
-                CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"torque = ",residualValue,err,error,*999)
-              ENDDO !fieldComponent
-              CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"**********************************************",ERR,ERROR,*999)
+!              CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"******************** torque ******************",ERR,ERROR,*999)
+!              DO fieldComponent=1,3
+!                dofIdx=residualVariable%components(7+fieldComponent)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
+!                CALL DISTRIBUTED_VECTOR_VALUES_GET(nonlinearMatrices%RESIDUAL,dofIdx,residualValue,err,error,*999)
+!                CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"torque = ",residualValue,err,error,*999)
+!              ENDDO !fieldComponent
+!              CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"**********************************************",ERR,ERROR,*999)
               !Update the residual parameter set
               residualParameterSet=>residualVariable%PARAMETER_SETS%SET_TYPE(FIELD_RESIDUAL_SET_TYPE)%PTR
               IF(ASSOCIATED(residualParameterSet)) THEN
