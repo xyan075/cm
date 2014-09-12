@@ -1339,7 +1339,7 @@ CONTAINS
                       !#############################################################################################################
                       
                       ! These terms are only required if geometric term is added to the contact stiffness matrix
-!                      IF((contactMetrics%addGeometricTerm) .AND. (contactMetrics%inContact(contactPtIdx))) THEN
+                      IF((contactMetrics%addGeometricTerm) .AND. (contactMetrics%inContact(contactPtIdx))) THEN
                         ! Store the second derivative information
                         contactPointMetrics%tangentDerivatives(1,1,:)=interpolatedPointMaster%VALUES(1:noGeoComp,PART_DERIV_S1_S1)
                         contactPointMetrics%tangentDerivatives(1,2,:)=interpolatedPointMaster%VALUES(1:noGeoComp,PART_DERIV_S1_S2)
@@ -1365,7 +1365,7 @@ CONTAINS
                           ENDDO
                         ENDDO
                         CALL INVERT(A,contactPointMetrics%inverseA,detA,ERR,ERROR,*999)
-!                      ENDIF !add geometric term
+                      ENDIF !add geometric term
                       !#############################################################################################################
                     ENDIF !orthogonally projected
                   ENDDO !contactPtIdx

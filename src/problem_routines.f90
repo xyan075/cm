@@ -1344,7 +1344,19 @@ CONTAINS
 !                  EQUATIONS_SET%EQUATIONS%EQUATIONS_MAPPING%NONLINEAR_MAPPING%RESIDUAL_VARIABLES(1)%PTR%NUMBER_OF_COMPONENTS= &
 !                    & noComp-6
                   !Assemble the equations for linear problems
+                  
+                  
+                  
+                  
+                  
                   CALL EQUATIONS_SET_JACOBIAN_EVALUATE(EQUATIONS_SET,ERR,ERROR,*999)
+                  
+                  
+                  
+                  
+                  
+                  
+                  
                   !\todo: XY rigid-deformable contact, restore number of components
 !                  EQUATIONS_SET%EQUATIONS%EQUATIONS_MAPPING%NONLINEAR_MAPPING%RESIDUAL_VARIABLES(1)%PTR%NUMBER_OF_COMPONENTS=noComp
                   !\todo: XY -Modify Jacobian for contact
@@ -1360,7 +1372,7 @@ CONTAINS
                         & iterationNumber,ERR,ERROR,*999)
                       CALL EquationsSet_JacobianRigidBodyContactUpdateStaticFEM(EQUATIONS_SET,iterationNumber,ERR,ERROR,*999)
                       IF(iterationNumber>=interfaceCondition%interfaceContactMetrics%iterationGeometricTerm) THEN
-                        CALL EquationsSet_JacobianRigidBodyContactPerturb(EQUATIONS_SET,ERR,ERROR,*999)
+!                        CALL EquationsSet_JacobianRigidBodyContactPerturb(EQUATIONS_SET,ERR,ERROR,*999)
                       ENDIF
                     ! deformable-deformable body contact
                     ELSEIF(EQUATIONS_SET%TYPE==EQUATIONS_SET_FINITE_ELASTICITY_TYPE) THEN
@@ -1875,10 +1887,26 @@ CONTAINS
       & colGlobalNode,colFaceDerivative,colDerivative,colVersion,colElemParameterNo
     INTEGER(INTG) :: defBodyIdx,rigidBodyIdx,globalDataPointNum,rigidBodyRowDofCompIdx,rigidBodyColDofCompIdx, &
       & rowIdx,colIdx,junkIdx,componentIdx,dummyCompIdx
+    INTEGER(INTG) :: xiIdxAlpha,xiIdxBeta,xiIdxGamma
     REAL(DP) :: defXi(3),rigidXi(3),rigidBodyMatrix(3,3),contactPtPosition(3),forceTerm,rowDofScaleFactor,rowPhi, &
       & colDofScaleFactor,colPhi,centreOfMass(3),theta(3),rigidBodyPhi(6)
-    
+    REAL(DP) :: kappa(2,2),TRow(2),TCol(2),NRow(2),NCol(2),DRow(2),DCol(2), &
+      & tempA,tempB,geometricTerm,matrixValue
     TYPE(VARYING_STRING) :: localError
+    
+!    TYPE(VARYING_STRING) :: directory
+!    LOGICAL :: dirExists
+!    INTEGER(INTG) :: IUNIT,i,j
+!    CHARACTER(LEN=100) :: filenameOutput
+!    
+!    directory="results_iter/"
+!    INQUIRE(FILE=CHAR(directory),EXIST=dirExists)
+!    IF(.NOT.dirExists) THEN
+!      CALL SYSTEM(CHAR("mkdir "//directory))
+!    ENDIF
+!    
+!    filenameOutput=directory//"stiffnessMatrix.exdata"
+!    OPEN(UNIT=IUNIT,FILE=filenameOutput,STATUS="UNKNOWN",ACTION="WRITE",IOSTAT=ERR)
     
     CALL ENTERS("EquationsSet_JacobianRigidBodyContactUpdateStaticFEM",ERR,ERROR,*999)
 
@@ -1932,6 +1960,36 @@ CONTAINS
                 defBodyIdx=1
                 rigidBodyIdx=2
                 
+                IF(contactMetrics%addGeometricTerm) THEN !Only calculate if geometric term is included
+                  !Calculate quantities that do not vary w.r.t xyz or node
+                  kappa=0.0_DP
+                  !Calculate kappa (see Jae's cm implementation)
+                  DO xiIdxAlpha=1,2
+                    DO xiIdxBeta=1,2
+                      kappa(xiIdxAlpha,xiIdxBeta)= & 
+                        & DOT_PRODUCT(contactPointMetrics%tangentDerivatives(xiIdxAlpha,xiIdxBeta,:), &
+                        & contactPointMetrics%normal(:))
+                    ENDDO !xiIdxBeta
+                  ENDDO !xiIdxAlpha
+                  
+
+!                    WRITE(IUNIT,'(''kappa:'',E25.15,'','',E25.15,'','',E25.15,'','',E25.15)') &
+!                      & kappa(1,1),kappa(1,2),kappa(2,1),kappa(2,2)
+                  
+!                      WRITE(IUNIT,'(''inverseA:'',E25.15,'','',E25.15,'','',E25.15,'','',E25.15)') &
+!                        & contactPointMetrics%inverseA(1,1),contactPointMetrics%inverseA(1,2), &
+!                        & contactPointMetrics%inverseA(2,1),contactPointMetrics%inverseA(2,2)
+
+!                      WRITE(IUNIT,'(''inverseM:'',E25.15,'','',E25.15,'','',E25.15,'','',E25.15)') &
+!                        & contactPointMetrics%contravariantMetricTensor(1,1),contactPointMetrics%contravariantMetricTensor(1,2), &
+!                        & contactPointMetrics%contravariantMetricTensor(2,1),contactPointMetrics%contravariantMetricTensor(2,2)
+
+!                      WRITE(IUNIT,'(''tangents:'',E25.15,'','',E25.15,'','',E25.15,'','',E25.15,'','',E25.15,'','',E25.15)') &
+!                        & contactPointMetrics%tangents(1,1),contactPointMetrics%tangents(1,2),contactPointMetrics%tangents(1,3), &
+!                        & contactPointMetrics%tangents(2,1),contactPointMetrics%tangents(2,2),contactPointMetrics%tangents(2,3)
+                    
+                ENDIF !addGeometricTerm
+                
                 !###########################################################################################################
                 !                                         Contact subMatrix 11    
                 defElementNum=pointsConnectivity%pointsConnectivity(globalDataPointNum,defBodyIdx)%coupledMeshElementNumber
@@ -1971,6 +2029,29 @@ CONTAINS
                       !Evaluate the basis at the projected/connected xi
                       rowPhi=BASIS_EVALUATE_XI(rowDependentBasis,rowDependentBasis% &
                         & ELEMENT_PARAMETER_INDEX(rowDerivative,rowFaceLocalElemNode),NO_PART_DERIV,defXi,err,error)
+                        
+                      !###########################################################################################################
+                      IF(contactMetrics%addGeometricTerm) THEN !Only calculate if geometric term is included
+                        !Calculate row metrics
+                        !\todo: generalise contact xi direction, at the moment assume in xi1 and xi2
+                          
+                        !NRow TRow changes at every row dof
+                        DO xiIdxAlpha=1,2
+                          NRow(xiIdxAlpha)=0.0_DP
+                          !T has scale factors in it
+                          TRow(xiIdxAlpha)=rowPhi*contactPointMetrics%tangents(xiIdxAlpha,rowFieldComp)
+                        ENDDO !xiIdxAlpha    
+                        
+                        !DRow varies at every row dof
+                        DRow=0.0_DP
+                        DO xiIdxAlpha=1,2
+                          DO xiIdxBeta=1,2
+                            DRow(xiIdxAlpha)=DRow(xiIdxAlpha)+contactPointMetrics%inverseA(xiIdxAlpha,xiIdxBeta)* &
+                              & (TRow(xiIdxBeta)+contactPointMetrics%signedGapNormal*NRow(xiIdxBeta))
+                          ENDDO !xiIdxBeta
+                        ENDDO !xiIdxAlpha   
+                      ENDIF !addGeometricTerm
+                      !###########################################################################################################
                       
                       DO colFieldComp=1,3
                         colMeshComp=defDepField%VARIABLE_TYPE_MAP(FIELD_U_VARIABLE_TYPE)%PTR% &
@@ -2002,12 +2083,72 @@ CONTAINS
                             
                             !Calculate the force term --idx 1 for frictionless, normal direction
                             forceTerm=rowPhi*contactPointMetrics%normal(rowFieldComp)* & 
-                              & colPhi*contactPointMetrics%normal(colFieldComp)*contactPointMetrics%contactStiffness(1)* &
-                              & rowDofScaleFactor*colDofScaleFactor*contactPointMetrics%Jacobian*interface%DATA_POINTS% &
-                              & DATA_POINTS(globalDataPointNum)%WEIGHTS(1)
+                              & colPhi*contactPointMetrics%normal(colFieldComp)*contactPointMetrics%contactStiffness(1)
+                              
+                            geometricTerm=0.0_DP
+                            !#####################################################################################################
+                            IF(contactMetrics%addGeometricTerm) THEN !Only calculate if geometric term is included
+                              !Calculate col metrics
+                              
+                              !NCol and TCol changes at every col dof
+                              DO xiIdxAlpha=1,2
+                                NCol(xiIdxAlpha)=0.0_DP
+                                TCol(xiIdxAlpha)=colPhi*contactPointMetrics%tangents(xiIdxAlpha,colFieldComp)
+                              ENDDO      
+                              
+                              !DCol varies at every col dof
+                              DCol=0.0_DP
+                              DO xiIdxAlpha=1,2
+                                DO xiIdxBeta=1,2
+                                  DCol(xiIdxAlpha)=DCol(xiIdxAlpha)+contactPointMetrics%inverseA(xiIdxAlpha,xiIdxBeta)* &
+                                    & (TCol(xiIdxBeta)+contactPointMetrics%signedGapNormal*NCol(xiIdxBeta))
+                                ENDDO !xiIdxBeta
+                              ENDDO !xiIdxAlpha  
+                              
+                              !****************************************************************************************************
+                              
+                              !Calculate geometric term, see Jae's thesis equation 4.40
+                              geometricTerm=0.0_DP
+                              DO xiIdxGamma=1,2
+                                DO xiIdxBeta=1,2
+                                  tempA=0.0_DP
+                                  tempB=0.0_DP
+                                  DO xiIdxAlpha=1,2
+                                    tempA=tempA+kappa(xiIdxAlpha,xiIdxGamma)*DRow(xiIdxAlpha) !For row variable
+                                    tempB=tempB+kappa(xiIdxAlpha,xiIdxBeta)*DCol(xiIdxAlpha) !For col variable
+                                  ENDDO !xiIdxGamma
+                                  geometricTerm=geometricTerm+contactPointMetrics%signedGapNormal* &
+                                    & contactPointMetrics%contravariantMetricTensor(xiIdxGamma,xiIdxBeta)* &
+                                    & (NRow(xiIdxGamma)-tempA)*(NCol(xiIdxBeta)-tempB) + &
+                                    & kappa(xiIdxBeta,xiIdxGamma)*DRow(xiIdxGamma)*DCol(xiIdxBeta)
+                                ENDDO !xiIdxBeta
+                                geometricTerm=geometricTerm-DRow(xiIdxGamma)*NCol(xiIdxGamma)-NRow(xiIdxGamma)*DCol(xiIdxGamma)
+                              ENDDO !xiIdxAlpha  
+                              
+                              geometricTerm=geometricTerm*contactPointMetrics%contactForce
+
+!                                CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"Geometric term : ",geometricTerm,ERR,ERROR,*999)
+                            ENDIF
+                            !##################################################################################################### 
+                            
+                            !Multiply by the scale factor
+                            matrixValue=(forceTerm+geometricTerm)*contactPointMetrics%Jacobian*interface%DATA_POINTS% &
+                              & DATA_POINTS(globalDataPointNum)%WEIGHTS(1)*rowDofScaleFactor*colDofScaleFactor 
                             
                             !Multiply by scale factors
-                            CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,rowIdx,colIdx,forceTerm,err,error,*999)
+                            CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,rowIdx,colIdx,matrixValue,err,error,*999)
+                            
+!                            WRITE(IUNIT,'('' GK(pt='',I4,'',v1='',I1,'',v2='',I1,'',n1='',I1, &
+!                              & '',n2='',I1,'',d1='',I1,'',d2='',I1,''):'',E25.15)') &
+!                              & globalDataPointNum,rowFieldComp,colFieldComp,rowLocalFaceNodeIdx, &
+!                              & colLocalFaceNodeIdx,rowFaceDerivative,colfaceDerivative, &
+!                              & matrixValue
+                            
+!                            WRITE(IUNIT,'('' GK(pt='',I4,'',v1='',I1,'',v2='',I1,'',n1='',I1, &
+!                              & '',n2='',I1,'',d1='',I1,'',d2='',I1,''):'',E25.15,'','',E25.15)') &
+!                              & globalDataPointNum,rowFieldComp,colFieldComp,rowLocalFaceNodeIdx, &
+!                              & colLocalFaceNodeIdx,rowFaceDerivative,colfaceDerivative, &
+!                              & DCol(1)*colDofScaleFactor,DCol(2)*colDofScaleFactor
                             
                           ENDDO !colFaceDerivative
                         ENDDO !colLocalFaceNodeIdx
@@ -2074,8 +2215,9 @@ CONTAINS
                           & contactPointMetrics%contactStiffness(1)*rowDofScaleFactor* &
                           & contactPointMetrics%Jacobian*interface%DATA_POINTS%DATA_POINTS(globalDataPointNum)%WEIGHTS(1)
                         CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,colIdx,rowIdx,forceTerm,err,error,*999)
-                        IF (iterationNumber<contactMetrics%iterationGeometricTerm)  &
-                          & CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,rowIdx,colIdx,forceTerm,err,error,*999)
+!                        IF (iterationNumber<contactMetrics%iterationGeometricTerm) THEN
+                          CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,rowIdx,colIdx,forceTerm,err,error,*999)
+!                        ENDIF
                       ENDDO !colFieldComp
                       
                       ! Moment balance
@@ -2090,8 +2232,9 @@ CONTAINS
                             & contactPointMetrics%contactStiffness(1)*rowDofScaleFactor* &
                             & contactPointMetrics%Jacobian*interface%DATA_POINTS%DATA_POINTS(globalDataPointNum)%WEIGHTS(1)
                           CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,colIdx,rowIdx,forceTerm,err,error,*999)
-                          IF (iterationNumber<contactMetrics%iterationGeometricTerm)  &
-                            & CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,rowIdx,colIdx,-forceTerm,err,error,*999)
+!                          IF (iterationNumber<contactMetrics%iterationGeometricTerm) THEN
+                            CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,rowIdx,colIdx,-forceTerm,err,error,*999)
+!                          ENDIF
                       ENDDO !colFieldComp
                     ENDDO !rowFaceDerivative
                   ENDDO !rowLocalFaceNodeIdx
@@ -2099,25 +2242,7 @@ CONTAINS
                 !###########################################################################################################
                 !                                         Contact subMatrix 22    
                 !\todo: generalise the offset for deformable body components, i.e. 4
-                IF(iterationNumber<contactMetrics%iterationGeometricTerm) THEN
-!                  DO rowFieldComp=1,3
-!                    DO rigidBodyRowDofCompIdx=1,6
-!                      rowPhi=rigidBodyMatrix(rowFieldComp,rigidBodyRowDofCompIdx)
-!                      rowIdx=defDepVariable%components(rigidBodyRowDofCompIdx+4)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP 
-!                      colFieldComp=rowFieldComp
-!                      DO colFieldComp=1,3
-!                        DO rigidBodyColDofCompIdx=1,6
-!                          colPhi=rigidBodyMatrix(colFieldComp,rigidBodyColDofCompIdx)
-!                          colIdx=defDepVariable%components(rigidBodyColDofCompIdx+4)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP 
-!                          forceTerm=coefficient*rowPhi*contactPointMetrics%normal(rowFieldComp)*colPhi* &
-!                            & contactPointMetrics%normal(colFieldComp)*contactPointMetrics%contactStiffness(1)* &
-!                            & contactPointMetrics%Jacobian*interface%DATA_POINTS%DATA_POINTS(globalDataPointNum)% &
-!                            & WEIGHTS(1)
-!                          CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,rowIdx,colIdx,forceTerm,err,error,*999)
-!                        ENDDO !rigidBodyColDofCompIdx
-!                      ENDDO !colFieldComp
-!                    ENDDO !rigidBodyRowDofCompIdx
-!                  ENDDO !rowFieldComp
+!                IF(iterationNumber<contactMetrics%iterationGeometricTerm) THEN
 
                   DO rowFieldComp=1,6
                     rowIdx=defDepVariable%components(4+rowFieldComp)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
@@ -2134,7 +2259,7 @@ CONTAINS
                       CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,rowIdx,colIdx,forceTerm,err,error,*999)
                     ENDDO !colFieldComp
                   ENDDO !rowFieldComp
-                ENDIF !iterationNumber<iterationGeometricTerm
+!                ENDIF !iterationNumber<iterationGeometricTerm
               ENDIF !inContact
             ENDDO !globalDataPointNum
             CALL DISTRIBUTED_MATRIX_UPDATE_START(jacobian,err,error,*999)
@@ -2248,7 +2373,7 @@ CONTAINS
             
 !            CALL DistributedVector_L2Norm(parameters,delta,err,error,*999)
 !            delta=(1.0_DP+delta)*1E-7_DP
-            delta=1E-9_DP
+            delta=1E-7_DP
             
 !            deformableBodyIdx=1;
 !            numberOfContactPoints=interface%DATA_POINTS%NUMBER_OF_DATA_POINTS
@@ -2996,20 +3121,6 @@ CONTAINS
                   rigidBodyMatrix(3,1)=contactPtPosition(2)
                   rigidBodyMatrix(3,2)=-contactPtPosition(1)
                   !\todo: generalise the offset for deformable body components, i.e. 4
-!                  DO fieldComponent=1,3
-!                    DO rigidBodyDofCompIdx=1,6
-!                      dofIdx=residualVariable%components(rigidBodyDofCompIdx+4)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP 
-!                      residualValue=-coefficient*rigidBodyMatrix(fieldComponent,rigidBodyDofCompIdx)* &
-!                        & contactPointMetrics%normal(fieldComponent)*contactPointMetrics%contactForce* &
-!                        & contactPointMetrics%Jacobian*interface%DATA_POINTS%DATA_POINTS(globalDataPointNum)%WEIGHTS(1)
-!                      IF(perburbation) THEN
-!                        contactMetrics%residualPerturbed(dofIdx)=contactMetrics%residualPerturbed(dofIdx)+residualValue
-!                      ELSE
-!                        contactMetrics%residualOriginal(dofIdx)=contactMetrics%residualOriginal(dofIdx)+residualValue
-!                        CALL DISTRIBUTED_VECTOR_VALUES_ADD(nonlinearMatrices%RESIDUAL,dofIdx,residualValue,err,error,*999)
-!                      ENDIF
-!                    ENDDO !dofIdx
-!                  ENDDO !fieldComponent
                   
                   ! Force balance
                   DO fieldComponent=1,3
