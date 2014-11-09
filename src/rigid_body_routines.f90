@@ -510,7 +510,114 @@ CONTAINS
         CASE(EQUATIONS_SET_SETUP_MATERIALS_TYPE)
           !Do nothing
         CASE(EQUATIONS_SET_SETUP_SOURCE_TYPE)
-          !Do nothing
+          !------------------------------------------------- source field ----------------------------------------------------
+          
+          !\todo: XY rigid-doformable contact, ATM source field stores applied body force and moment
+          SELECT CASE(equationsSetSetup%ACTION_TYPE)
+          CASE(EQUATIONS_SET_SETUP_START_ACTION)
+            IF(equationsSet%SOURCE%SOURCE_FIELD_AUTO_CREATED) THEN
+              !Create the auto created independent field
+              CALL FIELD_CREATE_START(equationsSetSetup%FIELD_USER_NUMBER,equationsSet%REGION,equationsSet%SOURCE% &
+                & SOURCE_FIELD,err,error,*999)
+              CALL FIELD_LABEL_SET(equationsSet%SOURCE%SOURCE_FIELD,"source field",err,error,*999)
+              CALL FIELD_TYPE_SET_AND_LOCK(equationsSet%SOURCE%SOURCE_FIELD,FIELD_GENERAL_TYPE,err,error,*999)
+              CALL FIELD_DEPENDENT_TYPE_SET_AND_LOCK(equationsSet%SOURCE%SOURCE_FIELD,FIELD_INDEPENDENT_TYPE, &
+                & err,error,*999)
+              CALL FIELD_MESH_DECOMPOSITION_GET(equationsSet%GEOMETRY%GEOMETRIC_FIELD,geometricDecomposition,err,error,*999)
+              CALL FIELD_MESH_DECOMPOSITION_SET_AND_LOCK(equationsSet%SOURCE%SOURCE_FIELD,geometricDecomposition, &
+                & err,error,*999)
+              CALL FIELD_GEOMETRIC_FIELD_SET_AND_LOCK(equationsSet%SOURCE%SOURCE_FIELD,equationsSet%GEOMETRY% &
+                & GEOMETRIC_FIELD,err,error,*999)
+
+              CALL FIELD_NUMBER_OF_VARIABLES_SET_AND_LOCK(equationsSet%SOURCE%SOURCE_FIELD,1,err,error,*999)
+              CALL FIELD_VARIABLE_TYPES_SET_AND_LOCK(equationsSet%SOURCE%SOURCE_FIELD,[FIELD_U_VARIABLE_TYPE], &
+                & err,error,*999)
+              CALL FIELD_VARIABLE_LABEL_SET(equationsSet%SOURCE%SOURCE_FIELD,FIELD_U_VARIABLE_TYPE,"centre of mass", &
+                & err,error,*999)
+
+              CALL FIELD_DIMENSION_SET_AND_LOCK(equationsSet%SOURCE%SOURCE_FIELD,FIELD_U_VARIABLE_TYPE, &
+                & FIELD_VECTOR_DIMENSION_TYPE,err,error,*999)
+              CALL FIELD_DATA_TYPE_SET_AND_LOCK(equationsSet%SOURCE%SOURCE_FIELD,FIELD_U_VARIABLE_TYPE, &
+                & FIELD_DP_TYPE,err,error,*999)
+              CALL FIELD_NUMBER_OF_COMPONENTS_GET(equationsSet%GEOMETRY%GEOMETRIC_FIELD,FIELD_U_VARIABLE_TYPE, &
+                & numberOfDimensions,err,error,*999)
+
+              !calculate number of components with one component for each dimension and one for pressure
+              independentFieldNumberOfComponents=6
+              CALL FIELD_NUMBER_OF_COMPONENTS_SET_AND_LOCK(equationsSet%SOURCE%SOURCE_FIELD,FIELD_U_VARIABLE_TYPE, & 
+                & independentFieldNumberOfComponents,err,error,*999)
+
+              SELECT CASE(equationsSet%SOLUTION_METHOD)
+              CASE(EQUATIONS_SET_FEM_SOLUTION_METHOD)
+                DO compIdx=1,independentFieldNumberOfComponents
+                  !\todo: XY rigid-doformable contact, ATM dependent field stores nodal parameters therefore nodal interpolation, 
+                  ! should store 6 dof of rigid body motion and constant interpolation when LHS mapping is ready
+                  CALL FIELD_COMPONENT_INTERPOLATION_SET_AND_LOCK(equationsSet%SOURCE%SOURCE_FIELD, &
+                    & FIELD_U_VARIABLE_TYPE,compIdx,FIELD_CONSTANT_INTERPOLATION,err,error,*999)
+                ENDDO !compIdx
+                CALL FIELD_SCALING_TYPE_SET(equationsSet%SOURCE%SOURCE_FIELD,FIELD_NO_SCALING,err,error,*999)
+                !Other solutions not defined yet
+              CASE(EQUATIONS_SET_BEM_SOLUTION_METHOD)
+                CALL FLAG_ERROR("Not implemented.",err,error,*999)
+              CASE(EQUATIONS_SET_FD_SOLUTION_METHOD)
+                CALL FLAG_ERROR("Not implemented.",err,error,*999)
+              CASE(EQUATIONS_SET_FV_SOLUTION_METHOD)
+                CALL FLAG_ERROR("Not implemented.",err,error,*999)
+              CASE(EQUATIONS_SET_GFEM_SOLUTION_METHOD)
+                CALL FLAG_ERROR("Not implemented.",err,error,*999)
+              CASE(EQUATIONS_SET_GFV_SOLUTION_METHOD)
+                CALL FLAG_ERROR("Not implemented.",err,error,*999)
+              CASE DEFAULT
+                localError="The solution method of "//TRIM(NUMBER_TO_VSTRING(equationsSet%SOLUTION_METHOD,"*",err,error))// &
+                  & " is invalid."
+                CALL FLAG_ERROR(localError,err,error,*999)
+              END SELECT
+            ELSE
+            !Check the user specified field
+              CALL FIELD_TYPE_CHECK(equationsSetSetup%FIELD,FIELD_GENERAL_TYPE,err,error,*999)
+              CALL FIELD_DEPENDENT_TYPE_CHECK(equationsSetSetup%FIELD,FIELD_INDEPENDENT_TYPE,err,error,*999)
+              CALL FIELD_NUMBER_OF_VARIABLES_CHECK(equationsSetSetup%FIELD,1,err,error,*999)
+              CALL FIELD_VARIABLE_TYPES_CHECK(equationsSetSetup%FIELD,[FIELD_U_VARIABLE_TYPE],err,error,*999)
+              CALL FIELD_DIMENSION_CHECK(equationsSetSetup%FIELD,FIELD_U_VARIABLE_TYPE,FIELD_VECTOR_DIMENSION_TYPE, & 
+                & err,error,*999)
+              CALL FIELD_DATA_TYPE_CHECK(equationsSetSetup%FIELD,FIELD_U_VARIABLE_TYPE,FIELD_DP_TYPE,err,error,*999)
+
+              CALL FIELD_NUMBER_OF_COMPONENTS_GET(equationsSet%GEOMETRY%GEOMETRIC_FIELD,FIELD_U_VARIABLE_TYPE, &
+                & numberOfDimensions,err,error,*999)
+
+              independentFieldNumberOfComponents=6
+              CALL FIELD_NUMBER_OF_COMPONENTS_CHECK(equationsSetSetup%FIELD,FIELD_U_VARIABLE_TYPE, & 
+                & independentFieldNumberOfComponents,err,error,*999)
+              SELECT CASE(equationsSet%SOLUTION_METHOD)
+              CASE(EQUATIONS_SET_FEM_SOLUTION_METHOD)
+                CALL FIELD_COMPONENT_INTERPOLATION_CHECK(equationsSetSetup%FIELD,FIELD_U_VARIABLE_TYPE,1, &
+                  & FIELD_CONSTANT_INTERPOLATION,err,error,*999)
+              CASE(EQUATIONS_SET_BEM_SOLUTION_METHOD)
+                CALL FLAG_ERROR("Not implemented.",err,error,*999)
+              CASE(EQUATIONS_SET_FD_SOLUTION_METHOD)
+                CALL FLAG_ERROR("Not implemented.",err,error,*999)
+              CASE(EQUATIONS_SET_FV_SOLUTION_METHOD)
+                CALL FLAG_ERROR("Not implemented.",err,error,*999)
+              CASE(EQUATIONS_SET_GFEM_SOLUTION_METHOD)
+                CALL FLAG_ERROR("Not implemented.",err,error,*999)
+              CASE(EQUATIONS_SET_GFV_SOLUTION_METHOD)
+                CALL FLAG_ERROR("Not implemented.",err,error,*999)
+              CASE DEFAULT
+                localError="The solution method of "//TRIM(NUMBER_TO_VSTRING(equationsSet%SOLUTION_METHOD,"*",err,error))// &
+                  & " is invalid."
+                CALL FLAG_ERROR(localError,err,error,*999)
+              END SELECT
+            ENDIF
+          CASE(EQUATIONS_SET_SETUP_FINISH_ACTION)
+            IF(equationsSet%SOURCE%SOURCE_FIELD_AUTO_CREATED) THEN
+              CALL FIELD_CREATE_FINISH(equationsSet%SOURCE%SOURCE_FIELD,err,error,*999)
+            ENDIF
+          CASE DEFAULT
+            localError="The action type of "//TRIM(NUMBER_TO_VSTRING(equationsSetSetup%ACTION_TYPE,"*",err,error))// &
+              & " for a setup type of "//TRIM(NUMBER_TO_VSTRING(equationsSetSetup%SETUP_TYPE,"*",err,error))// &
+              & " is invalid for a moving mesh Laplace equation"
+            CALL FLAG_ERROR(localError,err,error,*999)
+          END SELECT
         CASE(EQUATIONS_SET_SETUP_ANALYTIC_TYPE)
           !Do nothing
         CASE(EQUATIONS_SET_SETUP_EQUATIONS_TYPE)
@@ -620,7 +727,7 @@ CONTAINS
     TYPE(FIELD_INTERPOLATED_POINT_METRICS_TYPE), POINTER :: pointMetrics
     INTEGER(INTG) :: elementIdx,gaussIdx,componentIdx
     INTEGER(INTG) :: meshComponentNumber,localElementNumber,noGeoComp,userNodeNumber
-    REAL(DP) :: gaussWeight,mass,centreOfMass(3)
+    REAL(DP) :: gaussWeight,mass,centreOfMass(3),temp
     TYPE(VARYING_STRING) :: localError
     
     CALL ENTERS("RigidBody_CentreOfMassCalculate",err,error,*999)
@@ -672,8 +779,21 @@ CONTAINS
               
               !---------------------------------------------------------------------------------------------------------------------
               ! Centre of mass has been shift to a node for testing purpose, will need to be removed or done properly
-              userNodeNumber=1107
+              
               DO componentIdx=1,noGeoComp
+              ! for position between two nodes
+!                temp=0.0_DP
+!                userNodeNumber=1110
+!                CALL FIELD_PARAMETER_SET_GET_NODE(geometricField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE,1,1, &
+!                  & userNodeNumber,componentIdx,centreOfMass(componentIdx),ERR,ERROR,*999)
+!                  
+!                userNodeNumber=1112
+!                CALL FIELD_PARAMETER_SET_GET_NODE(geometricField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE,1,1, &
+!                  & userNodeNumber,componentIdx,temp,ERR,ERROR,*999)
+!                centreOfMass(componentIdx)=(centreOfMass(componentIdx)+temp)*0.5_DP
+                
+                ! for position on a node
+                userNodeNumber=1107
                 CALL FIELD_PARAMETER_SET_GET_NODE(geometricField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE,1,1, &
                   & userNodeNumber,componentIdx,centreOfMass(componentIdx),ERR,ERROR,*999)
               ENDDO !componentIdx

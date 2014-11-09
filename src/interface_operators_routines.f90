@@ -1206,32 +1206,34 @@ CONTAINS
                     ! Get the metric structure for this contact point
                     contactPointMetrics=>contactMetrics%contactPointMetrics(contactPtIdx)
                     ! Get the contact stiffness for this data point, so that it only need to access the data structure once
+                    DO normalStiffnessComp=1,3 ! Xiani hardcode for penalising flexion of head
+                      SELECT CASE(penaltyField%VARIABLE_TYPE_MAP(FIELD_U_VARIABLE_TYPE)%PTR% &
+                          & COMPONENTS(normalStiffnessComp)%INTERPOLATION_TYPE)
+                      CASE(FIELD_CONSTANT_INTERPOLATION)
+                        CALL FIELD_PARAMETER_SET_GET_CONSTANT(penaltyField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE, &
+                          & normalStiffnessComp,contactPointMetrics%contactStiffness(normalStiffnessComp),err,error,*999)
+                      CASE(FIELD_ELEMENT_BASED_INTERPOLATION)
+                        !\todo mesh 1 element no is assumed to be where contact point embed
+  !                      ContPtElementNum=pointsConnectivity%pointsConnectivity(contactPtIdx,1)%coupledMeshElementNumber
+  !                      WRITE(*,'(1X,''elem: '',I4)') ContPtElementNum
+                        ContPtElementNum=pointsConnectivity%interfaceMesh%topology(1)%ptr%datapoints%datapoints(contactPtIdx)% &
+                          & elementnumber
+                        penaltyPtDof=penaltyField%VARIABLE_TYPE_MAP(FIELD_U_VARIABLE_TYPE)%PTR%COMPONENTS(normalStiffnessComp)% &
+                          & PARAM_TO_DOF_MAP%ELEMENT_PARAM2DOF_MAP%ELEMENTS(ContPtElementNum)
+                        CALL FIELD_PARAMETER_SET_GET_LOCAL_DOF(penaltyField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE, &
+                          & penaltyPtDof,contactPointMetrics%contactStiffness(normalStiffnessComp),err,error,*999)
+                      CASE(FIELD_DATA_POINT_BASED_INTERPOLATION)
+                        ! \todo: 1 is for the frictionless contact, normal contact stiffness 
+                        penaltyPtDof=penaltyField%VARIABLE_TYPE_MAP(FIELD_U_VARIABLE_TYPE)%PTR%COMPONENTS(normalStiffnessComp)% &
+                          & PARAM_TO_DOF_MAP%DATA_POINT_PARAM2DOF_MAP%DATA_POINTS(contactPtIdx)
+                        CALL FIELD_PARAMETER_SET_GET_LOCAL_DOF(penaltyField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE, &
+                          & penaltyPtDof,contactPointMetrics%contactStiffness(normalStiffnessComp),err,error,*999)
+                      CASE DEFAULT
+                        CALL FLAG_ERROR("Interface penalty field can only be constant, element based or data point based.", &
+                          & err,error,*999)
+                      END SELECT
+                    ENDDO
                     normalStiffnessComp=1
-                    SELECT CASE(penaltyField%VARIABLE_TYPE_MAP(FIELD_U_VARIABLE_TYPE)%PTR% &
-                        & COMPONENTS(normalStiffnessComp)%INTERPOLATION_TYPE)
-                    CASE(FIELD_CONSTANT_INTERPOLATION)
-                      CALL FIELD_PARAMETER_SET_GET_CONSTANT(penaltyField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE, &
-                        & normalStiffnessComp,contactPointMetrics%contactStiffness(normalStiffnessComp),err,error,*999)
-                    CASE(FIELD_ELEMENT_BASED_INTERPOLATION)
-                      !\todo mesh 1 element no is assumed to be where contact point embed
-!                      ContPtElementNum=pointsConnectivity%pointsConnectivity(contactPtIdx,1)%coupledMeshElementNumber
-!                      WRITE(*,'(1X,''elem: '',I4)') ContPtElementNum
-                      ContPtElementNum=pointsConnectivity%interfaceMesh%topology(1)%ptr%datapoints%datapoints(contactPtIdx)% &
-                        & elementnumber
-                      penaltyPtDof=penaltyField%VARIABLE_TYPE_MAP(FIELD_U_VARIABLE_TYPE)%PTR%COMPONENTS(normalStiffnessComp)% &
-                        & PARAM_TO_DOF_MAP%ELEMENT_PARAM2DOF_MAP%ELEMENTS(ContPtElementNum)
-                      CALL FIELD_PARAMETER_SET_GET_LOCAL_DOF(penaltyField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE, &
-                        & penaltyPtDof,contactPointMetrics%contactStiffness(normalStiffnessComp),err,error,*999)
-                    CASE(FIELD_DATA_POINT_BASED_INTERPOLATION)
-                      ! \todo: 1 is for the frictionless contact, normal contact stiffness 
-                      penaltyPtDof=penaltyField%VARIABLE_TYPE_MAP(FIELD_U_VARIABLE_TYPE)%PTR%COMPONENTS(normalStiffnessComp)% &
-                        & PARAM_TO_DOF_MAP%DATA_POINT_PARAM2DOF_MAP%DATA_POINTS(contactPtIdx)
-                      CALL FIELD_PARAMETER_SET_GET_LOCAL_DOF(penaltyField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE, &
-                        & penaltyPtDof,contactPointMetrics%contactStiffness(normalStiffnessComp),err,error,*999)
-                    CASE DEFAULT
-                      CALL FLAG_ERROR("Interface penalty field can only be constant, element based or data point based.", &
-                        & err,error,*999)
-                    END SELECT
                     
                     ! Determine if a contact point has been orthogonally projected for this Newton step
                     

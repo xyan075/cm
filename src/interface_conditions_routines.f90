@@ -1779,10 +1779,13 @@ CONTAINS
                 IF(INTERFACE_CONDITION%OPERATOR==INTERFACE_CONDITION_FLS_CONTACT_OPERATOR .OR. &
                     & INTERFACE_CONDITION%OPERATOR==INTERFACE_CONDITION_FLS_CONTACT_REPROJECT_OPERATOR) THEN
                   !Default 1 component for the contact lagrange variable in a frictionless contact problem
+                  ! component number 2 and 3 are for Xiani's childbirth model- penalising flexion of the fetal head
                   CALL FIELD_NUMBER_OF_COMPONENTS_SET(INTERFACE_CONDITION%PENALTY%PENALTY_FIELD,FIELD_U_VARIABLE_TYPE, &
-                    & 1,ERR,ERROR,*999)
+                    & 3,ERR,ERROR,*999)
+                  DO component_idx=1,3
                   CALL FIELD_COMPONENT_INTERPOLATION_SET(INTERFACE_CONDITION%PENALTY%PENALTY_FIELD, &
-                      & FIELD_U_VARIABLE_TYPE,1,FIELD_ELEMENT_BASED_INTERPOLATION,ERR,ERROR,*999)
+                      & FIELD_U_VARIABLE_TYPE,component_idx,FIELD_ELEMENT_BASED_INTERPOLATION,ERR,ERROR,*999)
+                  ENDDO 
                 ELSE
                   !Default the number of component to the first variable of the interface dependent field's number of components, 
                   CALL FIELD_NUMBER_OF_COMPONENTS_SET(INTERFACE_CONDITION%PENALTY%PENALTY_FIELD,FIELD_U_VARIABLE_TYPE, &
