@@ -509,19 +509,19 @@ MODULE FIELD_ROUTINES
   END INTERFACE !FIELD_PARAMETER_SET_UPDATE_LOCAL_NODE
 
   !>Updates the given parameter set with the given value for a particular element and gauss point of the field variable component. 
-  INTERFACE FieldParameterSetUpdateGaussPoint
-    MODULE PROCEDURE FieldParameterSetUpdateGaussPointIntg
-    MODULE PROCEDURE FieldParameterSetUpdateGaussPointSP
-    MODULE PROCEDURE FieldParameterSetUpdateGaussPointDP
-    MODULE PROCEDURE FieldParameterSetUpdateGaussPointL
-  END INTERFACE FieldParameterSetUpdateGaussPoint
+  INTERFACE Field_ParameterSetUpdateGaussPoint
+    MODULE PROCEDURE Field_ParameterSetUpdateGaussPointIntg
+    MODULE PROCEDURE Field_ParameterSetUpdateGaussPointSP
+    MODULE PROCEDURE Field_ParameterSetUpdateGaussPointDP
+    MODULE PROCEDURE Field_ParameterSetUpdateGaussPointL
+  END INTERFACE Field_ParameterSetUpdateGaussPoint
 
   !>Updates the given parameter set with the given value for a particular element and gauss point of the field variable component. 
   INTERFACE FIELD_PARAMETER_SET_UPDATE_GAUSS_POINT
-    MODULE PROCEDURE FieldParameterSetUpdateGaussPointIntg
-    MODULE PROCEDURE FieldParameterSetUpdateGaussPointSP
-    MODULE PROCEDURE FieldParameterSetUpdateGaussPointDP
-    MODULE PROCEDURE FieldParameterSetUpdateGaussPointL
+    MODULE PROCEDURE Field_ParameterSetUpdateGaussPointIntg
+    MODULE PROCEDURE Field_ParameterSetUpdateGaussPointSP
+    MODULE PROCEDURE Field_ParameterSetUpdateGaussPointDP
+    MODULE PROCEDURE Field_ParameterSetUpdateGaussPointL
   END INTERFACE FIELD_PARAMETER_SET_UPDATE_GAUSS_POINT
 
   !>Updates the given parameter set with the given value for a particular element and data point of the field variable component. TODO: sp/int/l versions
@@ -722,7 +722,7 @@ MODULE FIELD_ROUTINES
     & Field_ParameterSetNodeScaleFactorsGet,Field_ParameterSetNodeScaleFactorsSet, &
     & Field_ParameterSetNodeNumberOfScaleFactorDofsGet
 
-  PUBLIC FieldParameterSetUpdateGaussPoint,FIELD_PARAMETER_SET_UPDATE_GAUSS_POINT
+  PUBLIC Field_ParameterSetUpdateGaussPoint,FIELD_PARAMETER_SET_UPDATE_GAUSS_POINT
 
   PUBLIC FIELD_PARAMETER_SET_INTERPOLATE_SINGLE_XI, FIELD_PARAMETER_SET_INTERPOLATE_MULTIPLE_XI
 
@@ -26914,8 +26914,8 @@ CONTAINS
 
 !!\todo Should also think about quadrature schemes?
 
-  !>Updates the given parameter set with the given integer value for a particular gauss point of the field variable component.  \see CMISSFieldParameterSetUpdateGaussPoint
-  SUBROUTINE FieldParameterSetUpdateGaussPointIntg(field,variableType,fieldSetType,gaussPointNumber,userElementNumber, &
+  !>Updates the given parameter set with the given integer value for a particular gauss point of the field variable component.  \see CMISSField_ParameterSetUpdateGaussPoint
+  SUBROUTINE Field_ParameterSetUpdateGaussPointIntg(field,variableType,fieldSetType,gaussPointNumber,userElementNumber, &
     & componentNumber,value,err,error,*)
 
     !Argument variables
@@ -26937,7 +26937,7 @@ CONTAINS
     TYPE(FIELD_VARIABLE_TYPE), POINTER :: fieldVariable
     TYPE(VARYING_STRING) :: localError
 
-    CALL Enters("FieldParameterSetUpdateGaussPointDP",err,error,*999)
+    CALL Enters("Field_ParameterSetUpdateGaussPointDP",err,error,*999)
 
     IF(ASSOCIATED(field)) THEN
       IF(field%FIELD_FINISHED) THEN
@@ -27067,13 +27067,13 @@ CONTAINS
       CALL FlagError("Field is not associated.",err,error,*999)
     ENDIF
 
-    CALL Exits("FieldParameterSetUpdateGaussPointIntg")
+    CALL Exits("Field_ParameterSetUpdateGaussPointIntg")
     RETURN
-999 CALL Errors("FieldParameterSetUpdateGaussPointIntg",err,error)
-    CALL Exits("FieldParameterSetUpdateGaussPointIntg")
+999 CALL Errors("Field_ParameterSetUpdateGaussPointIntg",err,error)
+    CALL Exits("Field_ParameterSetUpdateGaussPointIntg")
     RETURN 1
     
-  END SUBROUTINE FieldParameterSetUpdateGaussPointIntg
+  END SUBROUTINE Field_ParameterSetUpdateGaussPointIntg
 
   !
   !================================================================================================================================
@@ -27081,8 +27081,8 @@ CONTAINS
 
 !!\todo Should also think about quadrature schemes?
 
-  !>Updates the given parameter set with the given single precision value for a particular gauss point of the field variable component.  \see CMISSFieldParameterSetUpdateGaussPoint
-  SUBROUTINE FieldParameterSetUpdateGaussPointSP(field,variableType,fieldSetType,gaussPointNumber,userElementNumber, &
+  !>Updates the given parameter set with the given single precision value for a particular gauss point of the field variable component.  \see CMISSField_ParameterSetUpdateGaussPoint
+  SUBROUTINE Field_ParameterSetUpdateGaussPointSP(field,variableType,fieldSetType,gaussPointNumber,userElementNumber, &
     & componentNumber,value,err,error,*)
 
     !Argument variables
@@ -27104,7 +27104,7 @@ CONTAINS
     TYPE(FIELD_VARIABLE_TYPE), POINTER :: fieldVariable
     TYPE(VARYING_STRING) :: localError
 
-    CALL Enters("FieldParameterSetUpdateGaussPointSP",err,error,*999)
+    CALL Enters("Field_ParameterSetUpdateGaussPointSP",err,error,*999)
 
     IF(ASSOCIATED(field)) THEN
       IF(field%FIELD_FINISHED) THEN
@@ -27234,13 +27234,13 @@ CONTAINS
       CALL FlagError("Field is not associated.",err,error,*999)
     ENDIF
 
-    CALL Exits("FieldParameterSetUpdateGaussPointSP")
+    CALL Exits("Field_ParameterSetUpdateGaussPointSP")
     RETURN
-999 CALL Errors("FieldParameterSetUpdateGaussPointSP",err,error)
-    CALL Exits("FieldParameterSetUpdateGaussPointSP")
+999 CALL Errors("Field_ParameterSetUpdateGaussPointSP",err,error)
+    CALL Exits("Field_ParameterSetUpdateGaussPointSP")
     RETURN 1
     
-  END SUBROUTINE FieldParameterSetUpdateGaussPointSP
+  END SUBROUTINE Field_ParameterSetUpdateGaussPointSP
 
   !
   !================================================================================================================================
@@ -27248,8 +27248,8 @@ CONTAINS
 
 !!\todo Should also think about quadrature schemes?
 
-  !>Updates the given parameter set with the given double precision value for a particular gauss point of the field variable component.  \see CMISSFieldParameterSetUpdateGaussPoint
-  SUBROUTINE FieldParameterSetUpdateGaussPointDP(field,variableType,fieldSetType,gaussPointNumber,userElementNumber, &
+  !>Updates the given parameter set with the given double precision value for a particular gauss point of the field variable component.  \see CMISSField_ParameterSetUpdateGaussPoint
+  SUBROUTINE Field_ParameterSetUpdateGaussPointDP(field,variableType,fieldSetType,gaussPointNumber,userElementNumber, &
     & componentNumber,value,err,error,*)
 
     !Argument variables
@@ -27271,7 +27271,7 @@ CONTAINS
     TYPE(FIELD_VARIABLE_TYPE), POINTER :: fieldVariable
     TYPE(VARYING_STRING) :: localError
 
-    CALL Enters("FieldParameterSetUpdateGaussPointDP",err,error,*999)
+    CALL Enters("Field_ParameterSetUpdateGaussPointDP",err,error,*999)
 
     IF(ASSOCIATED(field)) THEN
       IF(field%FIELD_FINISHED) THEN
@@ -27401,13 +27401,13 @@ CONTAINS
       CALL FlagError("Field is not associated.",err,error,*999)
     ENDIF
 
-    CALL Exits("FieldParameterSetUpdateGaussPointDP")
+    CALL Exits("Field_ParameterSetUpdateGaussPointDP")
     RETURN
-999 CALL Errors("FieldParameterSetUpdateGaussPointDP",err,error)
-    CALL Exits("FieldParameterSetUpdateGaussPointDP")
+999 CALL Errors("Field_ParameterSetUpdateGaussPointDP",err,error)
+    CALL Exits("Field_ParameterSetUpdateGaussPointDP")
     RETURN 1
     
-  END SUBROUTINE FieldParameterSetUpdateGaussPointDP
+  END SUBROUTINE Field_ParameterSetUpdateGaussPointDP
 
   !
   !================================================================================================================================
@@ -27415,8 +27415,8 @@ CONTAINS
 
 !!\todo Should also think about quadrature schemes?
 
-  !>Updates the given parameter set with the given logical value for a particular gauss point of the field variable component.  \see CMISSFieldParameterSetUpdateGaussPoint
-  SUBROUTINE FieldParameterSetUpdateGaussPointL(field,variableType,fieldSetType,gaussPointNumber,userElementNumber, &
+  !>Updates the given parameter set with the given logical value for a particular gauss point of the field variable component.  \see CMISSField_ParameterSetUpdateGaussPoint
+  SUBROUTINE Field_ParameterSetUpdateGaussPointL(field,variableType,fieldSetType,gaussPointNumber,userElementNumber, &
     & componentNumber,value,err,error,*)
 
     !Argument variables
@@ -27438,7 +27438,7 @@ CONTAINS
     TYPE(FIELD_VARIABLE_TYPE), POINTER :: fieldVariable
     TYPE(VARYING_STRING) :: localError
 
-    CALL Enters("FieldParameterSetUpdateGaussPointDP",err,error,*999)
+    CALL Enters("Field_ParameterSetUpdateGaussPointDP",err,error,*999)
 
     IF(ASSOCIATED(field)) THEN
       IF(field%FIELD_FINISHED) THEN
@@ -27568,13 +27568,13 @@ CONTAINS
       CALL FlagError("Field is not associated.",err,error,*999)
     ENDIF
 
-    CALL Exits("FieldParameterSetUpdateGaussPointL")
+    CALL Exits("Field_ParameterSetUpdateGaussPointL")
     RETURN
-999 CALL Errors("FieldParameterSetUpdateGaussPointL",err,error)
-    CALL Exits("FieldParameterSetUpdateGaussPointL")
+999 CALL Errors("Field_ParameterSetUpdateGaussPointL",err,error)
+    CALL Exits("Field_ParameterSetUpdateGaussPointL")
     RETURN 1
     
-  END SUBROUTINE FieldParameterSetUpdateGaussPointL
+  END SUBROUTINE Field_ParameterSetUpdateGaussPointL
 
   !
   !================================================================================================================================
@@ -30619,7 +30619,7 @@ CONTAINS
           INTERP_VAL = INTERP_VAL + WT * VAL
         ENDDO       
          ! store in gauss point parent field 
-        CALL FIELD_PARAMETER_SET_UPDATE_GAUSS_POINT(PARENT_FIELD,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE,E,GP,& ! TODO: var type/par set from input
+        CALL FIELD_PARAMETER_SET_UPDATE_GAUSS_POINT(PARENT_FIELD,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE,GP,E,& ! TODO: var type/par set from input
           &  PARENT_COMPONENT, INTERP_VAL,ERR,ERROR,*999) 
       ENDDO
     ENDDO
