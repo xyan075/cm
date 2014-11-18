@@ -1288,7 +1288,7 @@ CONTAINS
                       DO componentIdx=1,noGeoComp
                         !contactPtIdx is the same as global number
                         CALL Field_ParameterSetUpdateDataPoint(LagrangeField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE, &
-                          & contactPtIdx,componentIdx,dataPoints%DATA_POINTS(contactPtIdx)%position(componentIdx)- &
+                          & contactPtIdx,componentIdx,interpolatedPointMaster%VALUES(componentIdx,NO_PART_DERIV)- &
                           & centreOfMass(componentIdx),ERR,ERROR,*999) 
                       ENDDO !componentIdx
                         

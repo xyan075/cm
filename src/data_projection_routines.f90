@@ -1383,7 +1383,7 @@ CONTAINS
                         & DATA_PROJECTION_RESULTS(data_point_idx)%ELEMENT_LINE_NUMBER,DATA_PROJECTION%DATA_PROJECTION_RESULTS( &
                         & data_point_idx)%DISTANCE,DATA_PROJECTION%DATA_PROJECTION_RESULTS(data_point_idx)%XI,ERR,ERROR,*999)
                     ENDDO
-                  CASE (DATA_PROJECTION_BOUNDARY_FACES_PROJECTION_TYPE) !find closest candidate faces
+                  CASE (DATA_PROJECTION_BOUNDARY_FACES_PROJECTION_TYPE) !Newton project to closest faces, and find miminum projection
                     DO data_point_idx=1,NUMBER_OF_DATA_POINTS
                       CALL DATA_PROJECTION_NEWTON_FACES_EVALUATE(DATA_PROJECTION,INTERPOLATED_POINT,DATA_POINTS%DATA_POINTS( &
                         & data_point_idx)%position,CLOSEST_ELEMENTS(data_point_idx,:),CLOSEST_FACES(data_point_idx,:), &
@@ -1392,7 +1392,7 @@ CONTAINS
                         & DATA_PROJECTION_RESULTS(data_point_idx)%ELEMENT_FACE_NUMBER,DATA_PROJECTION%DATA_PROJECTION_RESULTS( &
                         & data_point_idx)%DISTANCE,DATA_PROJECTION%DATA_PROJECTION_RESULTS(data_point_idx)%XI,ERR,ERROR,*999)
                     ENDDO
-                  CASE (DATA_PROJECTION_ALL_ELEMENTS_PROJECTION_TYPE) !find closest candidate elements        
+                  CASE (DATA_PROJECTION_ALL_ELEMENTS_PROJECTION_TYPE) !Newton project to closest faces, and find miminum projection      
                     SELECT CASE(DATA_PROJECTION%NUMBER_OF_XI)
                       CASE (1) !1D mesh
                         DO data_point_idx=1,NUMBER_OF_DATA_POINTS
