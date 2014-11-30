@@ -144,6 +144,8 @@ MODULE DATA_PROJECTION_ROUTINES
   PUBLIC DATA_PROJECTION_RESULT_EXIT_TAG_GET
   
   PUBLIC DATA_PROJECTION_LABEL_GET,DATA_PROJECTION_LABEL_SET
+  
+  PUBLIC DataProjection_PerturbationStart
 
 CONTAINS
 
@@ -784,6 +786,8 @@ CONTAINS
             NUMBER_OF_DATA_POINTS = DATA_PROJECTION%DATA_POINTS%NUMBER_OF_DATA_POINTS
             ALLOCATE(DATA_PROJECTION%DATA_PROJECTION_RESULTS(NUMBER_OF_DATA_POINTS),STAT=ERR)
             IF(ERR/=0) CALL FLAG_ERROR("Could not allocate data projection data projection results.",ERR,ERROR,*999)
+            ALLOCATE(DATA_PROJECTION%perturbationInitialGuess(NUMBER_OF_DATA_POINTS),STAT=ERR)
+            IF(ERR/=0) CALL FLAG_ERROR("Could not allocate data projection initial guess.",ERR,ERROR,*999)
             DO data_point_idx=1,NUMBER_OF_DATA_POINTS
               DATA_PROJECTION%DATA_PROJECTION_RESULTS(data_point_idx)%USER_NUMBER=DATA_PROJECTION%DATA_POINTS%DATA_POINTS( &
                 & data_point_idx)%USER_NUMBER
@@ -797,7 +801,20 @@ CONTAINS
                 & "("//TRIM(NUMBER_TO_VSTRING (data_point_idx,"*",ERR,ERROR))//") xi.",ERR,ERROR,*999)
               DATA_PROJECTION%DATA_PROJECTION_RESULTS(data_point_idx)%XI(1:DATA_PROJECTION%NUMBER_OF_XI)= &
                 & DATA_PROJECTION%STARTING_XI(1:DATA_PROJECTION%NUMBER_OF_XI)
+                
+              ! Initialise the data projection perturbation initial guess
+              DATA_PROJECTION%perturbation=.FALSE.
+              DATA_PROJECTION%perturbationInitialGuess(data_point_idx)%userNumber=DATA_PROJECTION%DATA_POINTS%DATA_POINTS( &
+                & data_point_idx)%USER_NUMBER
+              DATA_PROJECTION%perturbationInitialGuess(data_point_idx)%elementNumber=0
+              DATA_PROJECTION%perturbationInitialGuess(data_point_idx)%elementFaceNumber=0
+              ALLOCATE(DATA_PROJECTION%perturbationInitialGuess(data_point_idx)%xi(DATA_PROJECTION%NUMBER_OF_XI),STAT=ERR)
+              IF(ERR/=0) CALL FLAG_ERROR("Could not allocate perturbation initial guess, data point no. "// &
+                & "("//TRIM(NUMBER_TO_VSTRING (data_point_idx,"*",ERR,ERROR))//") xi.",ERR,ERROR,*999)
             ENDDO !data_point_idx
+            ALLOCATE(DATA_PROJECTION%projectData(NUMBER_OF_DATA_POINTS),STAT=ERR)
+            IF(ERR/=0) CALL FLAG_ERROR("Could not allocate data point projection for perturbation.",err,error,*999)
+            DATA_PROJECTION%projectData=.TRUE.
           ELSE
             CALL FLAG_ERROR("Data projection data points have not been finished.",ERR,ERROR,*999)
           ENDIF
@@ -882,6 +899,16 @@ CONTAINS
         ENDDO !dataPointIdx
         DEALLOCATE(DATA_PROJECTION%DATA_PROJECTION_RESULTS)
       ENDIF
+      ! deallocation perturbation initial guess
+      IF(ALLOCATED(DATA_PROJECTION%perturbationInitialGuess)) THEN
+        DATA_PROJECTION%perturbationInitialGuess(dataPointIdx)%userNumber=0
+        DATA_PROJECTION%perturbationInitialGuess(dataPointIdx)%elementNumber=0
+        DATA_PROJECTION%perturbationInitialGuess(dataPointIdx)%elementFaceNumber=0
+        IF(ALLOCATED(DATA_PROJECTION%perturbationInitialGuess(dataPointIdx)%xi)) THEN
+          DEALLOCATE(DATA_PROJECTION%perturbationInitialGuess(dataPointIdx)%xi)
+        ENDIF
+      ENDIF !ALLOCATED(DATA_PROJECTION%perturbationInitialGuess)
+      IF(ALLOCATED(DATA_PROJECTION%projectData)) DEALLOCATE(DATA_PROJECTION%projectData)
       DEALLOCATE(DATA_PROJECTION)
     ELSE
       CALL FLAG_ERROR("Data projection is not associated.",ERR,ERROR,*999)
@@ -1012,7 +1039,10 @@ CONTAINS
               MY_COMPUTATIONAL_NODE=COMPUTATIONAL_NODE_NUMBER_GET(ERR,ERROR)
               NUMBER_COMPUTATIONAL_NODES=COMPUTATIONAL_ENVIRONMENT%NUMBER_COMPUTATIONAL_NODES
               BOUNDARY_PROJECTION=(DATA_PROJECTION%PROJECTION_TYPE==DATA_PROJECTION_BOUNDARY_LINES_PROJECTION_TYPE).OR.( &
-                & DATA_PROJECTION%PROJECTION_TYPE==DATA_PROJECTION_BOUNDARY_FACES_PROJECTION_TYPE)          
+                & DATA_PROJECTION%PROJECTION_TYPE==DATA_PROJECTION_BOUNDARY_FACES_PROJECTION_TYPE)      
+              IF(DATA_PROJECTION%perturbation) THEN
+                
+              ELSE
               !#####################################################################################################################
               !find elements/faces/lines inside current computational node, get the boundary faces/lines only if asked
               !the elements/faces/lines are required to perform projection of points in the current computational node
@@ -1167,6 +1197,7 @@ CONTAINS
                 CASE DEFAULT
                   CALL FLAG_ERROR("No match for data projection type found",ERR,ERROR,*999)
               END SELECT
+              ENDIF ! .NOT. perturbation 
               !#####################################################################################################################
               !Newton project data point to the list of closest elements, faces or lines
               !project the data points to each of the closest elements, use MPI if number of computational nodes is greater than 1
@@ -1384,14 +1415,28 @@ CONTAINS
                         & data_point_idx)%DISTANCE,DATA_PROJECTION%DATA_PROJECTION_RESULTS(data_point_idx)%XI,ERR,ERROR,*999)
                     ENDDO
                   CASE (DATA_PROJECTION_BOUNDARY_FACES_PROJECTION_TYPE) !Newton project to closest faces, and find miminum projection
-                    DO data_point_idx=1,NUMBER_OF_DATA_POINTS
-                      CALL DATA_PROJECTION_NEWTON_FACES_EVALUATE(DATA_PROJECTION,INTERPOLATED_POINT,DATA_POINTS%DATA_POINTS( &
-                        & data_point_idx)%position,CLOSEST_ELEMENTS(data_point_idx,:),CLOSEST_FACES(data_point_idx,:), &
-                        & DATA_PROJECTION%DATA_PROJECTION_RESULTS(data_point_idx)%EXIT_TAG,DATA_PROJECTION% &
-                        & DATA_PROJECTION_RESULTS(data_point_idx)%ELEMENT_NUMBER,DATA_PROJECTION% &
-                        & DATA_PROJECTION_RESULTS(data_point_idx)%ELEMENT_FACE_NUMBER,DATA_PROJECTION%DATA_PROJECTION_RESULTS( &
-                        & data_point_idx)%DISTANCE,DATA_PROJECTION%DATA_PROJECTION_RESULTS(data_point_idx)%XI,ERR,ERROR,*999)
-                    ENDDO
+                    IF(DATA_PROJECTION%perturbation) THEN
+                      DO data_point_idx=1,NUMBER_OF_DATA_POINTS
+                        IF(DATA_PROJECTION%projectData(data_point_idx)) THEN
+                        CALL DATA_PROJECTION_NEWTON_FACES_EVALUATE(DATA_PROJECTION,INTERPOLATED_POINT,DATA_POINTS%DATA_POINTS( &
+                          & data_point_idx)%position,[DATA_PROJECTION%perturbationInitialGuess(data_point_idx)%elementNumber], &
+                          & [DATA_PROJECTION%perturbationInitialGuess(data_point_idx)%elementFaceNumber], &
+                          & DATA_PROJECTION%DATA_PROJECTION_RESULTS(data_point_idx)%EXIT_TAG,DATA_PROJECTION% &
+                          & DATA_PROJECTION_RESULTS(data_point_idx)%ELEMENT_NUMBER,DATA_PROJECTION% &
+                          & DATA_PROJECTION_RESULTS(data_point_idx)%ELEMENT_FACE_NUMBER,DATA_PROJECTION%DATA_PROJECTION_RESULTS( &
+                          & data_point_idx)%DISTANCE,DATA_PROJECTION%DATA_PROJECTION_RESULTS(data_point_idx)%XI,ERR,ERROR,*999)
+                        ENDIF
+                      ENDDO
+                    ELSE
+                      DO data_point_idx=1,NUMBER_OF_DATA_POINTS
+                        CALL DATA_PROJECTION_NEWTON_FACES_EVALUATE(DATA_PROJECTION,INTERPOLATED_POINT,DATA_POINTS%DATA_POINTS( &
+                          & data_point_idx)%position,CLOSEST_ELEMENTS(data_point_idx,:),CLOSEST_FACES(data_point_idx,:), &
+                          & DATA_PROJECTION%DATA_PROJECTION_RESULTS(data_point_idx)%EXIT_TAG,DATA_PROJECTION% &
+                          & DATA_PROJECTION_RESULTS(data_point_idx)%ELEMENT_NUMBER,DATA_PROJECTION% &
+                          & DATA_PROJECTION_RESULTS(data_point_idx)%ELEMENT_FACE_NUMBER,DATA_PROJECTION%DATA_PROJECTION_RESULTS( &
+                          & data_point_idx)%DISTANCE,DATA_PROJECTION%DATA_PROJECTION_RESULTS(data_point_idx)%XI,ERR,ERROR,*999)
+                      ENDDO
+                    ENDIF ! DATA_PROJECTION%perturbation
                   CASE (DATA_PROJECTION_ALL_ELEMENTS_PROJECTION_TYPE) !Newton project to closest faces, and find miminum projection      
                     SELECT CASE(DATA_PROJECTION%NUMBER_OF_XI)
                       CASE (1) !1D mesh
@@ -3652,6 +3697,51 @@ CONTAINS
 
   END SUBROUTINE DATA_PROJECTION_RESULT_XI_SET
 
+  !
+  !================================================================================================================================
+  !
+  
+  SUBROUTINE DataProjection_PerturbationStart(dataProjection,err,error,*)
+    !Argument variables
+    TYPE(DATA_PROJECTION_TYPE), POINTER :: dataProjection !<A pointer to the data projection 
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: error !<The error string
+    !Local Variables
+    INTEGER(INTG) :: dataPointIdx
+    TYPE(DATA_POINTS_TYPE), POINTER :: dataPoints
+    
+    
+    CALL ENTERS("DataProjection_PerturbationStart",err,error,*999)
+    
+    IF(ASSOCIATED(dataProjection)) THEN
+      IF(dataProjection%DATA_PROJECTION_PROJECTED) THEN
+        dataPoints=>dataProjection%DATA_POINTS
+        IF(ASSOCIATED(dataPoints)) THEN !Has to be associated
+          dataProjection%perturbation=.TRUE.
+          DO dataPointIdx=1,dataPoints%NUMBER_OF_DATA_POINTS
+            dataProjection%perturbationInitialGuess(dataPointIdx)%elementNumber= &
+              & dataProjection%DATA_PROJECTION_RESULTS(dataPointIdx)%ELEMENT_NUMBER
+            dataProjection%perturbationInitialGuess(dataPointIdx)%elementFaceNumber= &
+              & dataProjection%DATA_PROJECTION_RESULTS(dataPointIdx)%ELEMENT_FACE_NUMBER
+            dataProjection%perturbationInitialGuess(dataPointIdx)%xi(:)= &
+              & dataProjection%DATA_PROJECTION_RESULTS(dataPointIdx)%XI(:)
+          ENDDO !dataPointIdx
+        ELSE
+          CALL FLAG_ERROR("Data points is not associated.",ERR,ERROR,*999)
+        ENDIF
+      ENDIF !dataProjection%DATA_PROJECTION_PROJECTED
+    ELSE
+      CALL FLAG_ERROR("Data projection is not associated.",ERR,ERROR,*999)
+    ENDIF
+    
+    CALL EXITS("DataProjection_PerturbationStart")
+    RETURN
+999 CALL ERRORS("DataProjection_PerturbationStart",err,error)
+    CALL EXITS("DataProjection_PerturbationStart")
+    RETURN 1
+
+  END SUBROUTINE DataProjection_PerturbationStart
+  
   !
   !================================================================================================================================
   !

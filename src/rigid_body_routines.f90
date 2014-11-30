@@ -793,9 +793,9 @@ CONTAINS
 !                centreOfMass(componentIdx)=(centreOfMass(componentIdx)+temp)*0.5_DP
                 
                 ! for position on a node
-                userNodeNumber=1107
-                CALL FIELD_PARAMETER_SET_GET_NODE(geometricField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE,1,1, &
-                  & userNodeNumber,componentIdx,centreOfMass(componentIdx),ERR,ERROR,*999)
+!                userNodeNumber=1107
+!                CALL FIELD_PARAMETER_SET_GET_NODE(geometricField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE,1,1, &
+!                  & userNodeNumber,componentIdx,centreOfMass(componentIdx),ERR,ERROR,*999)
               ENDDO !componentIdx
 !              
 !              CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"centre of mass(1) = ",centreOfMass(1),err,error,*999)

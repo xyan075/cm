@@ -283,6 +283,14 @@ MODULE TYPES
     INTEGER(INTG) :: EXIT_TAG !<The exit tage of the data projection. \See DATA_PROJECTION_ROUTINES. Assigned only if DATA_POINTS_PROJECTED is .TRUE. 
     REAL(DP), ALLOCATABLE :: XI(:) !<The xi coordinate of the projection. Assigned only if DATA_POINTS_PROJECTED is .TRUE.
   END TYPE DATA_PROJECTION_RESULT_TYPE
+  
+  !>Contains information about a data projection result necessary for the next perturbation.
+  TYPE DataProjectionInitialGuessType
+    INTEGER(INTG) :: userNumber !<The user number of the data point
+    INTEGER(INTG) :: elementNumber !<The element of the mesh the data point projects onto. 
+    INTEGER(INTG) :: elementFaceNumber !<The element face of the mesh the data point projects onto.
+    REAL(DP), ALLOCATABLE :: xi(:) !<The xi coordinate of the projection. 
+  END TYPE DataProjectionInitialGuessType
 
   TYPE DATA_PROJECTION_TYPE
     INTEGER(INTG) :: GLOBAL_NUMBER !<The global number of data projection. 
@@ -304,7 +312,10 @@ MODULE TYPES
     INTEGER(INTG), ALLOCATABLE :: candidateElementNumbers(:) !<candidateElementNumbers(candidateElementIdx). The user specified USER (get convert to local element number in PROJECTION_EVALUATE routines) candidate element numbers
     INTEGER(INTG), ALLOCATABLE :: localFaceLineNumbers(:) !<localFaceLineNumbers(candidateElementIdx). The user specified corresponding element face/line numbers for the candidate elements
     LOGICAL :: DATA_PROJECTION_PROJECTED !<Is .TRUE. if the data projection have been projected, .FALSE. if not.
+    LOGICAL :: perturbation !<Is .TRUE. if the data projection is for perturbation, i.e. use previous results as initial guess
     TYPE(DATA_PROJECTION_RESULT_TYPE), ALLOCATABLE :: DATA_PROJECTION_RESULTS(:)
+    TYPE(DataProjectionInitialGuessType), ALLOCATABLE :: perturbationInitialGuess(:)
+    LOGICAL, ALLOCATABLE :: projectData(:) ! project data for perturbation
   END TYPE DATA_PROJECTION_TYPE
 
   !>A buffer type to allow for an array of pointers to a DATA_PROJECTION_TYPE.
@@ -2141,6 +2152,10 @@ END TYPE GENERATED_MESH_ELLIPSOID_TYPE
     INTEGER(INTG), POINTER :: VARIABLE_MESH_INDICES(:) !<VARIABLE_MESH_INDICES(variable_idx). The mesh index of the variable_idx'th dependent variable in the interface condition.
   END TYPE INTERFACE_DEPENDENT_TYPE
   
+  TYPE rigidBodyType
+    REAL(DP) :: forces(3)
+  END TYPE rigidBodyType
+  
   !>Contains metrics information for contact points
   TYPE InterfaceContactPointMetricsType
     REAL(DP), ALLOCATABLE :: normal(:) !<normals(CoordinateIdx). Normal vector at each contact point 
@@ -2165,6 +2180,7 @@ END TYPE GENERATED_MESH_ELLIPSOID_TYPE
     INTEGER(INTG) :: iterationGeometricTerm !< the iteration number geometric term is added
     REAL(DP), ALLOCATABLE :: residualOriginal(:) !< the original residual \todo: XY rigid-body deformable contact, need to be removed when LHS mapping is in
     REAL(DP), ALLOCATABLE :: residualPerturbed(:) !< the perturbed residual\todo: XY rigid-body deformable contact, need to be removed when LHS mapping is in
+    TYPE(rigidBodyType) :: rigidBody
   END TYPE InterfaceContactMetricsType
 
   !>Contains information for the interface condition data.
@@ -2217,6 +2233,11 @@ END TYPE GENERATED_MESH_ELLIPSOID_TYPE
     TYPE(INTERFACE_ELEMENT_CONNECTIVITY_TYPE), ALLOCATABLE :: ELEMENT_CONNECTIVITY(:,:) !<ELEMENT_CONNECTIVITY(element_idx,coupled_mesh_idx) !<The mesh connectivity for a given interface mesh element
   END TYPE INTERFACE_MESH_CONNECTIVITY_TYPE
   
+  TYPE InterfaceNodeDataPointsType
+    INTEGER(INTG) :: numberOfDataPoints
+    INTEGER(INTG), ALLOCATABLE :: dataPoints(:)
+  END TYPE InterfaceNodeDataPointsType
+  
   !>Contains information on a data connectivity point 
   TYPE InterfacePointConnectivityType
     INTEGER(INTG) :: coupledMeshElementNumber !<The element number this point is connected to in the coupled mesh
@@ -2239,6 +2260,7 @@ END TYPE GENERATED_MESH_ELLIPSOID_TYPE
     TYPE(InterfacePointConnectivityType), ALLOCATABLE :: pointsConnectivity(:,:) !<pointsConnectivity(dataPointIndex,coupledMeshIdx). The points connectivity information for each data point in each coupled mesh. 
     TYPE(InterfaceCoupledElementsType), ALLOCATABLE :: coupledElements(:,:) !<coupledElements(interfaceElementIdx,coupledMeshIdx). The coupled mesh elements that are connected to each interface element.
     INTEGER(INTG), ALLOCATABLE :: maxNumberOfCoupledElements(:) !<maxNumberOfCoupledElements(coupledMeshIdx). The maximum number of coupled elements to an interface element in coupledMeshIdx'th mesh
+    TYPE(InterfaceNodeDataPointsType), ALLOCATABLE :: nodeDataPoints(:)
   END TYPE InterfacePointsConnectivityType
  
   !>Contains information for the interface data.

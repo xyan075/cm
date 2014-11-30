@@ -4341,6 +4341,11 @@ MODULE OPENCMISS
     MODULE PROCEDURE CMISSInterfacePointsConnectivity_UpdateFromProjectionINumber
     MODULE PROCEDURE CMISSInterfacePointsConnectivity_UpdateFromProjectionObj
   END INTERFACE !CMISSInterfacePointsConnectivity_UpdateFromProjection
+  
+  !> Set up reprojection data points for slave body dofs
+  INTERFACE CMISSInterfacePointsConnectivity_PerturbDataPointsCalculate
+    MODULE PROCEDURE CMISSInterfacePointsConnectivity_PerturbDataPointsCalculateObj
+  END INTERFACE !CMISSInterfacePointsConnectivity_PerturbDataPointsCalculate
 
   PUBLIC CMISSInterface_MeshAdd
 
@@ -4371,6 +4376,8 @@ MODULE OPENCMISS
   PUBLIC CMISSInterfacePointsConnectivity_ElementNumberSet,CMISSInterfacePointsConnectivity_PointXiSet
   
   PUBLIC CMISSInterfacePointsConnectivity_UpdateFromIntProjection,CMISSInterfacePointsConnectivity_UpdateFromProjection
+  
+  PUBLIC CMISSInterfacePointsConnectivity_PerturbDataPointsCalculate
 
 !!==================================================================================================================================
 !!
@@ -4531,6 +4538,11 @@ MODULE OPENCMISS
     MODULE PROCEDURE CMISSInterfaceCondition_OperatorSetNumber
     MODULE PROCEDURE CMISSInterfaceCondition_OperatorSetObj
   END INTERFACE !CMISSInterfaceCondition_OperatorSet
+  
+  !>Sets/changes rigid body external force and moment for an interface condition.
+  INTERFACE CMISSInterfaceCondition_RigidBodySet
+    MODULE PROCEDURE CMISSInterfaceCondition_RigidBodySetObj
+  END INTERFACE !CMISSInterfaceCondition_RigidBodySet
 
   !>Returns the sparsity for interface equations.
   INTERFACE CMISSInterfaceEquations_SparsityGet
@@ -4586,6 +4598,8 @@ MODULE OPENCMISS
   PUBLIC CMISSInterfaceCondition_MethodGet,CMISSInterfaceCondition_MethodSet
 
   PUBLIC CMISSInterfaceCondition_OperatorGet,CMISSInterfaceCondition_OperatorSet
+  
+  PUBLIC CMISSInterfaceCondition_RigidBodySet
 
   PUBLIC CMISSInterfaceEquations_SparsityGet,CMISSInterfaceEquations_SparsitySet
 
@@ -39160,6 +39174,36 @@ CONTAINS
     RETURN
     
   END SUBROUTINE CMISSInterfacePointsConnectivity_UpdateFromProjectionObj
+  
+  !  
+  !================================================================================================================================
+  !  
+
+  !>Update points connectivity with projection results, data projection identified by object
+  SUBROUTINE CMISSInterfacePointsConnectivity_PerturbDataPointsCalculateObj(pointsConnectivity,dependentField,dataProjection, &
+      & noPointsPerFace,err)
+  
+    !Argument variables
+    TYPE(CMISSInterfacePointsConnectivityType), INTENT(IN) :: pointsConnectivity !<A pointer to the interface points connectivity to finish creating
+    TYPE(CMISSFieldType), INTENT(IN) :: dependentField !<The dependent field for the Perturb dof.
+    TYPE(CMISSDataProjectionType), INTENT(IN) :: dataProjection !<The data projection to update points connectivity with
+    INTEGER(INTG), INTENT(IN) :: noPointsPerFace
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code.
+    !Local variables
+    
+    CALL ENTERS("CMISSInterfacePointsConnectivity_PerturbDataPointsCalculateObj",err,error,*999)
+ 
+    CALL InterfacePointsConnectivity_PerturbDataPointsCalculate(pointsConnectivity%pointsConnectivity, &
+      & dependentField%FIELD,dataProjection%DATA_PROJECTION,noPointsPerFace,err,error,*999) 
+
+    CALL EXITS("CMISSInterfacePointsConnectivity_PerturbDataPointsCalculateObj")
+    RETURN
+999 CALL ERRORS("CMISSInterfacePointsConnectivity_PerturbDataPointsCalculateObj",err,error)
+    CALL EXITS("CMISSInterfacePointsConnectivity_PerturbDataPointsCalculateObj")
+    CALL CMISS_HANDLE_ERROR(Err,error)
+    RETURN
+    
+  END SUBROUTINE CMISSInterfacePointsConnectivity_PerturbDataPointsCalculateObj
 
 !!==================================================================================================================================
 !!
@@ -40732,6 +40776,33 @@ CONTAINS
     RETURN
 
   END SUBROUTINE CMISSInterfaceCondition_OperatorSetObj
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Sets/changes the rigid body external forces and moments for an interface condition identified by an object.
+  SUBROUTINE CMISSInterfaceCondition_RigidBodySetObj(interfaceCondition,forces,err)
+
+    !Argument variables
+    TYPE(CMISSInterfaceConditionType), INTENT(IN) :: interfaceCondition !<The interface condition to set the operator for.
+    REAL(DP), INTENT(IN) :: forces(:) !<The rigid body forces
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code.
+    !Local variables
+
+    CALL ENTERS("CMISSInterfaceCondition_RigidBodySetObj",err,error,*999)
+
+    CALL InterfaceContactMetrics_RigidBodySet(interfaceCondition%INTERFACE_CONDITION,forces, &
+      & err,error,*999)
+
+    CALL EXITS("CMISSInterfaceCondition_RigidBodySetObj")
+    RETURN
+999 CALL ERRORS("CMISSInterfaceCondition_RigidBodySetObj",err,error)
+    CALL EXITS("CMISSInterfaceCondition_RigidBodySetObj")
+    CALL CMISS_HANDLE_ERROR(err,error)
+    RETURN
+
+  END SUBROUTINE CMISSInterfaceCondition_RigidBodySetObj
 
   !
   !================================================================================================================================

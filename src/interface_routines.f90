@@ -117,6 +117,8 @@ MODULE INTERFACE_ROUTINES
   
   PUBLIC InterfacePointsConnectivity_UpdateFromIntProjection,InterfacePointsConnectivity_UpdateFromProjection
   
+  PUBLIC InterfacePointsConnectivity_PerturbDataPointsCalculate
+  
 CONTAINS
 
   !
@@ -1574,6 +1576,9 @@ CONTAINS
         IF(ASSOCIATED(interfacePointsConnectivity)) THEN
           dataPoints=>interface%DATA_POINTS
           IF(ASSOCIATED(dataPoints)) THEN
+          
+            !Data reprojection and update points connectivity information with the projection results
+            dataProjection=>dataPoints%DATA_PROJECTIONS(projectionBodyIdx+1)%PTR !projectionBodyIdx+1 since the first projection is for interface
 
             !Evaluate data points positions
             dependentFieldFixed=>interfaceCondition%DEPENDENT%FIELD_VARIABLES(fixedBodyIdx)%PTR%FIELD
@@ -1585,32 +1590,35 @@ CONTAINS
                 & FIELD_GEOMETRIC_COMPONENTS_TYPE)
               interpolatedPoint=>interpolatedPoints(FIELD_U_VARIABLE_TYPE)%PTR
               DO dataPointIdx=1,dataPoints%NUMBER_OF_DATA_POINTS
-                elementNumber=interfacePointsConnectivity%pointsConnectivity(dataPointIdx,fixedBodyIdx)% &
-                  & coupledMeshElementNumber
-                connectedFace=interfacePointsConnectivity%pointsConnectivity(dataPointIdx,fixedBodyIdx)%elementLineFaceNumber
-                coupledMeshFaceLineNumber=dependentFieldFixed%DECOMPOSITION%TOPOLOGY%ELEMENTS% &
-                  & ELEMENTS(elementNumber)%ELEMENT_FACES(connectedFace)
-                CALL FIELD_INTERPOLATION_PARAMETERS_FACE_GET(FIELD_VALUES_SET_TYPE,coupledMeshFaceLineNumber, &
-                  & interpolationParameters(FIELD_U_VARIABLE_TYPE)%PTR,err,error,*999,FIELD_GEOMETRIC_COMPONENTS_TYPE)
-                CALL FIELD_INTERPOLATE_XI(NO_PART_DERIV,interfacePointsConnectivity%pointsConnectivity(dataPointIdx, &
-                  & fixedBodyIdx)%reducedXi(:),interpolatedPoint,err,error,*999,FIELD_GEOMETRIC_COMPONENTS_TYPE) !Interpolate contact data points on each surface
-                DO component=1,numberOfGeometricComponents
-                  dataPoints%DATA_POINTS(dataPointIdx)%position(component) = interpolatedPoint%VALUES(component,NO_PART_DERIV)
-                ENDDO !component
+                IF(dataProjection%projectData(dataPointIdx)) THEN
+                  elementNumber=interfacePointsConnectivity%pointsConnectivity(dataPointIdx,fixedBodyIdx)% &
+                    & coupledMeshElementNumber
+                  connectedFace=interfacePointsConnectivity%pointsConnectivity(dataPointIdx,fixedBodyIdx)%elementLineFaceNumber
+                  coupledMeshFaceLineNumber=dependentFieldFixed%DECOMPOSITION%TOPOLOGY%ELEMENTS% &
+                    & ELEMENTS(elementNumber)%ELEMENT_FACES(connectedFace)
+                  CALL FIELD_INTERPOLATION_PARAMETERS_FACE_GET(FIELD_VALUES_SET_TYPE,coupledMeshFaceLineNumber, &
+                    & interpolationParameters(FIELD_U_VARIABLE_TYPE)%PTR,err,error,*999,FIELD_GEOMETRIC_COMPONENTS_TYPE)
+                  CALL FIELD_INTERPOLATE_XI(NO_PART_DERIV,interfacePointsConnectivity%pointsConnectivity(dataPointIdx, &
+                    & fixedBodyIdx)%reducedXi(:),interpolatedPoint,err,error,*999,FIELD_GEOMETRIC_COMPONENTS_TYPE) !Interpolate contact data points on each surface
+                  DO component=1,numberOfGeometricComponents
+                    dataPoints%DATA_POINTS(dataPointIdx)%position(component) = interpolatedPoint%VALUES(component,NO_PART_DERIV)
+                  ENDDO !component
+                ENDIF
               ENDDO !dataPointIdx
             ELSE
               CALL FLAG_ERROR("Fixed dependent field is not associated.",err,error,*999)
             ENDIF
             
-            !Data reprojection and update points connectivity information with the projection results
-            dataProjection=>dataPoints%DATA_PROJECTIONS(projectionBodyIdx+1)%PTR !projectionBodyIdx+1 since the first projection is for interface
 !            CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"ProjectedBodyDataProjectionLabel",ERR,ERROR,*999)
 !            CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,dataProjection%label,ERR,ERROR,*999)
             IF(ASSOCIATED(dataProjection)) THEN
               dependentFieldProjection=>interfaceCondition%DEPENDENT%FIELD_VARIABLES(projectionBodyIdx)%PTR%FIELD
               IF(ASSOCIATED(dependentFieldProjection)) THEN
                 !Projection the data points (with know spatial positions) on the projection dependent field 
-                CALL DATA_PROJECTION_DATA_POINTS_PROJECTION_EVALUATE(dataProjection,dependentFieldProjection,err,error,*999)
+!                IF(.NOT. dataProjection%perturbation) THEN
+!                  CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"********************Reprojection******************",ERR,ERROR,*999)
+                  CALL DATA_PROJECTION_DATA_POINTS_PROJECTION_EVALUATE(dataProjection,dependentFieldProjection,err,error,*999)
+!                ENDIF
                 CALL InterfacePointsConnectivity_UpdateFromProjection(InterfacePointsConnectivity,dataProjection, &
                   & projectionBodyIdx,err,error,*999) 
               ELSE
@@ -2291,17 +2299,19 @@ CONTAINS
         IF(dataProjection%DATA_PROJECTION_FINISHED) THEN
 !          WRITE(*,*) "InterfacePointsConnectivity_UpdateFromProjection"
           DO dataPointIdx=1,SIZE(dataProjection%DATA_PROJECTION_RESULTS,1) !Update reduced xi location, projection element number and element face/line number with projection result
-            dataProjectionResult=>dataProjection%DATA_PROJECTION_RESULTS(dataPointIdx)
-            InterfacePointsConnectivity%pointsConnectivity(dataPointIdx,coupledMeshIndex)%reducedXi(:)= &
-              & dataProjectionResult%XI
-            InterfacePointsConnectivity%pointsConnectivity(dataPointIdx,coupledMeshIndex)%coupledMeshElementNumber= &
-              & dataProjectionResult%ELEMENT_NUMBER
-            IF(dataProjectionResult%ELEMENT_LINE_NUMBER/=0) THEN
-              InterfacePointsConnectivity%pointsConnectivity(dataPointIdx,coupledMeshIndex)%elementLineFaceNumber= &
-                & dataProjectionResult%ELEMENT_LINE_NUMBER
-            ELSEIF(dataProjectionResult%ELEMENT_FACE_NUMBER/=0) THEN
-              InterfacePointsConnectivity%pointsConnectivity(dataPointIdx,coupledMeshIndex)%elementLineFaceNumber= &
-                & dataProjectionResult%ELEMENT_FACE_NUMBER
+            IF(dataProjection%projectData(dataPointIdx)) THEN
+              dataProjectionResult=>dataProjection%DATA_PROJECTION_RESULTS(dataPointIdx)
+              InterfacePointsConnectivity%pointsConnectivity(dataPointIdx,coupledMeshIndex)%reducedXi(:)= &
+                & dataProjectionResult%XI
+              InterfacePointsConnectivity%pointsConnectivity(dataPointIdx,coupledMeshIndex)%coupledMeshElementNumber= &
+                & dataProjectionResult%ELEMENT_NUMBER
+              IF(dataProjectionResult%ELEMENT_LINE_NUMBER/=0) THEN
+                InterfacePointsConnectivity%pointsConnectivity(dataPointIdx,coupledMeshIndex)%elementLineFaceNumber= &
+                  & dataProjectionResult%ELEMENT_LINE_NUMBER
+              ELSEIF(dataProjectionResult%ELEMENT_FACE_NUMBER/=0) THEN
+                InterfacePointsConnectivity%pointsConnectivity(dataPointIdx,coupledMeshIndex)%elementLineFaceNumber= &
+                  & dataProjectionResult%ELEMENT_FACE_NUMBER
+              ENDIF
             ENDIF
           ENDDO
           CALL InterfacePointsConnectivity_FullXiCalculate(InterfacePointsConnectivity,coupledMeshIndex, &
@@ -2427,6 +2437,95 @@ CONTAINS
     CALL EXITS("InterfacePointsConnectivity_ReducedXiCalculate")
     RETURN 1
   END SUBROUTINE InterfacePointsConnectivity_ReducedXiCalculate
+  
+  
+  !================================================================================================================================
+  !
+  
+  !>Update points connectivity with projection results
+  SUBROUTINE InterfacePointsConnectivity_PerturbDataPointsCalculate(InterfacePointsConnectivity,dependentField, &
+      & dataProjection,noPointsPerFace,err,error,*) 
+  
+    !Argument variables
+    TYPE(InterfacePointsConnectivityType), POINTER :: InterfacePointsConnectivity !<A pointer to the interface points connectivity to finish creating
+    TYPE(FIELD_TYPE), POINTER :: dependentField
+    TYPE(DATA_PROJECTION_TYPE), POINTER :: dataProjection !<The data projection that points connectivity update with
+    INTEGER(INTG), INTENT(IN) :: noPointsPerFace
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: error !<The error string
+    !Local Variables
+    INTEGER(INTG) :: meshComp,noContactFaces,faceIdx,nodeIdx,decompositionFaceNumber, &
+      & localNodeNumber,elemIdx,elementNumber,dataPointIdx,noNodes
+    TYPE(LIST_TYPE), POINTER :: dataPointList
+    TYPE(DOMAIN_FACE_TYPE), POINTER :: domainFace
+    TYPE(DOMAIN_NODE_TYPE), POINTER :: domainNode
+    TYPE(FIELD_VARIABLE_TYPE), POINTER :: defDepVariable
+    TYPE(DecompositionElementDataPointsType), POINTER :: elementDataPoints
+    
+    CALL ENTERS("InterfacePointsConnectivity_PerturbDataPointsCalculate",err,error,*999)
+    
+    IF(ASSOCIATED(InterfacePointsConnectivity)) THEN
+      IF(ASSOCIATED(dataProjection)) THEN
+        meshComp=1
+        defDepVariable=>dependentField%VARIABLES(FIELD_U_VARIABLE_TYPE)
+        ! find the number of nodes in the slave
+        noNodes=dependentField%DECOMPOSITION%DOMAIN(1)%PTR%TOPOLOGY%NODES%NUMBER_OF_GLOBAL_NODES
+        ! Allocate memory for node data points
+        ALLOCATE(InterfacePointsConnectivity%nodeDataPoints(noNodes),STAT=ERR)
+        IF(ERR/=0) CALL FLAG_ERROR("Could not allocate structure for node data point.",err,error,*999)
+        DO nodeIdx=1,noNodes
+          InterfacePointsConnectivity%nodeDataPoints(nodeIdx)%numberOfDataPoints=0
+          IF(ALLOCATED(interfacePointsConnectivity%nodeDataPoints(nodeIdx)%dataPoints))  &
+            & DEALLOCATE(interfacePointsConnectivity%nodeDataPoints(nodeIdx)%dataPoints)
+        ENDDO
+        ! find the number of contact faces on slave
+        noContactFaces=SIZE(dataProjection%localFaceLineNumbers,1)
+        
+        DO faceIdx=1,noContactFaces
+          decompositionFaceNumber=dependentField%DECOMPOSITION%TOPOLOGY%ELEMENTS% &
+            & ELEMENTS(dataProjection%candidateElementNumbers(faceIdx))% &
+            & ELEMENT_FACES(dataProjection%localFaceLineNumbers(faceIdx))
+          domainFace=>dependentField%DECOMPOSITION%DOMAIN(meshComp)%PTR%TOPOLOGY%FACES%FACES(decompositionFaceNumber)
+          DO nodeIdx=1,domainFace%BASIS%NUMBER_OF_NODES
+            localNodeNumber=domainFace%NODES_IN_FACE(nodeIdx)
+            IF(InterfacePointsConnectivity%nodeDataPoints(localNodeNumber)%numberOfDataPoints==0) THEN
+              ! find the surrounding elements for this node
+              domainNode=>dependentField%DECOMPOSITION%DOMAIN(meshComp)%PTR%TOPOLOGY%NODES%NODES(localNodeNumber)
+              ! create list to store the data point numbers for the dof
+              NULLIFY(dataPointList)
+              CALL LIST_CREATE_START(dataPointList,err,error,*999)
+              CALL LIST_DATA_TYPE_SET(dataPointList,LIST_INTG_TYPE,err,error,*999)
+              CALL LIST_INITIAL_SIZE_SET(dataPointList,domainNode%NUMBER_OF_SURROUNDING_ELEMENTS*noPointsPerFace,err,error,*999)
+              CALL LIST_CREATE_FINISH(dataPointList,err,error,*999)
+              DO elemIdx=1,domainNode%NUMBER_OF_SURROUNDING_ELEMENTS
+                elementNumber=domainNode%SURROUNDING_ELEMENTS(elemIdx)
+                elementDataPoints=>InterfacePointsConnectivity%interfaceMesh%DECOMPOSITIONS%DECOMPOSITIONS(1)% &
+                  & PTR%TOPOLOGY%dataPoints%elementDataPoint(elementNumber)
+                DO dataPointIdx=1,elementDataPoints%numberOfProjectedData
+                  CALL LIST_ITEM_ADD(dataPointList,elementDataPoints%dataIndices(dataPointIdx)%localNumber,err,error,*999)
+                ENDDO !dataPointIdx
+              ENDDO !elemIdx
+              ! only keep the unique data numbers
+              CALL LIST_SORT(dataPointList,err,error,*999)
+              CALL LIST_DETACH_AND_DESTROY(dataPointList,InterfacePointsConnectivity%nodeDataPoints(localNodeNumber)% & 
+                & numberOfDataPoints,InterfacePointsConnectivity%nodeDataPoints(localNodeNumber)%dataPoints,ERR,ERROR,*999)
+            ENDIF !if not visited this node
+          ENDDO !nodeIdx
+        ENDDO !faceIdx
+      ELSE
+        CALL FLAG_ERROR("Data projection is not associated.",err,error,*999)
+      ENDIF
+    ELSE
+      CALL FLAG_ERROR("Interface points connectivity is not associated.",err,error,*999)
+    ENDIF
+     
+    CALL EXITS("InterfacePointsConnectivity_PerturbDataPointsCalculate")
+    RETURN
+999 CALL ERRORS("InterfacePointsConnectivity_PerturbDataPointsCalculate",err,error)
+    CALL EXITS("InterfacePointsConnectivity_PerturbDataPointsCalculate")
+    RETURN 1
+    
+  END SUBROUTINE InterfacePointsConnectivity_PerturbDataPointsCalculate
 
   !
   !================================================================================================================================
