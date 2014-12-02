@@ -1371,7 +1371,7 @@ CONTAINS
                         & iterationNumber,ERR,ERROR,*999)
                       CALL EquationsSet_JacobianRigidBodyContactUpdateStaticFEM(EQUATIONS_SET,iterationNumber,ERR,ERROR,*999)
 !                      IF(iterationNumber<=interfaceCondition%interfaceContactMetrics%iterationGeometricTerm) THEN
-                        CALL EquationsSet_JacobianRigidBodyContactPerturb(EQUATIONS_SET,iterationNumber,ERR,ERROR,*999)
+!                        CALL EquationsSet_JacobianRigidBodyContactPerturb(EQUATIONS_SET,iterationNumber,ERR,ERROR,*999)
 !                      ENDIF
                     ! deformable-deformable body contact
                     ELSEIF(EQUATIONS_SET%TYPE==EQUATIONS_SET_FINITE_ELASTICITY_TYPE) THEN
@@ -3283,7 +3283,7 @@ CONTAINS
               
               ! add body force
               dofIdx=residualVariable%components(6)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
-              residualValue=contactMetrics%rigidBody%forces(1) ! should be negative to go into +ve y
+              residualValue=contactMetrics%rigidBody%forces(2) ! should be negative to go into +ve y
               IF(perburbation) THEN
                 contactMetrics%residualPerturbed(dofIdx)=contactMetrics%residualPerturbed(dofIdx)+residualValue
               ELSE
