@@ -730,6 +730,8 @@ CONTAINS
     NULLIFY(DEPENDENT_BASIS_1)
     NULLIFY(DECOMPOSITION)
     NULLIFY(EQUATIONS_SET_FIELD_DATA)
+    
+!    CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"  ELEMENT_NUMBER = ",ELEMENT_NUMBER,ERR,ERROR,*999)
 
     IF(ASSOCIATED(EQUATIONS_SET)) THEN
       EQUATIONS=>EQUATIONS_SET%EQUATIONS
@@ -920,10 +922,21 @@ CONTAINS
             CALL FINITE_ELASTICITY_GAUSS_CAUCHY_TENSOR(EQUATIONS_SET,DEPENDENT_INTERPOLATED_POINT, &
               & MATERIALS_INTERPOLATED_POINT,DARCY_DEPENDENT_INTERPOLATED_POINT, &
               & INDEPENDENT_INTERPOLATED_POINT,CAUCHY_TENSOR,Jznu,DZDNU,ELEMENT_NUMBER,gauss_idx,ERR,ERROR,*999)
-              
-!            IF(ELEMENT_NUMBER==64) THEN
+            
+            ! XY - output deformation gradient tensor
+!            IF((ELEMENT_NUMBER==89).or.(ELEMENT_NUMBER==90)) THEN
 !              WRITE(IUNIT,'(3E25.15,/(3E25.15))') &
 !                & ((DZDNU(i,j),j=1,3),i=1,3)
+!            ENDIF
+
+            ! XY - output 2nd pk stress
+!            IF((ELEMENT_NUMBER>=88).and.(ELEMENT_NUMBER<=120)) THEN
+!              WRITE(IUNIT,'(3E25.15,/(3E25.15))') &
+!                & ((CAUCHY_TENSOR(i,j),j=1,3),i=1,3)
+!            ENDIF
+
+!            IF(ELEMENT_NUMBER==90) THEN
+!              CALL EXIT(0)
 !            ENDIF
 !            OPEN(UNIT=IUNIT)
 
@@ -948,6 +961,7 @@ CONTAINS
             
             !XY output dPhiDX
 !            IF(gauss_idx==1) THEN
+!            IF((ELEMENT_NUMBER==89).or.(ELEMENT_NUMBER==90)) THEN
 !              DO component_idx=1,64
 !                WRITE(IUNIT,'(1X,3E25.15,1X,3E25.15,1X,3E25.15)') DFDXN(component_idx,1),DFDXN(component_idx,2),&
 !                  & DFDXN(component_idx,3)
@@ -972,7 +986,14 @@ CONTAINS
             CALL MATRIX_PRODUCT(CAUCHY_TENSOR,DNUDZ,TEMP,ERR,ERROR,*999)
             
             !XY - write out Jacobian
-!            WRITE(IUNIT,'(1X,3E25.15)') GEOMETRIC_INTERPOLATED_POINT_METRICS%JACOBIAN
+!            IF(ELEMENT_NUMBER==53) THEN
+!              WRITE(IUNIT,'(1X,3E25.15)') GEOMETRIC_INTERPOLATED_POINT_METRICS%JACOBIAN*GAUSS_WEIGHT
+!            ENDIF
+
+            !XY - write out determinant of F
+!            IF(ELEMENT_NUMBER==53) THEN
+!              WRITE(IUNIT,'(1X,3E25.15)') Jznu
+!            ENDIF
                         
             DO component_idx=1,NUMBER_OF_DIMENSIONS
             
@@ -1048,6 +1069,11 @@ CONTAINS
                   NONLINEAR_MATRICES%ELEMENT_RESIDUAL%VECTOR(element_dof_idx)= &
                     & NONLINEAR_MATRICES%ELEMENT_RESIDUAL%VECTOR(element_dof_idx)+GAUSS_WEIGHT* &
                     & GEOMETRIC_INTERPOLATED_POINT_METRICS%JACOBIAN*(Jznu-1.0_DP)
+                    ! XY output hydrostatic pressure dof residual
+!                    IF(ELEMENT_NUMBER==53) THEN
+!                      WRITE(IUNIT,'(1X,3E25.15)') GAUSS_WEIGHT* &
+!                        & GEOMETRIC_INTERPOLATED_POINT_METRICS%JACOBIAN*(Jznu-1.0_DP)
+!                    ENDIF
                 ENDIF
               ENDIF
             ENDIF
@@ -2336,10 +2362,10 @@ CONTAINS
     
     
     
-    TYPE(VARYING_STRING) :: directory
-    LOGICAL :: dirExists
-    INTEGER(INTG) :: IUNIT
-    CHARACTER(LEN=100) :: filenameOutput
+!    TYPE(VARYING_STRING) :: directory
+!    LOGICAL :: dirExists
+!    INTEGER(INTG) :: IUNIT
+!    CHARACTER(LEN=100) :: filenameOutput
 
 !    directory="results_iter/"
 !    INQUIRE(FILE=CHAR(directory),EXIST=dirExists)
@@ -2376,7 +2402,9 @@ CONTAINS
 !    WRITE(IUNIT,'(3E25.15)') P
 
     CALL INVERT(AZL,AZU,I3,ERR,ERROR,*999)
-    Jznu=I3**0.5_DP
+    ! XY determinant of F, calculate directly from F, i.e. det(F) not sqrt(det(FTF))
+!    Jznu=I3**0.5_DP
+    Jznu=Determinant(DZDNU,err,error)
     E = 0.5_DP*AZL 
     DO i=1,3
       E(i,i)=E(i,i)-0.5_DP

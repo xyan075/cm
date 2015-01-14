@@ -13144,8 +13144,28 @@ CONTAINS
     TYPE(SOLVER_MATRIX_TYPE), POINTER :: SOLVER_MATRIX
     TYPE(VARYING_STRING) :: LOCAL_ERROR
     TYPE(BOUNDARY_CONDITIONS_SPARSITY_INDICES_TYPE), POINTER :: SPARSITY_INDICES
+    
+    
+!    TYPE(DISTRIBUTED_MATRIX_TYPE), POINTER :: matrix 
+!    INTEGER(INTG) :: m,n
+!    REAL(DP) :: matrixValue
+!    
+!    TYPE(VARYING_STRING) :: directory
+!    LOGICAL :: dirExists
+!    INTEGER(INTG) :: IUNIT,i,j
+!    CHARACTER(LEN=100) :: filenameOutput
+
+!    directory="results_iter/"
+!    INQUIRE(FILE=CHAR(directory),EXIST=dirExists)
+!    IF(.NOT.dirExists) THEN
+!      CALL SYSTEM(CHAR("mkdir "//directory))
+!    ENDIF
+!    
+!    filenameOutput=directory//"linesearch.txt"
+!    OPEN(UNIT=IUNIT,FILE=filenameOutput,STATUS="UNKNOWN",ACTION="WRITE",IOSTAT=ERR)
   
     CALL ENTERS("SOLVER_MATRICES_STATIC_ASSEMBLE",ERR,ERROR,*999)
+    
   
     IF(ASSOCIATED(SOLVER)) THEN
       SOLVER_EQUATIONS=>SOLVER%SOLVER_EQUATIONS
@@ -13257,6 +13277,22 @@ CONTAINS
               IF(ASSOCIATED(PREVIOUS_SOLVER_DISTRIBUTED_MATRIX)) THEN
                 CALL DISTRIBUTED_MATRIX_UPDATE_FINISH(PREVIOUS_SOLVER_DISTRIBUTED_MATRIX,ERR,ERROR,*999)
               ENDIF
+              
+              ! XY- output reduced Jacobian matrix
+!              CALL DistributedMatrix_DimensionsGet(SOLVER_DISTRIBUTED_MATRIX,m,n,err,error,*999)
+!              CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"Jacobian size 1: ",m,err,error,*999) 
+!              CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"Jacobian size 2: ",n,err,error,*999) 
+!              
+!              DO i=1,m
+!                DO j=1,n
+!                  CALL DISTRIBUTED_MATRIX_VALUES_GET(SOLVER_DISTRIBUTED_MATRIX,i,j,matrixValue,err,error,*999)
+!                  WRITE(IUNIT,'(1X,3E25.15)') matrixValue
+!                ENDDO
+!              ENDDO
+!!              
+!              
+!              CALL EXIT(0)   
+              
               IF(SOLVER%OUTPUT_TYPE>=SOLVER_TIMING_OUTPUT) THEN
                 CALL CPU_TIMER(USER_CPU,USER_TIME2,ERR,ERROR,*999)
                 CALL CPU_TIMER(SYSTEM_CPU,SYSTEM_TIME2,ERR,ERROR,*999)
@@ -13269,6 +13305,9 @@ CONTAINS
                   & ERR,ERROR,*999)
               ENDIF
             ENDIF
+            
+            
+            
             !The solver matrices have only one residual vector
             NULLIFY(SOLVER_RESIDUAL_VECTOR)
             IF(SELECTION_TYPE==SOLVER_MATRICES_ALL.OR. &

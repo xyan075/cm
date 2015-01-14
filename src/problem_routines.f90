@@ -1419,13 +1419,13 @@ CONTAINS
     REAL(DP) :: rowXi(3),colXi(2) !\todo generalise xi allocations for 1D,2D and 3D points connectivity
     REAL(DP) :: kappa(2,2),phiDeriRow(2),phiDeriCol(2),TRow(2),TCol(2),NRow(2),NCol(2),DRow(2),DCol(2)
     
-    TYPE(VARYING_STRING) :: directory
-    LOGICAL :: dirExists
-    INTEGER(INTG) :: IUNIT,i,j
-    CHARACTER(LEN=100) :: filenameOutput
-  
-    CALL ENTERS("EQUATIONS_SET_JACOBIAN_CONTACT_UPDATE_STATIC_FEM",ERR,ERROR,*999)
-    
+!    TYPE(VARYING_STRING) :: directory
+!    LOGICAL :: dirExists
+!    INTEGER(INTG) :: IUNIT,i,j
+!    CHARACTER(LEN=100) :: filenameOutput
+!  
+!    CALL ENTERS("EQUATIONS_SET_JACOBIAN_CONTACT_UPDATE_STATIC_FEM",ERR,ERROR,*999)
+!    
 !    directory="results_iter/"
 !    INQUIRE(FILE=CHAR(directory),EXIST=dirExists)
 !    IF(.NOT.dirExists) THEN
@@ -1746,6 +1746,7 @@ CONTAINS
                               CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,rowIdx,colIdx,matrixValue,err,error,*999)
                               
 !                              IF(contactMetrics%inContact(globalDataPointNum)) THEN
+!                              IF(globalDataPointNum==109) THEN
 !                                WRITE(IUNIT,'('' GK(pt='',I4,'',m='',I1,'',n='',I1,'',v1='',I1,'',v2='',I1,'',n1='',I2, &
 !                                  & '',n2='',I2,'',d1='',I1,'',d2='',I1,''):'',E25.15)') &
 !                                  & globalDataPointNum,rowBodyIdx,colBodyIdx,rowFieldComp,colFieldComp,rowLocalFaceNodeIdx, &
@@ -4568,8 +4569,8 @@ CONTAINS
           OPEN(UNIT=IUNIT,FILE=filenameOutput,STATUS="UNKNOWN",ACTION="WRITE",IOSTAT=ERR)
           nonlinearMatrices=>solverMapping%EQUATIONS_SETS(equationsSetGlobalNumber)%PTR%EQUATIONS%EQUATIONS_MATRICES% &
             & NONLINEAR_MATRICES
-          DO dofIdx=1,nonlinearMatrices%contactRESIDUAL%CMISS%DATA_SIZE
-            CALL DISTRIBUTED_VECTOR_VALUES_GET(nonlinearMatrices%contactRESIDUAL,dofIdx,residualValue,err,error,*999)
+          DO dofIdx=1,nonlinearMatrices%RESIDUAL%CMISS%DATA_SIZE
+            CALL DISTRIBUTED_VECTOR_VALUES_GET(nonlinearMatrices%RESIDUAL,dofIdx,residualValue,err,error,*999)
             WRITE(IUNIT,'(1X,3E25.15)') residualValue
           ENDDO !dofIdx
           
@@ -5329,11 +5330,11 @@ SUBROUTINE ProblemSolver_ConvergenceTestPetsc(snes,iterationNumber,xnorm,gnorm,f
               
               
               
-  !            DO i=1,SIZE(array,1)
-  !              WRITE(IUNIT,'(E25.15)') array(i)
-  !            ENDDO        
-  !            OPEN(UNIT=IUNIT)            
-  !            CALL EXIT(0)
+!              DO i=1,SIZE(farray,1)
+!                WRITE(IUNIT,'(E25.15)') farray(i)
+!              ENDDO        
+!              OPEN(UNIT=IUNIT)            
+!              CALL EXIT(0)
               IF(newtonSolver%convergenceTest%converged) THEN
                 reason=PETSC_SNES_CONVERGED_FNORM_ABS
                 newtonSolver%convergenceTest%energyFirstIter=0.0_DP
@@ -5407,6 +5408,13 @@ SUBROUTINE ProblemSolver_ShellLineSearchPetsc(lineSearch,ctx,err)
   LOGICAL :: parabolaFail
   TYPE(VARYING_STRING) :: error,localError
   
+! ----------------------  XY: for debugging only, output reduced stiffness matrix -------------------
+!  TYPE(PETSC_MAT_TYPE) :: aMatrix
+!  REAL(DP), POINTER :: aMatrixReal(:,:)
+!  REAL(DP) :: matrixValue
+!  TYPE(DISTRIBUTED_MATRIX_TYPE), POINTER :: matrix 
+!  INTEGER(INTG) :: m,n
+!  
 !  TYPE(VARYING_STRING) :: directory
 !  LOGICAL :: dirExists
 !  INTEGER(INTG) :: IUNIT,j
@@ -5452,11 +5460,48 @@ SUBROUTINE ProblemSolver_ShellLineSearchPetsc(lineSearch,ctx,err)
               ! calculating initial energy
               CALL ProblemSolver_ConvergenceTest(newtonSolver,iterationNumber,fArray,yArray,lambda,err,error,*999)
               CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"initialE ",newtonSolver%convergenceTest%energyFirstIter,err,error,*999)  
+              ! XY - output line search direction (yArray), residual (fArray)
 !              DO i=1,SIZE(yArray,1)
 !                WRITE(IUNIT,'(E25.15)') yArray(i)
 !              ENDDO
 !              OPEN(UNIT=IUNIT)
 !              CALL EXIT(0)   
+
+!----------------------  XY: for debugging only, output reduced stiffness matrix -------------------
+!              CALL PETSC_SNESGETJACOBIAN(lineSearchSolver%SNES,aMatrix,err,error,*999)
+!              CALL PETSC_MATGETARRAYF90(aMatrix,aMatrixReal,err,error,*999)
+!              CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"Jacobian size 1: ",SIZE(aMatrixReal,1),err,error,*999) 
+!              CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"Jacobian size 2: ",SIZE(aMatrixReal,2),err,error,*999) 
+!              
+!              DO i=1,SIZE(aMatrixReal,1)
+!                DO j=1,SIZE(aMatrixReal,2)
+!                  WRITE(IUNIT,'(E25.15)') aMatrixReal(i,j)
+!                ENDDO
+!              ENDDO
+              
+              
+              
+!              CALL SolverEquations_MatrixGet(nonlinearSolver%SOLVER%SOLVER_EQUATIONS,1,matrix,err,error,*999)
+!              CALL DistributedMatrix_DimensionsGet(matrix,m,n,err,error,*999)
+!              CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"Jacobian size 1: ",m,err,error,*999) 
+!              CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"Jacobian size 2: ",n,err,error,*999) 
+!              
+!              DO i=1,m
+!                DO j=1,n
+!                  CALL DISTRIBUTED_MATRIX_VALUES_GET(matrix,i,j,matrixValue,err,error,*999)
+!                  WRITE(IUNIT,'(1X,3E25.15)') matrixValue
+!                ENDDO
+!              ENDDO
+!              
+!                
+              
+              
+              
+!              CALL EXIT(0)   
+              
+              
+              
+              
             ELSE
               CALL PETSC_VECGETARRAYF90(wPetsc,xArray,err,error,*999)
               CALL PETSC_VECGETARRAYF90(gPetsc,fArray,err,error,*999)

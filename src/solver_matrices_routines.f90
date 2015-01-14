@@ -1339,6 +1339,13 @@ CONTAINS
                                     row_coupling_coefficient=SOLVER_MAPPING%EQUATIONS_SET_TO_SOLVER_MAP( &
                                       & equations_set_idx)%EQUATIONS_ROW_TO_SOLVER_ROWS_MAPS(jacobian_row_number)% &
                                       & COUPLING_COEFFICIENTS(solver_row_idx)
+                                    !XY - write out row coupling coefficient
+!                                    IF(row_coupling_coefficient/=1.0_DP) THEN
+!                                      CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"row number: ",solver_row_number, &
+!                                        & err,error,*999) 
+!                                      CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"row coeff: ",row_coupling_coefficient, &
+!                                        & err,error,*999) 
+!                                    ENDIF
                                     !Loop over the columns of the Jacobian matrix
                                     DO jacobian_column_number=1,JACOBIAN_MATRIX%NUMBER_OF_COLUMNS
                                       !Loop over the solution columns this Jacobian column is mapped to
@@ -1349,6 +1356,16 @@ CONTAINS
                                         column_coupling_coefficient=JACOBIAN_TO_SOLVER_MAP% &
                                           & JACOBIAN_COL_TO_SOLVER_COLS_MAP(jacobian_column_number)% &
                                           & COUPLING_COEFFICIENTS(solver_column_idx)
+                                        column_coupling_coefficient=SOLVER_MAPPING%EQUATIONS_SET_TO_SOLVER_MAP( &
+                                          & equations_set_idx)%EQUATIONS_ROW_TO_SOLVER_ROWS_MAPS(jacobian_column_number)% &
+                                          & COUPLING_COEFFICIENTS(solver_column_idx)
+                                        !XY - write out col coupling coefficient
+!                                        IF((column_coupling_coefficient/=1.0_DP).AND.(solver_row_number==1)) THEN
+!                                          CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"col number: ",solver_column_number, &
+!                                            & err,error,*999) 
+!                                          CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"col coeff: ",column_coupling_coefficient, &
+!                                            & err,error,*999) 
+!                                        endif
                                         !Add in the solver matrix value
                                         VALUE=ALPHA*JACOBIAN_MATRIX_DATA(jacobian_row_number+(jacobian_column_number-1)* &
                                           & EQUATIONS_MATRICES%TOTAL_NUMBER_OF_ROWS)*row_coupling_coefficient* &
