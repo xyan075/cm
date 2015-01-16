@@ -1951,7 +1951,8 @@ CONTAINS
                           & iterationNumber,ERR,ERROR,*999)
                           IF(SOLVER%SOLVERS%CONTROL_LOOP%PROBLEM%SUBTYPE==PROBLEM_FE_CONTACT_TRANSFORM_REPROJECT_SUBTYPE .OR. &
                               & SOLVER%SOLVERS%CONTROL_LOOP%PROBLEM%SUBTYPE==PROBLEM_FE_CONTACT_REPROJECT_SUBTYPE .OR.  &
-                              & iterationNumber==0) THEN
+                              & SOLVER%SOLVERS%CONTROL_LOOP%PROBLEM%SUBTYPE==PROBLEM_FE_CONTACT_TRANSFORM_REPROJECT_CELLML_SUBTYPE &
+                              &  .OR. iterationNumber==0) THEN
 !                            CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"********************  Reproject! ***************",ERR,ERROR,*999)
                             CALL InterfacePointsConnectivity_DataReprojection(interface,interfaceCondition,err,error,*999)
                           ENDIF
@@ -3530,7 +3531,9 @@ CONTAINS
 #ifdef TAUPROF
       CALL TAU_STATIC_PHASE_START('Pre solve')
 #endif
-     CALL PROBLEM_SOLVER_PRE_SOLVE(SOLVER,ERR,ERROR,*999)
+     IF(SOLVER%SOLVE_TYPE/=SOLVER_GEOMETRIC_TRANSFORMATION_TYPE) THEN
+       CALL PROBLEM_SOLVER_PRE_SOLVE(SOLVER,ERR,ERROR,*999)
+     ENDIF
 #ifdef TAUPROF
       CALL TAU_STATIC_PHASE_STOP('Pre solve')
       
@@ -4119,7 +4122,8 @@ CONTAINS
                     reproject=.FALSE.
                   ENDIF
                 CASE(PROBLEM_LE_CONTACT_TRANSFORM_REPROJECT_SUBTYPE,PROBLEM_LE_CONTACT_REPROJECT_SUBTYPE, &
-                    & PROBLEM_FE_CONTACT_TRANSFORM_REPROJECT_SUBTYPE,PROBLEM_FE_CONTACT_REPROJECT_SUBTYPE)
+                    & PROBLEM_FE_CONTACT_TRANSFORM_REPROJECT_SUBTYPE,PROBLEM_FE_CONTACT_REPROJECT_SUBTYPE, &
+                    & PROBLEM_FE_CONTACT_TRANSFORM_REPROJECT_CELLML_SUBTYPE)
                   reproject=.TRUE.
                 CASE DEFAULT
                   localError="The problem subtype of "//TRIM(NUMBER_TO_VSTRING(problem%SUBTYPE,"*",err,error))//" &
