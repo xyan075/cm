@@ -5830,6 +5830,8 @@ CONTAINS
     NULLIFY(transformationSolver)
     NULLIFY(SOLVER_EQUATIONS)
     NULLIFY(SOLVERS)
+    NULLIFY(CellMLSolver)
+    NULLIFY(CELLML_EQUATIONS)
 
     IF(ASSOCIATED(PROBLEM)) THEN
       SELECT CASE(PROBLEM%SUBTYPE)
@@ -6562,7 +6564,7 @@ CONTAINS
                       IF(ASSOCIATED(CELLML_SOLVER)) THEN
                         !evaluate the constiutive equation in CellML
                         CALL SOLVER_SOLVE(CELLML_SOLVER,ERR,ERROR,*999)
-                        CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"**************** CellML! ****************",ERR,ERROR,*999)
+!                        CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"**************** CellML! ****************",ERR,ERROR,*999)
                       ENDIF
                     ENDIF
                   ENDDO !equations_set_idx=1,SOLVER_MAPPING%NUMBER_OF_EQUATIONS_SETS
