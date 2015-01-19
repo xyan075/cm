@@ -638,13 +638,14 @@ CONTAINS
   !
 
   !>Evaluates the residual and RHS vectors for a finite elasticity finite element equations set.
-  SUBROUTINE FINITE_ELASTICITY_FINITE_ELEMENT_RESIDUAL_EVALUATE(EQUATIONS_SET,ELEMENT_NUMBER,ERR,ERROR,*)
+  SUBROUTINE FINITE_ELASTICITY_FINITE_ELEMENT_RESIDUAL_EVALUATE(EQUATIONS_SET,ELEMENT_NUMBER,ERR,ERROR,*,output)
 
     !Argument variables
     TYPE(EQUATIONS_SET_TYPE), POINTER :: EQUATIONS_SET !<A pointer to the equations set
     INTEGER(INTG), INTENT(IN) :: ELEMENT_NUMBER !<The element number to calculate
     INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
     TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
+    LOGICAL, OPTIONAL, INTENT(IN) :: output 
     !Local Variables
     TYPE(BASIS_TYPE), POINTER :: DEPENDENT_BASIS,COMPONENT_BASIS
     TYPE(BOUNDARY_CONDITIONS_VARIABLE_TYPE), POINTER :: BOUNDARY_CONDITIONS_VARIABLE
@@ -695,20 +696,20 @@ CONTAINS
     INTEGER(INTG) :: component_idx3,xi_idx,derivative_idx
     
     
-!    TYPE(VARYING_STRING) :: directory
-!    LOGICAL :: dirExists
-!    INTEGER(INTG) :: IUNIT,i,j
-!    CHARACTER(LEN=100) :: filenameOutput
+    TYPE(VARYING_STRING) :: directory
+    LOGICAL :: dirExists
+    INTEGER(INTG) :: IUNIT,i,j
+    CHARACTER(LEN=100) :: filenameOutput
 
-!    
-!    directory="results_iter/"
-!    INQUIRE(FILE=CHAR(directory),EXIST=dirExists)
-!    IF(.NOT.dirExists) THEN
-!      CALL SYSTEM(CHAR("mkdir "//directory))
-!    ENDIF
-!    
-!    filenameOutput=directory//"FE.txt"
-!    OPEN(UNIT=IUNIT,FILE=filenameOutput,STATUS="UNKNOWN",ACTION="WRITE",IOSTAT=ERR)
+    
+    directory="results_iter/"
+    INQUIRE(FILE=CHAR(directory),EXIST=dirExists)
+    IF(.NOT.dirExists) THEN
+      CALL SYSTEM(CHAR("mkdir "//directory))
+    ENDIF
+    
+    filenameOutput=directory//"FE.txt"
+    OPEN(UNIT=IUNIT,FILE=filenameOutput,STATUS="UNKNOWN",ACTION="WRITE",IOSTAT=ERR)
 
 
     CALL ENTERS("FINITE_ELASTICITY_FINITE_ELEMENT_RESIDUAL_EVALUATE",ERR,ERROR,*999)
@@ -856,6 +857,17 @@ CONTAINS
         ELSE IF(EQUATIONS_SET%SUBTYPE==EQUATIONS_SET_STANDARD_MONODOMAIN_ELASTICITY_SUBTYPE) THEN
           INDEPENDENT_INTERPOLATED_POINT=>EQUATIONS%INTERPOLATION%INDEPENDENT_INTERP_POINT(FIELD_U_VARIABLE_TYPE)%PTR
         ENDIF
+        
+        !XY output element parameters
+!        IF(ELEMENT_NUMBER==1) THEN
+!          DO j=1,3
+!            DO i=1,64
+!              WRITE(IUNIT,'(1X,3E25.15)') DEPENDENT_INTERPOLATION_PARAMETERS%PARAMETERS(i,j)
+!              
+!            ENDDO
+!          ENDDO
+!          WRITE(IUNIT,'(1X,3E25.15)') DEPENDENT_INTERPOLATION_PARAMETERS%PARAMETERS(1,4)
+!        endif
 
         !SELECT: Compressible or incompressible cases, or poro multicompartment
         SELECT CASE(EQUATIONS_SET%SUBTYPE)
@@ -1134,6 +1146,12 @@ CONTAINS
             !Calculate F=dZ/dNU, the deformation gradient tensor at the gauss point
             CALL FiniteElasticityGaussDeformationGradientTensor(DEPENDENT_INTERPOLATED_POINT_METRICS, &
               & GEOMETRIC_INTERPOLATED_POINT_METRICS,FIBRE_INTERPOLATED_POINT,DZDNU,Jxxi,ERR,ERROR,*999)
+              
+            ! XY - output deformation gradient tensor
+!            IF(PRESENT(output)) THEN
+!            WRITE(IUNIT,'(3E25.15,/(3E25.15))') &
+!                & ((DZDNU(i,j),j=1,3),i=1,3)
+!            endif
 
             CALL MATRIX_TRANSPOSE(DZDNU,DZDNUT,ERR,ERROR,*999)
             CALL MATRIX_PRODUCT(DZDNUT,DZDNU,AZL,ERR,ERROR,*999)
@@ -1142,13 +1160,18 @@ CONTAINS
             P=DEPENDENT_INTERPOLATED_POINT%VALUES(HYDROSTATIC_PRESSURE_COMPONENT,1)
 
             CALL INVERT(AZL,AZU,I3,ERR,ERROR,*999)
-            Jznu=I3**0.5_DP
+            
+            ! XY - calculate Jznu determinant of F in the old cm way
+!            Jznu=I3**0.5_DP
+            Jznu=Determinant(DZDNU,err,error)
+            ! XY - output determinant of deformation gradient tensor
+!            WRITE(IUNIT,'(1X,3E25.15)') Jznu
 
             IF(DIAGNOSTICS1) THEN
               CALL WRITE_STRING_VALUE(DIAGNOSTIC_OUTPUT_TYPE,"  ELEMENT_NUMBER = ",ELEMENT_NUMBER,ERR,ERROR,*999)
               CALL WRITE_STRING_VALUE(DIAGNOSTIC_OUTPUT_TYPE,"  gauss_idx = ",gauss_idx,ERR,ERROR,*999)
             ENDIF
-
+            
             !get the stress field!!!
             IF(NUMBER_OF_DIMENSIONS==3) THEN
               CALL Field_ParameterSetGetLocalGaussPoint(DEPENDENT_FIELD,FIELD_U2_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE, &
@@ -1188,11 +1211,24 @@ CONTAINS
             ELSE
               CALL FLAG_ERROR("Only 2 and 3 dimensional problems are implemented.",ERR,ERROR,*999)
             ENDIF
+            
+            
+            
+            
+            
+            ! XY - output 2nd PK stress
+            IF(PRESENT(output)) THEN
+!              IF(ELEMENT_NUMBER==25) THEN
+                WRITE(IUNIT,'(3E25.15,/(3E25.15))') &
+                  & ((PIOLA_TENSOR(i,j),j=1,3),i=1,3)
+!              ENDIF
+            ENDIF
 
-            !Compute the CAUCHY stress tensor
-            CALL MATRIX_PRODUCT(DZDNU,PIOLA_TENSOR,TEMP,ERR,ERROR,*999)
-            CALL MATRIX_PRODUCT(TEMP,DZDNUT,CAUCHY_TENSOR,ERR,ERROR,*999)
-            CAUCHY_TENSOR=CAUCHY_TENSOR/Jznu
+            ! XY - do not need Cauchy stress since 2nd PK is used
+            !Compute the CAUCHY stress tensor 
+!            CALL MATRIX_PRODUCT(DZDNU,PIOLA_TENSOR,TEMP,ERR,ERROR,*999)
+!            CALL MATRIX_PRODUCT(TEMP,DZDNUT,CAUCHY_TENSOR,ERR,ERROR,*999)
+!            CAUCHY_TENSOR=CAUCHY_TENSOR/Jznu
 
             IF(DIAGNOSTICS1) THEN
               CALL WRITE_STRING_MATRIX(DIAGNOSTIC_OUTPUT_TYPE,1,1,3,1,1,3, &
@@ -1205,8 +1241,19 @@ CONTAINS
             ENDIF
 
             !Calculate dPhi/dZ at the gauss point, Phi is the basis function
-            CALL FINITE_ELASTICITY_GAUSS_DFDZ(DEPENDENT_INTERPOLATED_POINT,ELEMENT_NUMBER,gauss_idx,NUMBER_OF_DIMENSIONS, &
-              & NUMBER_OF_XI,DFDZ,ERR,ERROR,*999)
+!            CALL FINITE_ELASTICITY_GAUSS_DFDZ(DEPENDENT_INTERPOLATED_POINT,ELEMENT_NUMBER,gauss_idx,NUMBER_OF_DIMENSIONS, &
+!              & NUMBER_OF_XI,DFDZ,ERR,ERROR,*999)
+            
+            CALL FINITE_ELASTICITY_GAUSS_DFDXN(GEOMETRIC_INTERPOLATED_POINT,ELEMENT_NUMBER,gauss_idx,NUMBER_OF_DIMENSIONS, &
+              & NUMBER_OF_XI,DFDXN,ERR,ERROR,*999)
+              
+            !XY output dPhiDX
+!            IF(ELEMENT_NUMBER==25) THEN
+!            DO component_idx=1,64
+!              WRITE(IUNIT,'(1X,3E25.15,1X,3E25.15,1X,3E25.15)') DFDXN(component_idx,1),DFDXN(component_idx,2),&
+!                & DFDXN(component_idx,3)
+!            ENDDO 
+!            ENDIF
 
             !For membrane theory in 3D space, the final equation is multiplied by thickness. Default to unit thickness if equation set subtype is not membrane
             !!TODO Maybe have the thickness as a component in the equations set field.
@@ -1217,9 +1264,15 @@ CONTAINS
                   & FIELD_VARIABLE%NUMBER_OF_COMPONENTS,1)
               ENDIF
             ENDIF
+            
+            !XY residual calculation based on 2nd PK, total Lagrangian
+            ! multiply 2nd PK stress with deformation gradient tensor F transpose
+            CALL MATRIX_TRANSPOSE(DZDNU,DNUDZ,ERR,ERROR,*999)
+            CALL MATRIX_PRODUCT(PIOLA_TENSOR,DNUDZ,TEMP,ERR,ERROR,*999)
 
             !Now add up the residual terms
             element_dof_idx=0
+            
             DO component_idx=1,NUMBER_OF_DIMENSIONS
               DEPENDENT_COMPONENT_INTERPOLATION_TYPE=DEPENDENT_FIELD%VARIABLES(var1)%COMPONENTS(component_idx)%INTERPOLATION_TYPE
               IF(DEPENDENT_COMPONENT_INTERPOLATION_TYPE==FIELD_NODE_BASED_INTERPOLATION) THEN !node based
@@ -1228,18 +1281,40 @@ CONTAINS
                 NUMBER_OF_FIELD_COMPONENT_INTERPOLATION_PARAMETERS=DEPENDENT_BASIS%NUMBER_OF_ELEMENT_PARAMETERS
                 DO parameter_idx=1,NUMBER_OF_FIELD_COMPONENT_INTERPOLATION_PARAMETERS
                   element_dof_idx=element_dof_idx+1
-                  DO component_idx2=1,NUMBER_OF_DIMENSIONS
-                    NONLINEAR_MATRICES%ELEMENT_RESIDUAL%VECTOR(element_dof_idx)= &
-                      & NONLINEAR_MATRICES%ELEMENT_RESIDUAL%VECTOR(element_dof_idx)+ &
-                      & GAUSS_WEIGHT*Jxxi*Jznu*THICKNESS*CAUCHY_TENSOR(component_idx,component_idx2)* &
-                      & DFDZ(parameter_idx,component_idx2)
-                  ENDDO ! component_idx2 (inner component index)
+                  ! XY residual calculation based on 2nd PK, total Lagrangian
+                  ! the final form
+                  AGE=DFDXN(parameter_idx,1)*TEMP(1,component_idx)+DFDXN(parameter_idx,2)*TEMP(2,component_idx)+ &
+                    & DFDXN(parameter_idx,3)*TEMP(3,component_idx)
+                  NONLINEAR_MATRICES%ELEMENT_RESIDUAL%VECTOR(element_dof_idx)= &
+                    & NONLINEAR_MATRICES%ELEMENT_RESIDUAL%VECTOR(element_dof_idx)+ &
+                    &GAUSS_WEIGHT*GEOMETRIC_INTERPOLATED_POINT_METRICS%JACOBIAN*AGE 
                 ENDDO ! parameter_idx (residual vector loop)
               ELSEIF(DEPENDENT_COMPONENT_INTERPOLATION_TYPE==FIELD_ELEMENT_BASED_INTERPOLATION) THEN
                 !Will probably never be used
                 CALL FLAG_ERROR("Finite elasticity with element based interpolation is not implemented.",ERR,ERROR,*999)
               ENDIF
             ENDDO ! component_idx
+            
+!            DO component_idx=1,NUMBER_OF_DIMENSIONS
+!              DEPENDENT_COMPONENT_INTERPOLATION_TYPE=DEPENDENT_FIELD%VARIABLES(var1)%COMPONENTS(component_idx)%INTERPOLATION_TYPE
+!              IF(DEPENDENT_COMPONENT_INTERPOLATION_TYPE==FIELD_NODE_BASED_INTERPOLATION) THEN !node based
+!                DEPENDENT_BASIS=>DEPENDENT_FIELD%VARIABLES(var1)%COMPONENTS(component_idx)%DOMAIN%TOPOLOGY% &
+!                  & ELEMENTS%ELEMENTS(ELEMENT_NUMBER)%BASIS
+!                NUMBER_OF_FIELD_COMPONENT_INTERPOLATION_PARAMETERS=DEPENDENT_BASIS%NUMBER_OF_ELEMENT_PARAMETERS
+!                DO parameter_idx=1,NUMBER_OF_FIELD_COMPONENT_INTERPOLATION_PARAMETERS
+!                  element_dof_idx=element_dof_idx+1
+!                  DO component_idx2=1,NUMBER_OF_DIMENSIONS
+!                    NONLINEAR_MATRICES%ELEMENT_RESIDUAL%VECTOR(element_dof_idx)= &
+!                      & NONLINEAR_MATRICES%ELEMENT_RESIDUAL%VECTOR(element_dof_idx)+ &
+!                      & GAUSS_WEIGHT*Jxxi*Jznu*THICKNESS*CAUCHY_TENSOR(component_idx,component_idx2)* &
+!                      & DFDZ(parameter_idx,component_idx2)
+!                  ENDDO ! component_idx2 (inner component index)
+!                ENDDO ! parameter_idx (residual vector loop)
+!              ELSEIF(DEPENDENT_COMPONENT_INTERPOLATION_TYPE==FIELD_ELEMENT_BASED_INTERPOLATION) THEN
+!                !Will probably never be used
+!                CALL FLAG_ERROR("Finite elasticity with element based interpolation is not implemented.",ERR,ERROR,*999)
+!              ENDIF
+!            ENDDO ! component_idx
 
             !Hydrostatic pressure component (skip for membrane problems)
             IF (EQUATIONS_SET%SUBTYPE /= EQUATIONS_SET_MEMBRANE_SUBTYPE) THEN
@@ -1271,9 +1346,13 @@ CONTAINS
                     & NONLINEAR_MATRICES%ELEMENT_RESIDUAL%VECTOR(element_dof_idx)+GAUSS_WEIGHT*Jxxi* &
                     & (Jznu-1.0_DP-DARCY_VOL_INCREASE)
                 ELSE
+                  ! XY use volume Jacobian
+!                  NONLINEAR_MATRICES%ELEMENT_RESIDUAL%VECTOR(element_dof_idx)= &
+!                    & NONLINEAR_MATRICES%ELEMENT_RESIDUAL%VECTOR(element_dof_idx)+GAUSS_WEIGHT*Jxxi* &
+!                    & (Jznu-1.0_DP)
                   NONLINEAR_MATRICES%ELEMENT_RESIDUAL%VECTOR(element_dof_idx)= &
-                    & NONLINEAR_MATRICES%ELEMENT_RESIDUAL%VECTOR(element_dof_idx)+GAUSS_WEIGHT*Jxxi* &
-                    & (Jznu-1.0_DP)
+                    & NONLINEAR_MATRICES%ELEMENT_RESIDUAL%VECTOR(element_dof_idx)+GAUSS_WEIGHT* &
+                    & GEOMETRIC_INTERPOLATED_POINT_METRICS%JACOBIAN*(Jznu-1.0_DP)
                 ENDIF
               ENDIF
             ENDIF
@@ -1765,6 +1844,8 @@ CONTAINS
       & SYSTEM_TIME5(1)
 
     CALL ENTERS("FINITE_ELASTICITY_FINITE_ELEMENT_STRAIN_CALCULATE",ERR,ERROR,*999)
+    
+    CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"********************  strain cal! ***************",ERR,ERROR,*999)
 
     NULLIFY(GEOMETRIC_BASIS,DEPENDENT_BASIS)
     NULLIFY(EQUATIONS)
@@ -1840,7 +1921,7 @@ CONTAINS
           FIBRE_INTERPOLATED_POINT=>EQUATIONS%INTERPOLATION%FIBRE_INTERP_POINT(FIELD_U_VARIABLE_TYPE)%PTR
           DEPENDENT_INTERPOLATED_POINT=>EQUATIONS%INTERPOLATION%DEPENDENT_INTERP_POINT(FIELD_VAR_TYPE)%PTR
           DEPENDENT_INTERPOLATED_POINT_METRICS=>EQUATIONS%INTERPOLATION%DEPENDENT_INTERP_POINT_METRICS(FIELD_VAR_TYPE)%PTR
-
+          
           !Loop over gauss points
           DO gauss_idx=1,DEPENDENT_NUMBER_OF_GAUSS_POINTS
             !Interpolate dependent, geometric, fibre fields
@@ -1881,6 +1962,8 @@ CONTAINS
             DO i=1,3 !NUMBER_OF_DIMENSIONS
               E(i,i)=E(i,i)-0.5_DP
             ENDDO
+            
+            
 
             ! we only want to store the indepent components of the STRAIN FIELD
             IF(NUMBER_OF_DIMENSIONS==3) THEN
@@ -2984,10 +3067,11 @@ CONTAINS
       CALL FLAG_ERROR(LOCAL_ERROR,ERR,ERROR,*999)
     END SELECT
 
-    CALL MATRIX_PRODUCT(DZDNU,PIOLA_TENSOR,TEMP,ERR,ERROR,*999)
-    CALL MATRIX_PRODUCT(TEMP,DZDNUT,CAUCHY_TENSOR,ERR,ERROR,*999)
-    
-    CAUCHY_TENSOR=CAUCHY_TENSOR/Jznu
+    ! XY- comment out this Cauchy stess calculation as I only want 2PK
+!    CALL MATRIX_PRODUCT(DZDNU,PIOLA_TENSOR,TEMP,ERR,ERROR,*999)
+!    CALL MATRIX_PRODUCT(TEMP,DZDNUT,CAUCHY_TENSOR,ERR,ERROR,*999)
+!    
+!    CAUCHY_TENSOR=CAUCHY_TENSOR/Jznu
     
     CAUCHY_TENSOR=PIOLA_TENSOR
     

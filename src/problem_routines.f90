@@ -1419,13 +1419,13 @@ CONTAINS
     REAL(DP) :: rowXi(3),colXi(2) !\todo generalise xi allocations for 1D,2D and 3D points connectivity
     REAL(DP) :: kappa(2,2),phiDeriRow(2),phiDeriCol(2),TRow(2),TCol(2),NRow(2),NCol(2),DRow(2),DCol(2)
     
-!    TYPE(VARYING_STRING) :: directory
-!    LOGICAL :: dirExists
-!    INTEGER(INTG) :: IUNIT,i,j
-!    CHARACTER(LEN=100) :: filenameOutput
-!  
-!    CALL ENTERS("EQUATIONS_SET_JACOBIAN_CONTACT_UPDATE_STATIC_FEM",ERR,ERROR,*999)
-!    
+    TYPE(VARYING_STRING) :: directory
+    LOGICAL :: dirExists
+    INTEGER(INTG) :: IUNIT,i,j
+    CHARACTER(LEN=100) :: filenameOutput
+  
+    CALL ENTERS("EQUATIONS_SET_JACOBIAN_CONTACT_UPDATE_STATIC_FEM",ERR,ERROR,*999)
+    
 !    directory="results_iter/"
 !    INQUIRE(FILE=CHAR(directory),EXIST=dirExists)
 !    IF(.NOT.dirExists) THEN
@@ -5466,7 +5466,7 @@ SUBROUTINE ProblemSolver_ShellLineSearchPetsc(lineSearch,ctx,err)
               CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"initialE ",newtonSolver%convergenceTest%energyFirstIter,err,error,*999)  
               ! XY - output line search direction (yArray), residual (fArray)
 !              DO i=1,SIZE(yArray,1)
-!                WRITE(IUNIT,'(E25.15)') yArray(i)
+!                WRITE(IUNIT,'(E25.15)') fArray(i)
 !              ENDDO
 !              OPEN(UNIT=IUNIT)
 !              CALL EXIT(0)   
