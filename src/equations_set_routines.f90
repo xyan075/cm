@@ -3160,7 +3160,7 @@ CONTAINS
   !                  CALL DISTRIBUTED_VECTOR_VALUES_SET(parameters,localNy,origDepVar+delta*scaleFactor,err,error,*999)
                     nonlinearMatrices%ELEMENT_RESIDUAL%VECTOR=0.0_DP ! must remember to flush existing results, otherwise they're added
                     CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"********************  Jacobian! ***************",ERR,ERROR,*999)
-                    CALL FINITE_ELASTICITY_FINITE_ELEMENT_STRAIN_CALCULATE(equationsSet,ERR,ERROR,*999)
+                    CALL FINITE_ELASTICITY_FINITE_ELEMENT_PRE_RESIDUAL_EVALUATE(equationsSet,ERR,ERROR,*999)
 !                    CALL EQUATIONS_SET_FINITE_ELEMENT_RESIDUAL_EVALUATE(equationsSet,elementNumber,err,error,*999)
                     CALL FINITE_ELASTICITY_FINITE_ELEMENT_RESIDUAL_EVALUATE(equationsSet,elementNumber,err,error,*999,.TRUE.)
                     CALL DISTRIBUTED_VECTOR_VALUES_SET(parameters,localNy,origDepVar,err,error,*999)

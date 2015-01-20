@@ -698,20 +698,20 @@ CONTAINS
     INTEGER(INTG) :: component_idx3,xi_idx,derivative_idx
     
     
-    TYPE(VARYING_STRING) :: directory
-    LOGICAL :: dirExists
-    INTEGER(INTG) :: IUNIT,i,j
-    CHARACTER(LEN=100) :: filenameOutput
+!    TYPE(VARYING_STRING) :: directory
+!    LOGICAL :: dirExists
+!    INTEGER(INTG) :: IUNIT,i,j
+!    CHARACTER(LEN=100) :: filenameOutput
 
-    
-    directory="results_iter/"
-    INQUIRE(FILE=CHAR(directory),EXIST=dirExists)
-    IF(.NOT.dirExists) THEN
-      CALL SYSTEM(CHAR("mkdir "//directory))
-    ENDIF
-    
-    filenameOutput=directory//"FE.txt"
-    OPEN(UNIT=IUNIT,FILE=filenameOutput,STATUS="UNKNOWN",ACTION="WRITE",IOSTAT=ERR)
+!    
+!    directory="results_iter/"
+!    INQUIRE(FILE=CHAR(directory),EXIST=dirExists)
+!    IF(.NOT.dirExists) THEN
+!      CALL SYSTEM(CHAR("mkdir "//directory))
+!    ENDIF
+!    
+!    filenameOutput=directory//"FE.txt"
+!    OPEN(UNIT=IUNIT,FILE=filenameOutput,STATUS="UNKNOWN",ACTION="WRITE",IOSTAT=ERR)
 
 
     CALL ENTERS("FINITE_ELASTICITY_FINITE_ELEMENT_RESIDUAL_EVALUATE",ERR,ERROR,*999)
@@ -1189,12 +1189,12 @@ CONTAINS
               CALL Field_ParameterSetGetLocalGaussPoint(DEPENDENT_FIELD,FIELD_U2_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE, &
                 & gauss_idx,ELEMENT_NUMBER,6,PIOLA_TENSOR(3,3),ERR,ERROR,*999)
               !CellML computes the deviatoric stress. Add the volumetric component!
-              PIOLA_TENSOR(1,1)=PIOLA_TENSOR(1,1)+2.0_DP*P*AZU(1,1)
-              PIOLA_TENSOR(2,2)=PIOLA_TENSOR(2,2)+2.0_DP*P*AZU(2,2)
-              PIOLA_TENSOR(3,3)=PIOLA_TENSOR(3,3)+2.0_DP*P*AZU(3,3)
-              PIOLA_TENSOR(1,2)=PIOLA_TENSOR(1,2)+2.0_DP*P*AZU(1,2)
-              PIOLA_TENSOR(1,3)=PIOLA_TENSOR(1,3)+2.0_DP*P*AZU(1,3)
-              PIOLA_TENSOR(2,3)=PIOLA_TENSOR(2,3)+2.0_DP*P*AZU(2,3)
+              PIOLA_TENSOR(1,1)=PIOLA_TENSOR(1,1)!+2.0_DP*P*AZU(1,1)
+              PIOLA_TENSOR(2,2)=PIOLA_TENSOR(2,2)!+2.0_DP*P*AZU(2,2)
+              PIOLA_TENSOR(3,3)=PIOLA_TENSOR(3,3)!+2.0_DP*P*AZU(3,3)
+              PIOLA_TENSOR(1,2)=PIOLA_TENSOR(1,2)!+2.0_DP*P*AZU(1,2)
+              PIOLA_TENSOR(1,3)=PIOLA_TENSOR(1,3)!+2.0_DP*P*AZU(1,3)
+              PIOLA_TENSOR(2,3)=PIOLA_TENSOR(2,3)!+2.0_DP*P*AZU(2,3)
               PIOLA_TENSOR(2,1)=PIOLA_TENSOR(1,2)
               PIOLA_TENSOR(3,1)=PIOLA_TENSOR(1,3)
               PIOLA_TENSOR(3,2)=PIOLA_TENSOR(2,3)
@@ -1215,16 +1215,22 @@ CONTAINS
             ENDIF
             
             
-            
+            ! XY - output right Cauchy
+!            IF(PRESENT(output)) THEN
+!              IF(ELEMENT_NUMBER==1) THEN
+!                WRITE(IUNIT,'(3E25.15,/(3E25.15))') &
+!                  & ((AZL(i,j),j=1,3),i=1,3)
+!              ENDIF
+!            ENDIF
             
             
             ! XY - output 2nd PK stress
-            IF(PRESENT(output)) THEN
-!              IF(ELEMENT_NUMBER==25) THEN
-                WRITE(IUNIT,'(3E25.15,/(3E25.15))') &
-                  & ((PIOLA_TENSOR(i,j),j=1,3),i=1,3)
+!            IF(PRESENT(output)) THEN
+!              IF(ELEMENT_NUMBER==1) THEN
+!                WRITE(IUNIT,'(3E25.15,/(3E25.15))') &
+!                  & ((PIOLA_TENSOR(i,j),j=1,3),i=1,3)
 !              ENDIF
-            ENDIF
+!            ENDIF
 
             ! XY - do not need Cauchy stress since 2nd PK is used
             !Compute the CAUCHY stress tensor 
@@ -1898,6 +1904,21 @@ CONTAINS
     REAL(SP) :: ELEMENT_USER_ELAPSED,ELEMENT_SYSTEM_ELAPSED,USER_ELAPSED,USER_TIME2(1),USER_TIME3(1),USER_TIME4(1), &
       & USER_TIME5(1),SYSTEM_ELAPSED,SYSTEM_TIME2(1),SYSTEM_TIME3(1),SYSTEM_TIME4(1), &
       & SYSTEM_TIME5(1)
+      
+    TYPE(VARYING_STRING) :: directory
+    LOGICAL :: dirExists
+    INTEGER(INTG) :: IUNIT,j
+    CHARACTER(LEN=100) :: filenameOutput
+
+    
+    directory="results_iter/"
+    INQUIRE(FILE=CHAR(directory),EXIST=dirExists)
+    IF(.NOT.dirExists) THEN
+      CALL SYSTEM(CHAR("mkdir "//directory))
+    ENDIF
+    
+    filenameOutput=directory//"FE.txt"
+    OPEN(UNIT=IUNIT,FILE=filenameOutput,STATUS="UNKNOWN",ACTION="WRITE",IOSTAT=ERR)
 
     CALL ENTERS("FiniteElasticity_StrainCalculate",err,error,*999)
     CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"********************  strain cal! ***************",ERR,ERROR,*999)
@@ -2040,6 +2061,12 @@ CONTAINS
             DO i=1,3 !NUMBER_OF_DIMENSIONS
               E(i,i)=E(i,i)-0.5_DP
             ENDDO
+            
+            ! XY output green strain
+            IF(element_idx==1) THEN
+              WRITE(IUNIT,'(3E25.15,/(3E25.15))') &
+                & ((E(i,j),j=1,3),i=1,3)
+            ENDIF
             
             
 
