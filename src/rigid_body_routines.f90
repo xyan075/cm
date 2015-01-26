@@ -782,15 +782,15 @@ CONTAINS
               
               DO componentIdx=1,noGeoComp
               ! for position between two nodes
-!                temp=0.0_DP
-!                userNodeNumber=1110
-!                CALL FIELD_PARAMETER_SET_GET_NODE(geometricField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE,1,1, &
-!                  & userNodeNumber,componentIdx,centreOfMass(componentIdx),ERR,ERROR,*999)
-!                  
-!                userNodeNumber=1112
-!                CALL FIELD_PARAMETER_SET_GET_NODE(geometricField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE,1,1, &
-!                  & userNodeNumber,componentIdx,temp,ERR,ERROR,*999)
-!                centreOfMass(componentIdx)=(centreOfMass(componentIdx)+temp)*0.5_DP
+                temp=0.0_DP
+                userNodeNumber=1110
+                CALL FIELD_PARAMETER_SET_GET_NODE(geometricField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE,1,1, &
+                  & userNodeNumber,componentIdx,centreOfMass(componentIdx),ERR,ERROR,*999)
+                  
+                userNodeNumber=1112
+                CALL FIELD_PARAMETER_SET_GET_NODE(geometricField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE,1,1, &
+                  & userNodeNumber,componentIdx,temp,ERR,ERROR,*999)
+                centreOfMass(componentIdx)=(centreOfMass(componentIdx)+temp)*0.5_DP
                 
                 ! for position on a node
 !                userNodeNumber=1107

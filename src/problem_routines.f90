@@ -1371,7 +1371,7 @@ CONTAINS
                         & iterationNumber,ERR,ERROR,*999)
                       CALL EquationsSet_JacobianRigidBodyContactUpdateStaticFEM(EQUATIONS_SET,iterationNumber,ERR,ERROR,*999)
 !                      IF(iterationNumber<=interfaceCondition%interfaceContactMetrics%iterationGeometricTerm) THEN
-                        CALL EquationsSet_JacobianRigidBodyContactPerturb(EQUATIONS_SET,iterationNumber,ERR,ERROR,*999)
+!                        CALL EquationsSet_JacobianRigidBodyContactPerturb(EQUATIONS_SET,iterationNumber,ERR,ERROR,*999)
 !                      ENDIF
                     ! deformable-deformable body contact
                     ELSEIF(EQUATIONS_SET%TYPE==EQUATIONS_SET_FINITE_ELASTICITY_TYPE) THEN
@@ -1893,19 +1893,19 @@ CONTAINS
       & tempA,tempB,geometricTerm,matrixValue,junk1,junk2,junk3,angleX
     TYPE(VARYING_STRING) :: localError
     
-    TYPE(VARYING_STRING) :: directory
-    LOGICAL :: dirExists
-    INTEGER(INTG) :: IUNIT,i,j
-    CHARACTER(LEN=100) :: filenameOutput
-    
-    directory="results_iter/"
-    INQUIRE(FILE=CHAR(directory),EXIST=dirExists)
-    IF(.NOT.dirExists) THEN
-      CALL SYSTEM(CHAR("mkdir "//directory))
-    ENDIF
-    
-    filenameOutput=directory//"stiffnessMatrix.exdata"
-    OPEN(UNIT=IUNIT,FILE=filenameOutput,STATUS="UNKNOWN",ACTION="WRITE",IOSTAT=ERR)
+!    TYPE(VARYING_STRING) :: directory
+!    LOGICAL :: dirExists
+!    INTEGER(INTG) :: IUNIT,i,j
+!    CHARACTER(LEN=100) :: filenameOutput
+!    
+!    directory="results_iter/"
+!    INQUIRE(FILE=CHAR(directory),EXIST=dirExists)
+!    IF(.NOT.dirExists) THEN
+!      CALL SYSTEM(CHAR("mkdir "//directory))
+!    ENDIF
+!    
+!    filenameOutput=directory//"stiffnessMatrix.exdata"
+!    OPEN(UNIT=IUNIT,FILE=filenameOutput,STATUS="UNKNOWN",ACTION="WRITE",IOSTAT=ERR)
 !    
     CALL ENTERS("EquationsSet_JacobianRigidBodyContactUpdateStaticFEM",ERR,ERROR,*999)
 
@@ -2295,7 +2295,7 @@ CONTAINS
 !                  CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"angle Jacobian = ",angleX,err,error,*999)  
                   forceTerm=contactPointMetrics%contactStiffness(2)*contactPointMetrics%contactStiffness(3)* &
                     & EXP(contactPointMetrics%contactStiffness(3)*angleX)
-                  CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,rowIdx,rowIdx,forceTerm,err,error,*999)
+!                  CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,rowIdx,rowIdx,forceTerm,err,error,*999)
                   
 !                ENDIF !iterationNumber<iterationGeometricTerm
               ENDIF !inContact
@@ -2315,15 +2315,15 @@ CONTAINS
             CALL DISTRIBUTED_MATRIX_UPDATE_START(jacobian,err,error,*999)
             CALL DISTRIBUTED_MATRIX_UPDATE_FINISH(jacobian,err,error,*999)
             
-            rowIdx=defDepVariable%components(5)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
-            CALL DISTRIBUTED_MATRIX_VALUES_GET(jacobian,rowIdx,rowIdx,junk1,err,error,*999)
-            rowIdx=defDepVariable%components(6)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
-            CALL DISTRIBUTED_MATRIX_VALUES_GET(jacobian,rowIdx,rowIdx,junk2,err,error,*999)
-            rowIdx=defDepVariable%components(7)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
-            CALL DISTRIBUTED_MATRIX_VALUES_GET(jacobian,rowIdx,rowIdx,junk3,err,error,*999)
-!            
-            WRITE(IUNIT,'(''Jacobian:'',E25.15,'','',E25.15,'','',E25.15)') &
-              & junk1,junk2,junk3
+!            rowIdx=defDepVariable%components(5)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
+!            CALL DISTRIBUTED_MATRIX_VALUES_GET(jacobian,rowIdx,rowIdx,junk1,err,error,*999)
+!            rowIdx=defDepVariable%components(6)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
+!            CALL DISTRIBUTED_MATRIX_VALUES_GET(jacobian,rowIdx,rowIdx,junk2,err,error,*999)
+!            rowIdx=defDepVariable%components(7)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
+!            CALL DISTRIBUTED_MATRIX_VALUES_GET(jacobian,rowIdx,rowIdx,junk3,err,error,*999)
+!!            
+!            WRITE(IUNIT,'(''Jacobian:'',E25.15,'','',E25.15,'','',E25.15)') &
+!              & junk1,junk2,junk3
 !            
           ELSE
             CALL FLAG_ERROR("Equations matrices is not associated",err,error,*999)
@@ -3214,9 +3214,6 @@ CONTAINS
                           & contactPointMetrics%contactForce*contactPointMetrics%Jacobian*interface%DATA_POINTS% &
                           & DATA_POINTS(globalDataPointNum)%WEIGHTS(1)
                         
-!                        residualValue=phi*interface%DATA_POINTS% &
-!                          & DATA_POINTS(globalDataPointNum)%WEIGHTS(1)*contactPointMetrics%Jacobian
-                        
                         !Get the face parameter index in the element
                         elemParameterNo=dependentBasis%ELEMENT_PARAMETER_INDEX(derivative,faceLocalElemNode)
                         !Multiply the contribution by scale factor
@@ -3307,23 +3304,23 @@ CONTAINS
               ENDIF
               
               
-              ! penalise flexion of head
-              CALL FIELD_PARAMETER_SET_GET_CONSTANT(defDepField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE,9, &
-                & angleX,err,error,*999)
-              IF(angleX>=0.0_DP) THEN
-                residualValue=contactPointMetrics%contactStiffness(2)*(EXP(angleX*contactPointMetrics%contactStiffness(3))-1.0_DP)
-              ELSE
-                residualValue=-contactPointMetrics%contactStiffness(2)*(EXP(-angleX*contactPointMetrics%contactStiffness(3))-1.0_DP)
-              ENDIF
-              
-              dofIdx=residualVariable%components(9)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
-              IF(perburbation) THEN
-                contactMetrics%residualPerturbed(dofIdx)=contactMetrics%residualPerturbed(dofIdx)+residualValue
-              ELSE
-                contactMetrics%residualOriginal(dofIdx)=contactMetrics%residualOriginal(dofIdx)+residualValue
-                CALL DISTRIBUTED_VECTOR_VALUES_ADD(nonlinearMatrices%RESIDUAL,dofIdx,residualValue,err,error,*999)
-                CALL DISTRIBUTED_VECTOR_VALUES_ADD(nonlinearMatrices%contactRESIDUAL,dofIdx,residualValue,err,error,*999)
-              ENDIF
+              ! penalise asynclitic of head
+!              CALL FIELD_PARAMETER_SET_GET_CONSTANT(defDepField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE,9, &
+!                & angleX,err,error,*999)
+!              IF(angleX>=0.0_DP) THEN
+!                residualValue=contactPointMetrics%contactStiffness(2)*(EXP(angleX*contactPointMetrics%contactStiffness(3))-1.0_DP)
+!              ELSE
+!                residualValue=-contactPointMetrics%contactStiffness(2)*(EXP(-angleX*contactPointMetrics%contactStiffness(3))-1.0_DP)
+!              ENDIF
+!              
+!              dofIdx=residualVariable%components(9)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
+!              IF(perburbation) THEN
+!                contactMetrics%residualPerturbed(dofIdx)=contactMetrics%residualPerturbed(dofIdx)+residualValue
+!              ELSE
+!                contactMetrics%residualOriginal(dofIdx)=contactMetrics%residualOriginal(dofIdx)+residualValue
+!                CALL DISTRIBUTED_VECTOR_VALUES_ADD(nonlinearMatrices%RESIDUAL,dofIdx,residualValue,err,error,*999)
+!                CALL DISTRIBUTED_VECTOR_VALUES_ADD(nonlinearMatrices%contactRESIDUAL,dofIdx,residualValue,err,error,*999)
+!              ENDIF
               
               ! output to screen
 !              CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"******************** COM ******************",ERR,ERROR,*999)
