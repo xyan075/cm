@@ -3219,8 +3219,13 @@ CONTAINS
 
           ! XY output element stiffness matrix
 !          IF(elementNumber==1) THEN
-!            DO i=1,nonlinearMatrices%JACOBIANS(jacobianNumber)%PTR%ELEMENT_JACOBIAN%NUMBER_OF_ROWS
-!              DO j=1,nonlinearMatrices%JACOBIANS(jacobianNumber)%PTR%ELEMENT_JACOBIAN%NUMBER_OF_COLUMNS
+!            CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"rows: ", &
+!              & nonlinearMatrices%JACOBIANS(jacobianNumber)%PTR%ELEMENT_JACOBIAN%NUMBER_OF_ROWS,ERR,ERROR,*999)
+!            CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"cols: ", &
+!              & nonlinearMatrices%JACOBIANS(jacobianNumber)%PTR%ELEMENT_JACOBIAN%NUMBER_OF_COLUMNS,ERR,ERROR,*999)
+              
+!            DO i=1,193!nonlinearMatrices%JACOBIANS(jacobianNumber)%PTR%ELEMENT_JACOBIAN%NUMBER_OF_ROWS
+!              DO j=1,193!nonlinearMatrices%JACOBIANS(jacobianNumber)%PTR%ELEMENT_JACOBIAN%NUMBER_OF_COLUMNS
 !                WRITE(IUNIT,'(1X,3E25.15)') nonlinearMatrices%JACOBIANS(jacobianNumber)%PTR%ELEMENT_JACOBIAN%MATRIX(i,j)
 !              ENDDO !j
 !            ENDDO !i
@@ -5056,7 +5061,8 @@ CONTAINS
               CALL EQUATIONS_MATRICES_ELEMENT_CALCULATE(EQUATIONS_MATRICES,ne,ERR,ERROR,*999)
               CALL EQUATIONS_SET_FINITE_ELEMENT_JACOBIAN_EVALUATE(EQUATIONS_SET,ne,ERR,ERROR,*999)
               CALL EQUATIONS_MATRICES_JACOBIAN_ELEMENT_ADD(EQUATIONS_MATRICES,ERR,ERROR,*999)
-            ENDDO !element_idx                  
+            ENDDO !element_idx         
+!            call exit(0)         
             !Output timing information if required
             IF(EQUATIONS%OUTPUT_TYPE>=EQUATIONS_TIMING_OUTPUT) THEN
               CALL CPU_TIMER(USER_CPU,USER_TIME3,ERR,ERROR,*999)

@@ -2611,7 +2611,8 @@ CONTAINS
 !    WRITE(IUNIT,'(3E25.15)') P
 
     CALL INVERT(AZL,AZU,I3,ERR,ERROR,*999)
-    Jznu=I3**0.5_DP
+!    Jznu=I3**0.5_DP
+    Jznu=Determinant(DZDNU,err,error)
     E = 0.5_DP*AZL 
     DO i=1,3
       E(i,i)=E(i,i)-0.5_DP

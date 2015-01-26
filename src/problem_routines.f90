@@ -1371,7 +1371,7 @@ CONTAINS
                         & iterationNumber,ERR,ERROR,*999)
                       CALL EquationsSet_JacobianRigidBodyContactUpdateStaticFEM(EQUATIONS_SET,iterationNumber,ERR,ERROR,*999)
 !                      IF(iterationNumber<=interfaceCondition%interfaceContactMetrics%iterationGeometricTerm) THEN
-!                        CALL EquationsSet_JacobianRigidBodyContactPerturb(EQUATIONS_SET,iterationNumber,ERR,ERROR,*999)
+                        CALL EquationsSet_JacobianRigidBodyContactPerturb(EQUATIONS_SET,iterationNumber,ERR,ERROR,*999)
 !                      ENDIF
                     ! deformable-deformable body contact
                     ELSEIF(EQUATIONS_SET%TYPE==EQUATIONS_SET_FINITE_ELASTICITY_TYPE) THEN
@@ -1893,19 +1893,19 @@ CONTAINS
       & tempA,tempB,geometricTerm,matrixValue,junk1,junk2,junk3,angleX
     TYPE(VARYING_STRING) :: localError
     
-!    TYPE(VARYING_STRING) :: directory
-!    LOGICAL :: dirExists
-!    INTEGER(INTG) :: IUNIT,i,j
-!    CHARACTER(LEN=100) :: filenameOutput
-!    
-!    directory="results_iter/"
-!    INQUIRE(FILE=CHAR(directory),EXIST=dirExists)
-!    IF(.NOT.dirExists) THEN
-!      CALL SYSTEM(CHAR("mkdir "//directory))
-!    ENDIF
-!    
-!    filenameOutput=directory//"stiffnessMatrix.exdata"
-!    OPEN(UNIT=IUNIT,FILE=filenameOutput,STATUS="UNKNOWN",ACTION="WRITE",IOSTAT=ERR)
+    TYPE(VARYING_STRING) :: directory
+    LOGICAL :: dirExists
+    INTEGER(INTG) :: IUNIT,i,j
+    CHARACTER(LEN=100) :: filenameOutput
+    
+    directory="results_iter/"
+    INQUIRE(FILE=CHAR(directory),EXIST=dirExists)
+    IF(.NOT.dirExists) THEN
+      CALL SYSTEM(CHAR("mkdir "//directory))
+    ENDIF
+    
+    filenameOutput=directory//"stiffnessMatrix.exdata"
+    OPEN(UNIT=IUNIT,FILE=filenameOutput,STATUS="UNKNOWN",ACTION="WRITE",IOSTAT=ERR)
 !    
     CALL ENTERS("EquationsSet_JacobianRigidBodyContactUpdateStaticFEM",ERR,ERROR,*999)
 
@@ -1931,6 +1931,8 @@ CONTAINS
             jacobianNumber=1
             jacobian=>nonlinearMatrices%JACOBIANS(jacobianNumber)%PTR%JACOBIAN
             defDepVariable=>nonlinearMapping%JACOBIAN_TO_VAR_MAP(jacobianNumber)%VARIABLE
+            
+!            CALL DISTRIBUTED_MATRIX_ALL_VALUES_SET(jacobian,0.0_DP,err,error,*999)
             
             ! Get the 6 dof for rigid body position 
             DO componentIdx=1,3
@@ -2287,21 +2289,21 @@ CONTAINS
 !                    ENDIF
                   ENDDO !rowFieldComp
                   
-!                  rowIdx=defDepVariable%components(8)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
-!                  CALL FIELD_PARAMETER_SET_GET_CONSTANT(defDepField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE, &
-!                    & 8,angleX,err,error,*999)
-!!                  CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"angle Jacobian = ",angleX,err,error,*999)  
-!                  forceTerm=contactPointMetrics%contactStiffness(2)*contactPointMetrics%contactStiffness(3)* &
-!                    & EXP(contactPointMetrics%contactStiffness(3)*angleX)
-!                  CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,rowIdx,rowIdx,forceTerm,err,error,*999)
+                  rowIdx=defDepVariable%components(8)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
+                  CALL FIELD_PARAMETER_SET_GET_CONSTANT(defDepField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE, &
+                    & 8,angleX,err,error,*999)
+!                  CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"angle Jacobian = ",angleX,err,error,*999)  
+                  forceTerm=contactPointMetrics%contactStiffness(2)*contactPointMetrics%contactStiffness(3)* &
+                    & EXP(contactPointMetrics%contactStiffness(3)*angleX)
+                  CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,rowIdx,rowIdx,forceTerm,err,error,*999)
                   
 !                ENDIF !iterationNumber<iterationGeometricTerm
               ENDIF !inContact
             ENDDO !globalDataPointNum
             
             !write out stiffness matrx
-!            DO j=jacobian%CMISS%MATRIX%N-2,jacobian%CMISS%MATRIX%N
-!              DO i=1,jacobian%CMISS%MATRIX%M
+!            DO i=641,641!1,jacobian%CMISS%MATRIX%M
+!              DO j=1,jacobian%CMISS%MATRIX%N
 !                CALL DISTRIBUTED_MATRIX_VALUES_GET(jacobian,i,j,matrixValue,err,error,*999)
 !                WRITE(IUNIT,'(1X,3E25.15)') matrixValue
 !              ENDDO !j
@@ -2312,15 +2314,16 @@ CONTAINS
 
             CALL DISTRIBUTED_MATRIX_UPDATE_START(jacobian,err,error,*999)
             CALL DISTRIBUTED_MATRIX_UPDATE_FINISH(jacobian,err,error,*999)
-!            rowIdx=defDepVariable%components(5)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
-!            CALL DISTRIBUTED_MATRIX_VALUES_GET(jacobian,rowIdx,rowIdx,junk1,err,error,*999)
-!            rowIdx=defDepVariable%components(6)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
-!            CALL DISTRIBUTED_MATRIX_VALUES_GET(jacobian,rowIdx,rowIdx,junk2,err,error,*999)
-!            rowIdx=defDepVariable%components(7)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
-!            CALL DISTRIBUTED_MATRIX_VALUES_GET(jacobian,rowIdx,rowIdx,junk3,err,error,*999)
+            
+            rowIdx=defDepVariable%components(5)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
+            CALL DISTRIBUTED_MATRIX_VALUES_GET(jacobian,rowIdx,rowIdx,junk1,err,error,*999)
+            rowIdx=defDepVariable%components(6)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
+            CALL DISTRIBUTED_MATRIX_VALUES_GET(jacobian,rowIdx,rowIdx,junk2,err,error,*999)
+            rowIdx=defDepVariable%components(7)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
+            CALL DISTRIBUTED_MATRIX_VALUES_GET(jacobian,rowIdx,rowIdx,junk3,err,error,*999)
 !            
-!            WRITE(IUNIT,'(''Jacobian:'',E25.15,'','',E25.15,'','',E25.15)') &
-!              & junk1,junk2,junk3
+            WRITE(IUNIT,'(''Jacobian:'',E25.15,'','',E25.15,'','',E25.15)') &
+              & junk1,junk2,junk3
 !            
           ELSE
             CALL FLAG_ERROR("Equations matrices is not associated",err,error,*999)
@@ -6580,19 +6583,26 @@ SUBROUTINE ProblemSolver_ShellLineSearchPetsc(lineSearch,ctx,err)
   LOGICAL :: parabolaFail
   TYPE(VARYING_STRING) :: error,localError
   
-  TYPE(VARYING_STRING) :: directory
-  LOGICAL :: dirExists
-  INTEGER(INTG) :: IUNIT,j
-  CHARACTER(LEN=100) :: filenameOutput
+  ! ----------------------  XY: for debugging only, output reduced stiffness matrix -------------------
+!  TYPE(PETSC_MAT_TYPE) :: aMatrix
+!  REAL(DP), POINTER :: aMatrixReal(:,:)
+!  REAL(DP) :: matrixValue
+!  TYPE(DISTRIBUTED_MATRIX_TYPE), POINTER :: matrix 
+!  INTEGER(INTG) :: m,n
+!  
+!  TYPE(VARYING_STRING) :: directory
+!  LOGICAL :: dirExists
+!  INTEGER(INTG) :: IUNIT,j
+!  CHARACTER(LEN=100) :: filenameOutput
 
-  directory="results_iter/"
-  INQUIRE(FILE=CHAR(directory),EXIST=dirExists)
-  IF(.NOT.dirExists) THEN
-    CALL SYSTEM(CHAR("mkdir "//directory))
-  ENDIF
-  
-  filenameOutput=directory//"linesearch.txt"
-  OPEN(UNIT=IUNIT,FILE=filenameOutput,STATUS="UNKNOWN",ACTION="WRITE",IOSTAT=ERR)
+!  directory="results_iter/"
+!  INQUIRE(FILE=CHAR(directory),EXIST=dirExists)
+!  IF(.NOT.dirExists) THEN
+!    CALL SYSTEM(CHAR("mkdir "//directory))
+!  ENDIF
+!  
+!  filenameOutput=directory//"linesearch.txt"
+!  OPEN(UNIT=IUNIT,FILE=filenameOutput,STATUS="UNKNOWN",ACTION="WRITE",IOSTAT=ERR)
 
 
   IF(ASSOCIATED(ctx)) THEN
@@ -6630,11 +6640,43 @@ SUBROUTINE ProblemSolver_ShellLineSearchPetsc(lineSearch,ctx,err)
 !              ENDDO
 !              OPEN(UNIT=IUNIT)
 !              CALL EXIT(0)   
+
+
+!----------------------  XY: for debugging only, output reduced stiffness matrix -------------------
+!              CALL PETSC_SNESGETJACOBIAN(lineSearchSolver%SNES,aMatrix,err,error,*999)
+!              CALL PETSC_MATGETARRAYF90(aMatrix,aMatrixReal,err,error,*999)
+!              CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"Jacobian size 1: ",SIZE(aMatrixReal,1),err,error,*999) 
+!              CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"Jacobian size 2: ",SIZE(aMatrixReal,2),err,error,*999) 
+!              
+!              DO i=1,SIZE(aMatrixReal,1)
+!                DO j=1,SIZE(aMatrixReal,2)
+!                  WRITE(IUNIT,'(E25.15)') aMatrixReal(i,j)
+!                ENDDO
+!              ENDDO
+              
+              
+              
+!              CALL SolverEquations_MatrixGet(nonlinearSolver%SOLVER%SOLVER_EQUATIONS,1,matrix,err,error,*999)
+!              CALL DistributedMatrix_DimensionsGet(matrix,m,n,err,error,*999)
+!              CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"Jacobian size 1: ",m,err,error,*999) 
+!              CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"Jacobian size 2: ",n,err,error,*999) 
+!              
+!              DO i=1,m
+!                DO j=1,n
+!                  CALL DISTRIBUTED_MATRIX_VALUES_GET(matrix,i,j,matrixValue,err,error,*999)
+!                  WRITE(IUNIT,'(1X,3E25.15)') matrixValue
+!                ENDDO
+!              ENDDO
+              
+              
+!              CALL EXIT(0)   
+
+
+
             ELSE
               CALL PETSC_VECGETARRAYF90(wPetsc,xArray,err,error,*999)
               CALL PETSC_VECGETARRAYF90(gPetsc,fArray,err,error,*999)
               CALL PETSC_VECGETARRAYF90(yPetsc,yArray,err,error,*999)
-              
 !              IF(iterationNumber==4) THEN
 !                CALL PETSC_VECCOPY(xPetsc,wPetsc,ERR,ERROR,*999) !initialise w from x
 !                CALL PETSC_VECCOPY(fPetsc,gPetsc,ERR,ERROR,*999) !initialise w from x
