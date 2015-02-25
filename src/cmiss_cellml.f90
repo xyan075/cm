@@ -487,7 +487,6 @@ CONTAINS
                           CALL FLAG_ERROR("Not implemented.",ERR,ERROR,*999)
                         CASE(FIELD_GAUSS_POINT_BASED_INTERPOLATION)
                           CALL Field_ParameterSetUpdateLocalGaussPoint(MODEL_MAP%FIELD,MODEL_MAP%VARIABLE_TYPE, &
-                          CALL Field_ParameterSetUpdateGaussPoint(MODEL_MAP%FIELD,MODEL_MAP%VARIABLE_TYPE, &
                             & MODEL_MAP%FIELD_PARAMETER_SET,gaussNumber,elementNumber,MODEL_MAP%COMPONENT_NUMBER, &
                             & dofValue,ERR,ERROR,*999)
                         CASE DEFAULT
@@ -1029,7 +1028,6 @@ CONTAINS
                               CALL FLAG_ERROR("Not implemented.",ERR,ERROR,*999)
                             CASE(FIELD_GAUSS_POINT_BASED_INTERPOLATION)
                               CALL Field_ParameterSetUpdateLocalGaussPoint(CELLML%INTERMEDIATE_FIELD%INTERMEDIATE_FIELD, &
-                              CALL Field_ParameterSetUpdateGaussPoint(CELLML%INTERMEDIATE_FIELD%INTERMEDIATE_FIELD, &
                                 & FIELD_U_VARIABLE_TYPE,MODEL_MAP%CELLML_PARAMETER_SET,gaussNumber,elementNumber, &
                                 & MODEL_MAP%CELLML_VARIABLE_NUMBER,dofValue,ERR,ERROR,*999)
                             CASE DEFAULT
