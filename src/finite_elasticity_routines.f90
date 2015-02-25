@@ -930,11 +930,16 @@ CONTAINS
               & MATERIALS_INTERPOLATED_POINT,DARCY_DEPENDENT_INTERPOLATED_POINT, &
               & INDEPENDENT_INTERPOLATED_POINT,CAUCHY_TENSOR,Jznu,DZDNU,ELEMENT_NUMBER,gauss_idx,ERR,ERROR,*999)
               
+            ! XY - output Cauchy stress tensor
 !            IF(ELEMENT_NUMBER==64) THEN
 !              WRITE(IUNIT,'(3E25.15,/(3E25.15))') &
-!                & ((DZDNU(i,j),j=1,3),i=1,3)
+!                & ((CAUCHY_TENSOR(i,j),j=1,3),i=1,3)
 !            ENDIF
 !            OPEN(UNIT=IUNIT)
+
+            ! XY - output deformation gradient tensor
+!            WRITE(IUNIT,'(3E25.15,/(3E25.15))') &
+!                & ((DZDNU(i,j),j=1,3),i=1,3)
 
             IF(EQUATIONS_SET%SUBTYPE==EQUATIONS_SET_INCOMPRESSIBLE_ELASTICITY_DRIVEN_DARCY_SUBTYPE) THEN
               !Parameters settings for coupled elasticity Darcy INRIA model:

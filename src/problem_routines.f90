@@ -1371,7 +1371,7 @@ CONTAINS
                         & iterationNumber,ERR,ERROR,*999)
                       CALL EquationsSet_JacobianRigidBodyContactUpdateStaticFEM(EQUATIONS_SET,iterationNumber,ERR,ERROR,*999)
 !                      IF(iterationNumber<=interfaceCondition%interfaceContactMetrics%iterationGeometricTerm) THEN
-!                        CALL EquationsSet_JacobianRigidBodyContactPerturb(EQUATIONS_SET,iterationNumber,ERR,ERROR,*999)
+                        CALL EquationsSet_JacobianRigidBodyContactPerturb(EQUATIONS_SET,iterationNumber,ERR,ERROR,*999)
 !                      ENDIF
                     ! deformable-deformable body contact
                     ELSEIF(EQUATIONS_SET%TYPE==EQUATIONS_SET_FINITE_ELASTICITY_TYPE) THEN
@@ -2293,9 +2293,20 @@ CONTAINS
                   CALL FIELD_PARAMETER_SET_GET_CONSTANT(defDepField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE, &
                     & 8,angleX,err,error,*999)
 !                  CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"angle Jacobian = ",angleX,err,error,*999)  
+                  IF(angleX>=0.0_DP) THEN
+                    forceTerm=contactPointMetrics%contactStiffness(2)*contactPointMetrics%contactStiffness(3)* &
+                      & EXP(contactPointMetrics%contactStiffness(3)*angleX)
+                    CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,rowIdx,rowIdx,forceTerm,err,error,*999)
+                  ENDIF
+                  
+                  
+                  rowIdx=defDepVariable%components(9)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
+                  CALL FIELD_PARAMETER_SET_GET_CONSTANT(defDepField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE, &
+                    & 9,angleX,err,error,*999)
+!                  CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"angle Jacobian = ",angleX,err,error,*999)  
                   forceTerm=contactPointMetrics%contactStiffness(2)*contactPointMetrics%contactStiffness(3)* &
                     & EXP(contactPointMetrics%contactStiffness(3)*angleX)
-!                  CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,rowIdx,rowIdx,forceTerm,err,error,*999)
+                  CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,rowIdx,rowIdx,forceTerm,err,error,*999)
                   
 !                ENDIF !iterationNumber<iterationGeometricTerm
               ENDIF !inContact
@@ -2553,13 +2564,13 @@ CONTAINS
             
             !====================================================================================================================
             ! perturb rigid body dofs
-!            dataProjection%projectData=.TRUE.
+            dataProjection%projectData=.TRUE.
             DO perturbDofIdx=4,6
 !              CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"Perturbation:",ERR,ERROR,*999)
               IF(perturbDofIdx<4) THEN
                 delta=1E-6_DP
               ELSE
-                delta=1E-4_DP
+                delta=1E-6_DP
               ENDIF
               ! Get the original dependent dof value
               localNy=defDepVariable%COMPONENTS(perturbDofIdx+4)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
@@ -3281,7 +3292,7 @@ CONTAINS
                 ENDIF !inContact
               ENDDO !globalDataPointNum
               
-              ! add body force
+              ! add body force - y direction, push in contact with the pelvic floor horizontally
               dofIdx=residualVariable%components(6)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
               residualValue=contactMetrics%rigidBody%forces(2) ! should be negative to go into +ve y
               IF(perburbation) THEN
@@ -3292,9 +3303,28 @@ CONTAINS
                 CALL DISTRIBUTED_VECTOR_VALUES_ADD(nonlinearMatrices%contactRESIDUAL,dofIdx,residualValue,err,error,*999)
               ENDIF
               
-              ! add body force
+              ! add body force - z direction, push in contact with the pelvic floor vertically
               dofIdx=residualVariable%components(7)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
-              residualValue=contactMetrics%rigidBody%forces(3) ! should be negative to go into +ve y
+              residualValue=contactMetrics%rigidBody%forces(3) ! should be positive to go into -ve z
+              IF(perburbation) THEN
+                contactMetrics%residualPerturbed(dofIdx)=contactMetrics%residualPerturbed(dofIdx)+residualValue
+              ELSE
+                contactMetrics%residualOriginal(dofIdx)=contactMetrics%residualOriginal(dofIdx)+residualValue
+                CALL DISTRIBUTED_VECTOR_VALUES_ADD(nonlinearMatrices%RESIDUAL,dofIdx,residualValue,err,error,*999)
+                CALL DISTRIBUTED_VECTOR_VALUES_ADD(nonlinearMatrices%contactRESIDUAL,dofIdx,residualValue,err,error,*999)
+              ENDIF
+              
+              
+              ! penalise flexion of head
+              CALL FIELD_PARAMETER_SET_GET_CONSTANT(defDepField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE,8, &
+                & angleX,err,error,*999)
+              IF(angleX>=0.0_DP) THEN
+                residualValue=contactPointMetrics%contactStiffness(2)*(EXP(angleX*contactPointMetrics%contactStiffness(3))-1.0_DP)
+              ELSE
+                residualValue=0.0_DP
+              ENDIF
+              
+              dofIdx=residualVariable%components(8)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
               IF(perburbation) THEN
                 contactMetrics%residualPerturbed(dofIdx)=contactMetrics%residualPerturbed(dofIdx)+residualValue
               ELSE
@@ -3305,34 +3335,34 @@ CONTAINS
               
               
               ! penalise asynclitic of head
-!              CALL FIELD_PARAMETER_SET_GET_CONSTANT(defDepField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE,9, &
-!                & angleX,err,error,*999)
-!              IF(angleX>=0.0_DP) THEN
-!                residualValue=contactPointMetrics%contactStiffness(2)*(EXP(angleX*contactPointMetrics%contactStiffness(3))-1.0_DP)
-!              ELSE
-!                residualValue=-contactPointMetrics%contactStiffness(2)*(EXP(-angleX*contactPointMetrics%contactStiffness(3))-1.0_DP)
-!              ENDIF
-!              
-!              dofIdx=residualVariable%components(9)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
-!              IF(perburbation) THEN
-!                contactMetrics%residualPerturbed(dofIdx)=contactMetrics%residualPerturbed(dofIdx)+residualValue
-!              ELSE
-!                contactMetrics%residualOriginal(dofIdx)=contactMetrics%residualOriginal(dofIdx)+residualValue
-!                CALL DISTRIBUTED_VECTOR_VALUES_ADD(nonlinearMatrices%RESIDUAL,dofIdx,residualValue,err,error,*999)
-!                CALL DISTRIBUTED_VECTOR_VALUES_ADD(nonlinearMatrices%contactRESIDUAL,dofIdx,residualValue,err,error,*999)
-!              ENDIF
+              CALL FIELD_PARAMETER_SET_GET_CONSTANT(defDepField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE,9, &
+                & angleX,err,error,*999)
+              IF(angleX>=0.0_DP) THEN
+                residualValue=contactPointMetrics%contactStiffness(2)*(EXP(angleX*contactPointMetrics%contactStiffness(3))-1.0_DP)
+              ELSE
+                residualValue=-contactPointMetrics%contactStiffness(2)*(EXP(-angleX*contactPointMetrics%contactStiffness(3))-1.0_DP)
+              ENDIF
+              
+              dofIdx=residualVariable%components(9)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
+              IF(perburbation) THEN
+                contactMetrics%residualPerturbed(dofIdx)=contactMetrics%residualPerturbed(dofIdx)+residualValue
+              ELSE
+                contactMetrics%residualOriginal(dofIdx)=contactMetrics%residualOriginal(dofIdx)+residualValue
+                CALL DISTRIBUTED_VECTOR_VALUES_ADD(nonlinearMatrices%RESIDUAL,dofIdx,residualValue,err,error,*999)
+                CALL DISTRIBUTED_VECTOR_VALUES_ADD(nonlinearMatrices%contactRESIDUAL,dofIdx,residualValue,err,error,*999)
+              ENDIF
               
               ! output to screen
 !              CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"******************** COM ******************",ERR,ERROR,*999)
-              DO fieldComponent=2,2
-                CALL FIELD_PARAMETER_SET_GET_CONSTANT(defDepField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE,fieldComponent+7, &
-                  & angleX,err,error,*999)
-                IF(perburbation) THEN
-                  CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"p angle = ",angleX,err,error,*999)
-                else
-                 CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"angle = ",angleX,err,error,*999)
-                endif
-              ENDDO !fieldComponent
+!              DO fieldComponent=2,2
+!                CALL FIELD_PARAMETER_SET_GET_CONSTANT(defDepField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE,fieldComponent+7, &
+!                  & angleX,err,error,*999)
+!                IF(perburbation) THEN
+!                  CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"p angle = ",angleX,err,error,*999)
+!                else
+!                 CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"angle = ",angleX,err,error,*999)
+!                endif
+!              ENDDO !fieldComponent
 
 !              CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"******************** force ******************",ERR,ERROR,*999)
 !              DO fieldComponent=1,2
@@ -3347,17 +3377,17 @@ CONTAINS
 !                CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"******************** torque ******************",ERR,ERROR,*999)
               ENDIF
               
-              DO fieldComponent=2,2
-                dofIdx=residualVariable%components(7+fieldComponent)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
-                IF(perburbation) THEN
-                  residualValue=contactMetrics%residualPerturbed(dofIdx)
-                  CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"p torque = ",residualValue,err,error,*999)
-                ELSE
-                  CALL DISTRIBUTED_VECTOR_VALUES_GET(nonlinearMatrices%RESIDUAL,dofIdx,residualValue,err,error,*999)
-                  CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"torque = ",residualValue,err,error,*999)
-                ENDIF
-                
-              ENDDO !fieldComponent
+!              DO fieldComponent=2,2
+!                dofIdx=residualVariable%components(7+fieldComponent)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
+!                IF(perburbation) THEN
+!                  residualValue=contactMetrics%residualPerturbed(dofIdx)
+!                  CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"p torque = ",residualValue,err,error,*999)
+!                ELSE
+!                  CALL DISTRIBUTED_VECTOR_VALUES_GET(nonlinearMatrices%RESIDUAL,dofIdx,residualValue,err,error,*999)
+!                  CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"torque = ",residualValue,err,error,*999)
+!                ENDIF
+!                
+!              ENDDO !fieldComponent
 !              
 !              CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"******************** torque ******************",ERR,ERROR,*999)
 !              DO fieldComponent=1,3
