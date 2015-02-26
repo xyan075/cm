@@ -74,6 +74,7 @@ MODULE EQUATIONS_SET_ROUTINES
   USE MULTI_PHYSICS_ROUTINES
   USE NODE_ROUTINES
   USE STRINGS
+  USE SOLVER_ROUTINES
   USE TIMER
   USE TYPES
 
@@ -3039,6 +3040,7 @@ CONTAINS
     TYPE(FIELD_VARIABLE_TYPE), POINTER :: rowVariable,columnVariable
     TYPE(ELEMENT_VECTOR_TYPE) :: elementVector
     TYPE(BOUNDARY_CONDITIONS_DIRICHLET_TYPE), POINTER :: dirichletBC
+    TYPE(SOLVER_TYPE), POINTER :: SOLVER,CELLML_SOLVER
     INTEGER(INTG) :: componentIdx,localNy,version,derivativeIdx,derivative,nodeIdx,node,column
     INTEGER(INTG) :: componentInterpolationType
     INTEGER(INTG) :: numberOfRows
@@ -3104,7 +3106,9 @@ CONTAINS
           dirichletBC=>equationsSet%BOUNDARY_CONDITIONS%BOUNDARY_CONDITIONS_VARIABLES(1)%PTR%DIRICHLET_BOUNDARY_CONDITIONS
           noDofFixed=equationsSet%BOUNDARY_CONDITIONS%BOUNDARY_CONDITIONS_VARIABLES(1)%PTR%NUMBER_OF_DIRICHLET_CONDITIONS
             
-            
+          ! get the CellML solver
+          SOLVER=>equationsSet%BOUNDARY_CONDITIONS%SOLVER_EQUATIONS%SOLVER
+          CELLML_SOLVER=>SOLVER%NONLINEAR_SOLVER%NEWTON_SOLVER%CELLML_EVALUATOR_SOLVER
             
             
             
@@ -3118,15 +3122,15 @@ CONTAINS
           ! distributed out, have to use proper field accessing routines..
           ! so let's just loop over component, node/el, derivative
           column=0  ! element jacobian matrix column number
-          DO componentIdx=1,1!columnVariable%NUMBER_OF_COMPONENTS
+          DO componentIdx=1,columnVariable%NUMBER_OF_COMPONENTS
             elementsTopology=>columnVariable%COMPONENTS(componentIdx)%DOMAIN%TOPOLOGY%ELEMENTS
             componentInterpolationType=columnVariable%COMPONENTS(componentIdx)%INTERPOLATION_TYPE
             SELECT CASE (componentInterpolationType)
             CASE (FIELD_NODE_BASED_INTERPOLATION)
               basis=>elementsTopology%ELEMENTS(elementNumber)%BASIS
-              DO nodeIdx=1,1!basis%NUMBER_OF_NODES
+              DO nodeIdx=1,basis%NUMBER_OF_NODES
                 node=elementsTopology%ELEMENTS(elementNumber)%ELEMENT_NODES(nodeIdx)
-                DO derivativeIdx=1,1!basis%NUMBER_OF_DERIVATIVES(nodeIdx)
+                DO derivativeIdx=1,basis%NUMBER_OF_DERIVATIVES(nodeIdx)
                   derivative=elementsTopology%ELEMENTS(elementNumber)%ELEMENT_DERIVATIVES(derivativeIdx,nodeIdx)
                   version=elementsTopology%ELEMENTS(elementNumber)%elementVersions(derivativeIdx,nodeIdx)
                   localNy=columnVariable%COMPONENTS(componentIdx)%PARAM_TO_DOF_MAP%NODE_PARAM2DOF_MAP%NODES(node)% &
@@ -3159,8 +3163,14 @@ CONTAINS
                     ! XY multiply delta by scale factor
   !                  CALL DISTRIBUTED_VECTOR_VALUES_SET(parameters,localNy,origDepVar+delta*scaleFactor,err,error,*999)
                     nonlinearMatrices%ELEMENT_RESIDUAL%VECTOR=0.0_DP ! must remember to flush existing results, otherwise they're added
-                    CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"********************  Jacobian! ***************",ERR,ERROR,*999)
-                    CALL FINITE_ELASTICITY_FINITE_ELEMENT_PRE_RESIDUAL_EVALUATE(equationsSet,ERR,ERROR,*999)
+!                    CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"********************  Jacobian! ***************",ERR,ERROR,*999)
+                    ! evaluate green strain with the perturbed dof
+!                    CALL FINITE_ELASTICITY_FINITE_ELEMENT_PRE_RESIDUAL_EVALUATE(equationsSet,ERR,ERROR,*999)
+                    ! evalute 2nd PK stress
+                    IF(ASSOCIATED(CELLML_SOLVER)) THEN
+                      CALL SOLVER_SOLVE(CELLML_SOLVER,ERR,ERROR,*999)
+                    ENDIF
+                    
 !                    CALL EQUATIONS_SET_FINITE_ELEMENT_RESIDUAL_EVALUATE(equationsSet,elementNumber,err,error,*999)
                     CALL FINITE_ELASTICITY_FINITE_ELEMENT_RESIDUAL_EVALUATE(equationsSet,elementNumber,err,error,*999,.TRUE.)
                     CALL DISTRIBUTED_VECTOR_VALUES_SET(parameters,localNy,origDepVar,err,error,*999)
@@ -3174,18 +3184,13 @@ CONTAINS
 !                    ENDIF
 !                  
                     ! XY output purturbed element residual
-!                    IF((elementNumber==5)) THEN
+!                    IF((elementNumber==1)) THEN
 !                      DO i=1,193
 !                        WRITE(IUNIT,'(1X,3E25.15)') nonlinearMatrices%ELEMENT_RESIDUAL%VECTOR(i)
 !                      ENDDO
 !                    ENDIF
 
-
-
                   ENDIF !freeDof
-                  
-                  
-                  
                   
                 ENDDO !derivativeIdx
               ENDDO !nodeIdx
@@ -3202,6 +3207,12 @@ CONTAINS
               CALL DISTRIBUTED_VECTOR_VALUES_GET(parameters,localNy,origDepVar,err,error,*999)
               CALL DISTRIBUTED_VECTOR_VALUES_SET(parameters,localNy,origDepVar+delta,err,error,*999)
               nonlinearMatrices%ELEMENT_RESIDUAL%VECTOR=0.0_DP ! must remember to flush existing results, otherwise they're added
+              ! evaluate green strain with the perturbed dof
+              CALL FINITE_ELASTICITY_FINITE_ELEMENT_PRE_RESIDUAL_EVALUATE(equationsSet,ERR,ERROR,*999)
+              ! evalute 2nd PK stress
+              IF(ASSOCIATED(CELLML_SOLVER)) THEN
+                CALL SOLVER_SOLVE(CELLML_SOLVER,ERR,ERROR,*999)
+              ENDIF
               CALL EQUATIONS_SET_FINITE_ELEMENT_RESIDUAL_EVALUATE(equationsSet,elementNumber,err,error,*999)
               CALL DISTRIBUTED_VECTOR_VALUES_SET(parameters,localNy,origDepVar,err,error,*999)
               column=column+1
@@ -3265,7 +3276,7 @@ CONTAINS
       CALL FLAG_ERROR("Equations set is not associated.",err,error,*999)
     END IF
     
-    CALL EXIT(0)
+!    CALL EXIT(0)
 
     CALL EXITS("EquationsSet_FiniteElementJacobianEvaluateFD")
     RETURN
@@ -5083,7 +5094,7 @@ CONTAINS
             ENDIF
             NUMBER_OF_TIMES=0
             !Loop over the internal elements
-            DO element_idx=1,1!ELEMENTS_MAPPING%INTERNAL_START,ELEMENTS_MAPPING%INTERNAL_FINISH
+            DO element_idx=ELEMENTS_MAPPING%INTERNAL_START,ELEMENTS_MAPPING%INTERNAL_FINISH
               ne=ELEMENTS_MAPPING%DOMAIN_LIST(element_idx)
               
               
@@ -5099,8 +5110,8 @@ CONTAINS
 !                  WRITE(IUNIT,'(1X,3E25.15)') EQUATIONS_MATRICES%NONLINEAR_MATRICES%JACOBIANS(1)%PTR%ELEMENT_JACOBIAN%MATRIX(i,j)
 !                ENDDO !j
 !              ENDDO !i
-!              CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"  ELEMENT_NUMBER = ",ne,ERR,ERROR,*999)
-!!!              CALL EXIT(0)
+              CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"  ELEMENT_NUMBER = ",ne,ERR,ERROR,*999)
+!!              CALL EXIT(0)
 !              IF(ne==73) THEN
 !                OPEN(UNIT=IUNIT)
 !                CALL EXIT(0)
@@ -5108,7 +5119,7 @@ CONTAINS
               
               CALL EQUATIONS_MATRICES_JACOBIAN_ELEMENT_ADD(EQUATIONS_MATRICES,ERR,ERROR,*999)
             ENDDO !element_idx   
-            CALL EXIT(0)               
+!            CALL EXIT(0)               
             !Output timing information if required
             IF(EQUATIONS%OUTPUT_TYPE>=EQUATIONS_TIMING_OUTPUT) THEN
               CALL CPU_TIMER(USER_CPU,USER_TIME3,ERR,ERROR,*999)

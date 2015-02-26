@@ -5418,7 +5418,7 @@ SUBROUTINE ProblemSolver_ShellLineSearchPetsc(lineSearch,ctx,err)
 !  REAL(DP) :: matrixValue
 !  TYPE(DISTRIBUTED_MATRIX_TYPE), POINTER :: matrix 
 !  INTEGER(INTG) :: m,n
-!  
+  
 !  TYPE(VARYING_STRING) :: directory
 !  LOGICAL :: dirExists
 !  INTEGER(INTG) :: IUNIT,j
@@ -5466,7 +5466,7 @@ SUBROUTINE ProblemSolver_ShellLineSearchPetsc(lineSearch,ctx,err)
               CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"initialE ",newtonSolver%convergenceTest%energyFirstIter,err,error,*999)  
               ! XY - output line search direction (yArray), residual (fArray)
 !              DO i=1,SIZE(yArray,1)
-!                WRITE(IUNIT,'(E25.15)') fArray(i)
+!                WRITE(IUNIT,'(E25.15)') yArray(i)
 !              ENDDO
 !              OPEN(UNIT=IUNIT)
 !              CALL EXIT(0)   

@@ -1151,8 +1151,10 @@ CONTAINS
               
             ! XY - output deformation gradient tensor
 !            IF(PRESENT(output)) THEN
-!            WRITE(IUNIT,'(3E25.15,/(3E25.15))') &
-!                & ((DZDNU(i,j),j=1,3),i=1,3)
+!              IF(ELEMENT_NUMBER==1) THEN
+!                WRITE(IUNIT,'(3E25.15,/(3E25.15))') &
+!                    & ((DZDNU(i,j),j=1,3),i=1,3)
+!                endif
 !            endif
 
             CALL MATRIX_TRANSPOSE(DZDNU,DZDNUT,ERR,ERROR,*999)
@@ -1189,12 +1191,12 @@ CONTAINS
               CALL Field_ParameterSetGetLocalGaussPoint(DEPENDENT_FIELD,FIELD_U2_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE, &
                 & gauss_idx,ELEMENT_NUMBER,6,PIOLA_TENSOR(3,3),ERR,ERROR,*999)
               !CellML computes the deviatoric stress. Add the volumetric component!
-              PIOLA_TENSOR(1,1)=PIOLA_TENSOR(1,1)!+2.0_DP*P*AZU(1,1)
-              PIOLA_TENSOR(2,2)=PIOLA_TENSOR(2,2)!+2.0_DP*P*AZU(2,2)
-              PIOLA_TENSOR(3,3)=PIOLA_TENSOR(3,3)!+2.0_DP*P*AZU(3,3)
-              PIOLA_TENSOR(1,2)=PIOLA_TENSOR(1,2)!+2.0_DP*P*AZU(1,2)
-              PIOLA_TENSOR(1,3)=PIOLA_TENSOR(1,3)!+2.0_DP*P*AZU(1,3)
-              PIOLA_TENSOR(2,3)=PIOLA_TENSOR(2,3)!+2.0_DP*P*AZU(2,3)
+              PIOLA_TENSOR(1,1)=PIOLA_TENSOR(1,1)+2.0_DP*P*AZU(1,1)
+              PIOLA_TENSOR(2,2)=PIOLA_TENSOR(2,2)+2.0_DP*P*AZU(2,2)
+              PIOLA_TENSOR(3,3)=PIOLA_TENSOR(3,3)+2.0_DP*P*AZU(3,3)
+              PIOLA_TENSOR(1,2)=PIOLA_TENSOR(1,2)+2.0_DP*P*AZU(1,2)
+              PIOLA_TENSOR(1,3)=PIOLA_TENSOR(1,3)+2.0_DP*P*AZU(1,3)
+              PIOLA_TENSOR(2,3)=PIOLA_TENSOR(2,3)+2.0_DP*P*AZU(2,3)
               PIOLA_TENSOR(2,1)=PIOLA_TENSOR(1,2)
               PIOLA_TENSOR(3,1)=PIOLA_TENSOR(1,3)
               PIOLA_TENSOR(3,2)=PIOLA_TENSOR(2,3)
@@ -1905,23 +1907,23 @@ CONTAINS
       & USER_TIME5(1),SYSTEM_ELAPSED,SYSTEM_TIME2(1),SYSTEM_TIME3(1),SYSTEM_TIME4(1), &
       & SYSTEM_TIME5(1)
       
-    TYPE(VARYING_STRING) :: directory
-    LOGICAL :: dirExists
-    INTEGER(INTG) :: IUNIT,j
-    CHARACTER(LEN=100) :: filenameOutput
+!    TYPE(VARYING_STRING) :: directory
+!    LOGICAL :: dirExists
+!    INTEGER(INTG) :: IUNIT,j
+!    CHARACTER(LEN=100) :: filenameOutput
 
-    
-    directory="results_iter/"
-    INQUIRE(FILE=CHAR(directory),EXIST=dirExists)
-    IF(.NOT.dirExists) THEN
-      CALL SYSTEM(CHAR("mkdir "//directory))
-    ENDIF
-    
-    filenameOutput=directory//"FE.txt"
-    OPEN(UNIT=IUNIT,FILE=filenameOutput,STATUS="UNKNOWN",ACTION="WRITE",IOSTAT=ERR)
+!    
+!    directory="results_iter/"
+!    INQUIRE(FILE=CHAR(directory),EXIST=dirExists)
+!    IF(.NOT.dirExists) THEN
+!      CALL SYSTEM(CHAR("mkdir "//directory))
+!    ENDIF
+!    
+!    filenameOutput=directory//"FE.txt"
+!    OPEN(UNIT=IUNIT,FILE=filenameOutput,STATUS="UNKNOWN",ACTION="WRITE",IOSTAT=ERR)
 
     CALL ENTERS("FiniteElasticity_StrainCalculate",err,error,*999)
-    CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"********************  strain cal! ***************",ERR,ERROR,*999)
+!    CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"********************  strain cal! ***************",ERR,ERROR,*999)
 
     NULLIFY(GEOMETRIC_BASIS,DEPENDENT_BASIS)
     NULLIFY(EQUATIONS)
@@ -2063,10 +2065,10 @@ CONTAINS
             ENDDO
             
             ! XY output green strain
-            IF(element_idx==1) THEN
-              WRITE(IUNIT,'(3E25.15,/(3E25.15))') &
-                & ((E(i,j),j=1,3),i=1,3)
-            ENDIF
+!            IF(element_idx==1) THEN
+!              WRITE(IUNIT,'(3E25.15,/(3E25.15))') &
+!                & ((E(i,j),j=1,3),i=1,3)
+!            ENDIF
             
             
 
