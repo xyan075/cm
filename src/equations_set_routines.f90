@@ -3165,7 +3165,7 @@ CONTAINS
                     nonlinearMatrices%ELEMENT_RESIDUAL%VECTOR=0.0_DP ! must remember to flush existing results, otherwise they're added
 !                    CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"********************  Jacobian! ***************",ERR,ERROR,*999)
                     ! evaluate green strain with the perturbed dof
-!                    CALL FINITE_ELASTICITY_FINITE_ELEMENT_PRE_RESIDUAL_EVALUATE(equationsSet,ERR,ERROR,*999)
+                    CALL FINITE_ELASTICITY_FINITE_ELEMENT_PRE_RESIDUAL_EVALUATE(equationsSet,ERR,ERROR,*999)
                     ! evalute 2nd PK stress
                     IF(ASSOCIATED(CELLML_SOLVER)) THEN
                       CALL SOLVER_SOLVE(CELLML_SOLVER,ERR,ERROR,*999)
@@ -5110,7 +5110,7 @@ CONTAINS
 !                  WRITE(IUNIT,'(1X,3E25.15)') EQUATIONS_MATRICES%NONLINEAR_MATRICES%JACOBIANS(1)%PTR%ELEMENT_JACOBIAN%MATRIX(i,j)
 !                ENDDO !j
 !              ENDDO !i
-              CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"  ELEMENT_NUMBER = ",ne,ERR,ERROR,*999)
+!              CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"  ELEMENT_NUMBER = ",ne,ERR,ERROR,*999)
 !!              CALL EXIT(0)
 !              IF(ne==73) THEN
 !                OPEN(UNIT=IUNIT)
