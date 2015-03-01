@@ -985,6 +985,7 @@ CONTAINS
         SOLVER%CELLML_EVALUATOR_SOLVER%SOLVER=>SOLVER
         SOLVER%CELLML_EVALUATOR_SOLVER%SOLVER_LIBRARY=SOLVER_CMISS_LIBRARY
         SOLVER%CELLML_EVALUATOR_SOLVER%CURRENT_TIME=0.0_DP
+        SOLVER%CELLML_EVALUATOR_SOLVER%numberOfDofEvaluate=0
       ENDIF
     ELSE
       CALL FLAG_ERROR("Solver is not associated.",ERR,ERROR,*998)
@@ -1291,7 +1292,7 @@ CONTAINS
     INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
     TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
     !Local Variables
-    INTEGER(INTG) :: dof_idx,DOF_ORDER_TYPE,INTERMEDIATE_END_DOF,intermediate_idx,INTERMEDIATE_START_DOF,model_idx, &
+    INTEGER(INTG) :: countIdx,dof_idx,DOF_ORDER_TYPE,INTERMEDIATE_END_DOF,intermediate_idx,INTERMEDIATE_START_DOF,model_idx, &
       & NUMBER_INTERMEDIATES,NUMBER_PARAMETERS,NUMBER_STATES,PARAMETER_END_DOF,parameter_idx,PARAMETER_START_DOF, &
       & STATE_END_DOF,state_idx,STATE_START_DOF
     REAL(DP) :: INTERMEDIATES(MAX(1,MAX_NUMBER_INTERMEDIATES)),PARAMETERS(MAX(1,MAX_NUMBER_PARAMETERS)), &
@@ -1397,7 +1398,8 @@ CONTAINS
 
 #ifdef USECELLML                    
 
-              DO dof_idx=1,N
+              DO countIdx=1,CELLML_EVALUATOR_SOLVER%numberOfDofEvaluate
+                dof_idx=CELLML_EVALUATOR_SOLVER%dofNumbers(countIdx)
                 model_idx=MODELS_DATA(dof_idx)
                 IF(model_idx.GT.0) THEN
                   MODEL=>CELLML%MODELS(model_idx)%PTR

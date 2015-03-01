@@ -3040,7 +3040,7 @@ CONTAINS
     TYPE(FIELD_VARIABLE_TYPE), POINTER :: rowVariable,columnVariable
     TYPE(ELEMENT_VECTOR_TYPE) :: elementVector
     TYPE(BOUNDARY_CONDITIONS_DIRICHLET_TYPE), POINTER :: dirichletBC
-    TYPE(SOLVER_TYPE), POINTER :: SOLVER,CELLML_SOLVER
+!    TYPE(SOLVER_TYPE), POINTER :: SOLVER,CELLML_SOLVER
     INTEGER(INTG) :: componentIdx,localNy,version,derivativeIdx,derivative,nodeIdx,node,column
     INTEGER(INTG) :: componentInterpolationType
     INTEGER(INTG) :: numberOfRows
@@ -3107,8 +3107,8 @@ CONTAINS
           noDofFixed=equationsSet%BOUNDARY_CONDITIONS%BOUNDARY_CONDITIONS_VARIABLES(1)%PTR%NUMBER_OF_DIRICHLET_CONDITIONS
             
           ! get the CellML solver
-          SOLVER=>equationsSet%BOUNDARY_CONDITIONS%SOLVER_EQUATIONS%SOLVER
-          CELLML_SOLVER=>SOLVER%NONLINEAR_SOLVER%NEWTON_SOLVER%CELLML_EVALUATOR_SOLVER
+!          SOLVER=>equationsSet%BOUNDARY_CONDITIONS%SOLVER_EQUATIONS%SOLVER
+!          CELLML_SOLVER=>SOLVER%NONLINEAR_SOLVER%NEWTON_SOLVER%CELLML_EVALUATOR_SOLVER
             
             
             
@@ -3163,13 +3163,15 @@ CONTAINS
                     ! XY multiply delta by scale factor
   !                  CALL DISTRIBUTED_VECTOR_VALUES_SET(parameters,localNy,origDepVar+delta*scaleFactor,err,error,*999)
                     nonlinearMatrices%ELEMENT_RESIDUAL%VECTOR=0.0_DP ! must remember to flush existing results, otherwise they're added
+                    
+                    
 !                    CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"********************  Jacobian! ***************",ERR,ERROR,*999)
                     ! evaluate green strain with the perturbed dof
-                    CALL FINITE_ELASTICITY_FINITE_ELEMENT_PRE_RESIDUAL_EVALUATE(equationsSet,ERR,ERROR,*999)
+!                    CALL FINITE_ELASTICITY_FINITE_ELEMENT_PRE_RESIDUAL_EVALUATE(equationsSet,ERR,ERROR,*999)
                     ! evalute 2nd PK stress
-                    IF(ASSOCIATED(CELLML_SOLVER)) THEN
-                      CALL SOLVER_SOLVE(CELLML_SOLVER,ERR,ERROR,*999)
-                    ENDIF
+!                    IF(ASSOCIATED(CELLML_SOLVER)) THEN
+!                      CALL SOLVER_SOLVE(CELLML_SOLVER,ERR,ERROR,*999)
+!                    ENDIF
                     
 !                    CALL EQUATIONS_SET_FINITE_ELEMENT_RESIDUAL_EVALUATE(equationsSet,elementNumber,err,error,*999)
                     CALL FINITE_ELASTICITY_FINITE_ELEMENT_RESIDUAL_EVALUATE(equationsSet,elementNumber,err,error,*999,.TRUE.)
@@ -3207,12 +3209,16 @@ CONTAINS
               CALL DISTRIBUTED_VECTOR_VALUES_GET(parameters,localNy,origDepVar,err,error,*999)
               CALL DISTRIBUTED_VECTOR_VALUES_SET(parameters,localNy,origDepVar+delta,err,error,*999)
               nonlinearMatrices%ELEMENT_RESIDUAL%VECTOR=0.0_DP ! must remember to flush existing results, otherwise they're added
+              
+              
               ! evaluate green strain with the perturbed dof
-              CALL FINITE_ELASTICITY_FINITE_ELEMENT_PRE_RESIDUAL_EVALUATE(equationsSet,ERR,ERROR,*999)
-              ! evalute 2nd PK stress
-              IF(ASSOCIATED(CELLML_SOLVER)) THEN
-                CALL SOLVER_SOLVE(CELLML_SOLVER,ERR,ERROR,*999)
-              ENDIF
+!              CALL FINITE_ELASTICITY_FINITE_ELEMENT_PRE_RESIDUAL_EVALUATE(equationsSet,ERR,ERROR,*999)
+!              ! evalute 2nd PK stress
+!              IF(ASSOCIATED(CELLML_SOLVER)) THEN
+!                CALL SOLVER_SOLVE(CELLML_SOLVER,ERR,ERROR,*999)
+!              ENDIF
+              
+              
               CALL EQUATIONS_SET_FINITE_ELEMENT_RESIDUAL_EVALUATE(equationsSet,elementNumber,err,error,*999)
               CALL DISTRIBUTED_VECTOR_VALUES_SET(parameters,localNy,origDepVar,err,error,*999)
               column=column+1
@@ -5051,14 +5057,14 @@ CONTAINS
   
     CALL ENTERS("EQUATIONS_SET_JACOBIAN_EVALUATE_STATIC_FEM",ERR,ERROR,*999)
     
-!    directory="results_iter/"
-!    INQUIRE(FILE=CHAR(directory),EXIST=dirExists)
-!    IF(.NOT.dirExists) THEN
-!      CALL SYSTEM(CHAR("mkdir "//directory))
-!    ENDIF
-!    
-!    filenameOutput=directory//"elementResidual.exdata"
-!    OPEN(UNIT=IUNIT,FILE=filenameOutput,STATUS="UNKNOWN",ACTION="WRITE",IOSTAT=ERR)
+    directory="results_iter/"
+    INQUIRE(FILE=CHAR(directory),EXIST=dirExists)
+    IF(.NOT.dirExists) THEN
+      CALL SYSTEM(CHAR("mkdir "//directory))
+    ENDIF
+    
+    filenameOutput=directory//"elementResidual.exdata"
+    OPEN(UNIT=IUNIT,FILE=filenameOutput,STATUS="UNKNOWN",ACTION="WRITE",IOSTAT=ERR)
 
     IF(ASSOCIATED(EQUATIONS_SET)) THEN
       DEPENDENT_FIELD=>EQUATIONS_SET%DEPENDENT%DEPENDENT_FIELD

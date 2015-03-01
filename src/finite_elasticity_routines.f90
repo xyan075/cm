@@ -687,20 +687,21 @@ CONTAINS
     INTEGER(INTG) :: var1 ! Variable number corresponding to 'U' in single physics case
     INTEGER(INTG) :: var2 ! Variable number corresponding to 'DELUDLEN' in single physics case
     INTEGER(INTG), POINTER :: EQUATIONS_SET_FIELD_DATA(:)
-    REAL(DP) :: DZDNU(3,3),CAUCHY_TENSOR(3,3),DZDNUT(3,3),AZL(3,3),AZU(3,3),I3,P,PIOLA_TENSOR(3,3),TEMP(3,3)
-    REAL(DP) :: DFDZ(64,3) !temporary until a proper alternative is found
+    REAL(DP) :: DZDNU(3,3),CAUCHY_TENSOR(3,3),DZDNUT(3,3),AZL(3,3),AZU(3,3),I3,P,PIOLA_TENSOR(3,3),TEMP(3,3),E(3,3)
+    REAL(DP) :: DFDZ(64,3),AZUElement(64,3,3),DZDNUElement(64,3,3),pElement(64) !temporary until a proper alternative is found
     REAL(DP) :: GAUSS_WEIGHT,Jznu,Jxxi
     REAL(DP) :: THICKNESS ! for elastic membrane
     REAL(DP) :: DARCY_MASS_INCREASE,DARCY_VOL_INCREASE,DARCY_RHO_0_F,DENSITY  !coupling with Darcy model
     REAL(DP) :: Mfact, bfact, p0fact
     REAL(DP) :: TGZG
     REAL(DP) :: AGE,DNUDZ(3,3),DZDXI(3,3),DXIDZ(3,3),Jzxi,DXRCXN(3,3),DXIXN(3,3),DFDXN(64,3)
-    INTEGER(INTG) :: component_idx3,xi_idx,derivative_idx
+    INTEGER(INTG) :: component_idx3,xi_idx,derivative_idx,i
+    TYPE(SOLVER_TYPE), POINTER :: SOLVER,CELLML_SOLVER
     
     
 !    TYPE(VARYING_STRING) :: directory
 !    LOGICAL :: dirExists
-!    INTEGER(INTG) :: IUNIT,i,j
+!    INTEGER(INTG) :: IUNIT,j
 !    CHARACTER(LEN=100) :: filenameOutput
 
 !    
@@ -1126,12 +1127,13 @@ CONTAINS
 
           !Loop over gauss points and add residuals
           DO gauss_idx=1,DEPENDENT_NUMBER_OF_GAUSS_POINTS
-            GAUSS_WEIGHT=DEPENDENT_QUADRATURE_SCHEME%GAUSS_WEIGHTS(gauss_idx)
+          
             !Interpolate dependent, geometric, fibre and materials fields
             CALL FIELD_INTERPOLATE_GAUSS(FIRST_PART_DERIV,BASIS_DEFAULT_QUADRATURE_SCHEME,gauss_idx, &
               & DEPENDENT_INTERPOLATED_POINT,ERR,ERROR,*999)
             CALL FIELD_INTERPOLATED_POINT_METRICS_CALCULATE(DEPENDENT_BASIS%NUMBER_OF_XI,DEPENDENT_INTERPOLATED_POINT_METRICS, &
               & ERR,ERROR,*999)
+              
             CALL FIELD_INTERPOLATE_GAUSS(FIRST_PART_DERIV,BASIS_DEFAULT_QUADRATURE_SCHEME,gauss_idx, &
               & GEOMETRIC_INTERPOLATED_POINT,ERR,ERROR,*999)
             CALL FIELD_INTERPOLATED_POINT_METRICS_CALCULATE(GEOMETRIC_BASIS%NUMBER_OF_XI,GEOMETRIC_INTERPOLATED_POINT_METRICS, &
@@ -1145,9 +1147,14 @@ CONTAINS
                 & MATERIALS_INTERPOLATED_POINT,ERR,ERROR,*999)
             ENDIF
             
+            
+            HYDROSTATIC_PRESSURE_COMPONENT=DEPENDENT_INTERPOLATED_POINT%INTERPOLATION_PARAMETERS%FIELD_VARIABLE%NUMBER_OF_COMPONENTS
+            pElement(gauss_idx)=DEPENDENT_INTERPOLATED_POINT%VALUES(HYDROSTATIC_PRESSURE_COMPONENT,1)
+            
             !Calculate F=dZ/dNU, the deformation gradient tensor at the gauss point
             CALL FiniteElasticityGaussDeformationGradientTensor(DEPENDENT_INTERPOLATED_POINT_METRICS, &
               & GEOMETRIC_INTERPOLATED_POINT_METRICS,FIBRE_INTERPOLATED_POINT,DZDNU,Jxxi,ERR,ERROR,*999)
+            DZDNUElement(gauss_idx,:,:)=DZDNU(:,:)
               
             ! XY - output deformation gradient tensor
 !            IF(PRESENT(output)) THEN
@@ -1160,21 +1167,105 @@ CONTAINS
             CALL MATRIX_TRANSPOSE(DZDNU,DZDNUT,ERR,ERROR,*999)
             CALL MATRIX_PRODUCT(DZDNUT,DZDNU,AZL,ERR,ERROR,*999)
 
-            HYDROSTATIC_PRESSURE_COMPONENT=DEPENDENT_INTERPOLATED_POINT%INTERPOLATION_PARAMETERS%FIELD_VARIABLE%NUMBER_OF_COMPONENTS
-            P=DEPENDENT_INTERPOLATED_POINT%VALUES(HYDROSTATIC_PRESSURE_COMPONENT,1)
-
             CALL INVERT(AZL,AZU,I3,ERR,ERROR,*999)
             
-            ! XY - calculate Jznu determinant of F in the old cm way
-!            Jznu=I3**0.5_DP
-            Jznu=Determinant(DZDNU,err,error)
-            ! XY - output determinant of deformation gradient tensor
-!            WRITE(IUNIT,'(1X,3E25.15)') Jznu
-
+            ! Store AZU for 2nd PK stress tensor
+            AZUElement(gauss_idx,:,:)=AZU(:,:)
+            
+            !Calculate the green strain and update the dependent field
+            E = 0.5_DP*AZL 
+            DO i=1,3 !NUMBER_OF_DIMENSIONS
+              E(i,i)=E(i,i)-0.5_DP
+            ENDDO
+            
+            ! we only want to store the indepent components of the STRAIN FIELD
+            IF(NUMBER_OF_DIMENSIONS==3) THEN
+              ! 3 dimensional problem
+              ! ORDER OF THE COMPONENTS: U_11, U_12, U_13, U_22, U_23, U_33 (upper triangular matrix)
+              CALL Field_ParameterSetUpdateLocalGaussPoint(DEPENDENT_FIELD,FIELD_U1_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE, &
+                & gauss_idx,ELEMENT_NUMBER,1,E(1,1),ERR,ERROR,*999)
+              CALL Field_ParameterSetUpdateLocalGaussPoint(DEPENDENT_FIELD,FIELD_U1_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE, &
+                & gauss_idx,ELEMENT_NUMBER,2,E(1,2),ERR,ERROR,*999)
+              CALL Field_ParameterSetUpdateLocalGaussPoint(DEPENDENT_FIELD,FIELD_U1_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE, &
+                & gauss_idx,ELEMENT_NUMBER,3,E(1,3),ERR,ERROR,*999)
+              CALL Field_ParameterSetUpdateLocalGaussPoint(DEPENDENT_FIELD,FIELD_U1_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE, &
+                & gauss_idx,ELEMENT_NUMBER,4,E(2,2),ERR,ERROR,*999)
+              CALL Field_ParameterSetUpdateLocalGaussPoint(DEPENDENT_FIELD,FIELD_U1_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE, &
+                & gauss_idx,ELEMENT_NUMBER,5,E(2,3),ERR,ERROR,*999)
+              CALL Field_ParameterSetUpdateLocalGaussPoint(DEPENDENT_FIELD,FIELD_U1_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE, &
+                & gauss_idx,ELEMENT_NUMBER,6,E(3,3),ERR,ERROR,*999)
+            ELSE IF(NUMBER_OF_DIMENSIONS==2) THEN
+              ! 2 dimensional problem
+              ! ORDER OF THE COMPONENTS: U_11, U_12, U_22 (upper triangular matrix)
+              CALL Field_ParameterSetUpdateLocalGaussPoint(DEPENDENT_FIELD,FIELD_U1_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE, &
+                & gauss_idx,ELEMENT_NUMBER,1,E(1,1),ERR,ERROR,*999)
+              CALL Field_ParameterSetUpdateLocalGaussPoint(DEPENDENT_FIELD,FIELD_U1_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE, &
+                & gauss_idx,ELEMENT_NUMBER,2,E(1,2),ERR,ERROR,*999)
+              CALL Field_ParameterSetUpdateLocalGaussPoint(DEPENDENT_FIELD,FIELD_U1_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE, &
+                & gauss_idx,ELEMENT_NUMBER,3,E(2,2),ERR,ERROR,*999)
+            ELSE !NUMBER_OF_DIMENSIONS
+              CALL FLAG_ERROR("Only 2 dimensional and 3 dimensional problems are implemented at the moment.",ERR,ERROR,*999)
+            ENDIF !NUMBER_OF_DIMENSIONS
+            
+            
             IF(DIAGNOSTICS1) THEN
               CALL WRITE_STRING_VALUE(DIAGNOSTIC_OUTPUT_TYPE,"  ELEMENT_NUMBER = ",ELEMENT_NUMBER,ERR,ERROR,*999)
               CALL WRITE_STRING_VALUE(DIAGNOSTIC_OUTPUT_TYPE,"  gauss_idx = ",gauss_idx,ERR,ERROR,*999)
             ENDIF
+            
+          enddo
+          
+          ! get the CellML solver
+!          IF(PRESENT(output)) THEN
+          SOLVER=>EQUATIONS_SET%BOUNDARY_CONDITIONS%SOLVER_EQUATIONS%SOLVER
+          CELLML_SOLVER=>SOLVER%NONLINEAR_SOLVER%NEWTON_SOLVER%CELLML_EVALUATOR_SOLVER
+          IF(ASSOCIATED(CELLML_SOLVER)) THEN
+            ! tell CellML solver which dofs to evaluate
+            CELLML_SOLVER%CELLML_EVALUATOR_SOLVER%numberOfDofEvaluate=DEPENDENT_NUMBER_OF_GAUSS_POINTS
+            IF(.NOT.ALLOCATED(CELLML_SOLVER%CELLML_EVALUATOR_SOLVER%dofNumbers)) THEN
+              ALLOCATE(CELLML_SOLVER%CELLML_EVALUATOR_SOLVER%dofNumbers(DEPENDENT_NUMBER_OF_GAUSS_POINTS),STAT=ERR)
+            ENDIF
+            DO i=1,DEPENDENT_NUMBER_OF_GAUSS_POINTS
+              CELLML_SOLVER%CELLML_EVALUATOR_SOLVER%dofNumbers(i)=(ELEMENT_NUMBER-1)*DEPENDENT_NUMBER_OF_GAUSS_POINTS+i
+            ENDDO            
+            CALL SOLVER_SOLVE(CELLML_SOLVER,ERR,ERROR,*999)
+          ENDIF
+!          ENDIF
+          
+          DO gauss_idx=1,DEPENDENT_NUMBER_OF_GAUSS_POINTS
+          
+            GAUSS_WEIGHT=DEPENDENT_QUADRATURE_SCHEME%GAUSS_WEIGHTS(gauss_idx)
+            
+            !Interpolate dependent, geometric, fibre and materials fields
+            CALL FIELD_INTERPOLATE_GAUSS(FIRST_PART_DERIV,BASIS_DEFAULT_QUADRATURE_SCHEME,gauss_idx, &
+              & GEOMETRIC_INTERPOLATED_POINT,ERR,ERROR,*999)
+            CALL FIELD_INTERPOLATED_POINT_METRICS_CALCULATE(GEOMETRIC_BASIS%NUMBER_OF_XI,GEOMETRIC_INTERPOLATED_POINT_METRICS, &
+              & ERR,ERROR,*999)
+            IF(ASSOCIATED(FIBRE_FIELD)) THEN
+              CALL FIELD_INTERPOLATE_GAUSS(FIRST_PART_DERIV,BASIS_DEFAULT_QUADRATURE_SCHEME,gauss_idx, &
+                & FIBRE_INTERPOLATED_POINT,ERR,ERROR,*999)
+            ENDIF
+            IF(ASSOCIATED(MATERIALS_FIELD)) THEN
+              CALL FIELD_INTERPOLATE_GAUSS(NO_PART_DERIV,BASIS_DEFAULT_QUADRATURE_SCHEME,gauss_idx, &
+                & MATERIALS_INTERPOLATED_POINT,ERR,ERROR,*999)
+            ENDIF
+            
+            CALL FIELD_INTERPOLATE_GAUSS(FIRST_PART_DERIV,BASIS_DEFAULT_QUADRATURE_SCHEME,gauss_idx, &
+              & DEPENDENT_INTERPOLATED_POINT,ERR,ERROR,*999)
+            CALL FIELD_INTERPOLATED_POINT_METRICS_CALCULATE(DEPENDENT_BASIS%NUMBER_OF_XI,DEPENDENT_INTERPOLATED_POINT_METRICS, &
+              & ERR,ERROR,*999)
+            
+            !Calculate F=dZ/dNU, the deformation gradient tensor at the gauss point
+            CALL FiniteElasticityGaussDeformationGradientTensor(DEPENDENT_INTERPOLATED_POINT_METRICS, &
+              & GEOMETRIC_INTERPOLATED_POINT_METRICS,FIBRE_INTERPOLATED_POINT,DZDNU,Jxxi,ERR,ERROR,*999)
+              
+            ! XY - calculate Jznu determinant of F in the old cm way
+!            Jznu=I3**0.5_DP
+            Jznu=Determinant(DZDNUElement(gauss_idx,:,:),err,error)
+            ! XY - output determinant of deformation gradient tensor
+!            WRITE(IUNIT,'(1X,3E25.15)') Jznu
+
+
             
             !get the stress field!!!
             IF(NUMBER_OF_DIMENSIONS==3) THEN
@@ -1191,12 +1282,12 @@ CONTAINS
               CALL Field_ParameterSetGetLocalGaussPoint(DEPENDENT_FIELD,FIELD_U2_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE, &
                 & gauss_idx,ELEMENT_NUMBER,6,PIOLA_TENSOR(3,3),ERR,ERROR,*999)
               !CellML computes the deviatoric stress. Add the volumetric component!
-              PIOLA_TENSOR(1,1)=PIOLA_TENSOR(1,1)+2.0_DP*P*AZU(1,1)
-              PIOLA_TENSOR(2,2)=PIOLA_TENSOR(2,2)+2.0_DP*P*AZU(2,2)
-              PIOLA_TENSOR(3,3)=PIOLA_TENSOR(3,3)+2.0_DP*P*AZU(3,3)
-              PIOLA_TENSOR(1,2)=PIOLA_TENSOR(1,2)+2.0_DP*P*AZU(1,2)
-              PIOLA_TENSOR(1,3)=PIOLA_TENSOR(1,3)+2.0_DP*P*AZU(1,3)
-              PIOLA_TENSOR(2,3)=PIOLA_TENSOR(2,3)+2.0_DP*P*AZU(2,3)
+              PIOLA_TENSOR(1,1)=PIOLA_TENSOR(1,1)+2.0_DP*pElement(gauss_idx)*AZUElement(gauss_idx,1,1)
+              PIOLA_TENSOR(2,2)=PIOLA_TENSOR(2,2)+2.0_DP*pElement(gauss_idx)*AZUElement(gauss_idx,2,2)
+              PIOLA_TENSOR(3,3)=PIOLA_TENSOR(3,3)+2.0_DP*pElement(gauss_idx)*AZUElement(gauss_idx,3,3)
+              PIOLA_TENSOR(1,2)=PIOLA_TENSOR(1,2)+2.0_DP*pElement(gauss_idx)*AZUElement(gauss_idx,1,2)
+              PIOLA_TENSOR(1,3)=PIOLA_TENSOR(1,3)+2.0_DP*pElement(gauss_idx)*AZUElement(gauss_idx,1,3)
+              PIOLA_TENSOR(2,3)=PIOLA_TENSOR(2,3)+2.0_DP*pElement(gauss_idx)*AZUElement(gauss_idx,2,3)
               PIOLA_TENSOR(2,1)=PIOLA_TENSOR(1,2)
               PIOLA_TENSOR(3,1)=PIOLA_TENSOR(1,3)
               PIOLA_TENSOR(3,2)=PIOLA_TENSOR(2,3)
@@ -1231,8 +1322,10 @@ CONTAINS
 !              IF(ELEMENT_NUMBER==1) THEN
 !                WRITE(IUNIT,'(3E25.15,/(3E25.15))') &
 !                  & ((PIOLA_TENSOR(i,j),j=1,3),i=1,3)
+!                
 !              ENDIF
 !            ENDIF
+            
 
             ! XY - do not need Cauchy stress since 2nd PK is used
             !Compute the CAUCHY stress tensor 

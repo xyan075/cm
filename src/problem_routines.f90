@@ -5418,7 +5418,7 @@ SUBROUTINE ProblemSolver_ShellLineSearchPetsc(lineSearch,ctx,err)
 !  REAL(DP) :: matrixValue
 !  TYPE(DISTRIBUTED_MATRIX_TYPE), POINTER :: matrix 
 !  INTEGER(INTG) :: m,n
-  
+!  
 !  TYPE(VARYING_STRING) :: directory
 !  LOGICAL :: dirExists
 !  INTEGER(INTG) :: IUNIT,j

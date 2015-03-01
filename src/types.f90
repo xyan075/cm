@@ -2720,6 +2720,8 @@ END TYPE GENERATED_MESH_ELLIPSOID_TYPE
     INTEGER(INTG) :: SOLVER_LIBRARY !<The library type for the CellML evaluation solver \see SOLVER_ROUTINES_SolverLibraries,SOLVER_ROUTINES
     TYPE(CELLML_TYPE), POINTER :: CELLML !<A pointer to the CellML environment for the solver
     REAL(DP) :: CURRENT_TIME !<The current time value for the evaluator solver
+    INTEGER(INTG) :: numberOfDofEvaluate !<The number of dofs to evaluate at the current time
+    REAL(DP), ALLOCATABLE :: dofNumbers(:) !<Global number of the dof to evaluate
   END TYPE CELLML_EVALUATOR_SOLVER_TYPE
   
   !>Contains information for a geometric transformation solver
