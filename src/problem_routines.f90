@@ -1412,7 +1412,7 @@ CONTAINS
       & rowMeshComp,colMeshComp,rowDecompositionFaceNumber,colDecompositionFaceNumber, &
       & rowLocalFaceNodeIdx,colLocalFaceNodeIdx,rowFaceLocalElemNode,colFaceLocalElemNode,rowGlobalNode,colGlobalNode, &
       & rowFaceDerivative,colFaceDerivative,rowDerivative,colDerivative,rowVersion,colVersion,rowIdx,colIdx, &
-      & subMatrix,rowBodyIdx,colBodyIdx
+      & subMatrix,rowBodyIdx,colBodyIdx,interfaceConditionIdx
     INTEGER(INTG) :: xiIdxAlpha,xiIdxBeta,xiIdxGamma,rowElemParameterNo,colElemParameterNo,rowPreviousFaceNo,colPreviousFaceNo
     REAL(DP) :: matrixValue,rowPhi,colPhi
     REAL(DP) :: coefficient,forceTerm,geometricTerm,tempA,tempB,rowDofScaleFactor,colDofScaleFactor
@@ -1445,8 +1445,9 @@ CONTAINS
           IF(ASSOCIATED(equationsMatrices)) THEN
             nonlinearMatrices=>equationsMatrices%NONLINEAR_MATRICES
             nonlinearMapping=>equations%EQUATIONS_MAPPING%NONLINEAR_MAPPING
-
-            interfaceGlobalNumber=1
+            
+            DO interfaceConditionIdx=1,2
+            interfaceGlobalNumber=interfaceConditionIdx
             interfaceConditionGlobalNumber=1
             interface=>EQUATIONS_SET%REGION%PARENT_REGION%INTERFACES%INTERFACES(interfaceGlobalNumber)%PTR
             interfaceCondition=>interface%INTERFACE_CONDITIONS%INTERFACE_CONDITIONS(interfaceConditionGlobalNumber)%PTR
@@ -1791,6 +1792,7 @@ CONTAINS
             !IF(EQUATIONS%OUTPUT_TYPE>=EQUATIONS_MATRIX_OUTPUT) THEN
             ! CALL EQUATIONS_MATRICES_OUTPUT(GENERAL_OUTPUT_TYPE,EQUATIONS_MATRICES,ERR,ERROR,*999)
             !ENDIF
+            ENDDO ! interfaceConditionIdx
           ELSE
             CALL FLAG_ERROR("Equations matrices is not associated",err,error,*999)
           ENDIF
@@ -1838,7 +1840,8 @@ CONTAINS
 
     !\todo Temporarily added the variables below to allow the interface condition to be used in the single region contact problem
     !to be manually specified. Need to Generalise.
-    INTEGER(INTG) :: equationsSetGlobalNumber,interfaceGlobalNumber,interfaceConditionGlobalNumber,iterationNumber
+    INTEGER(INTG) :: equationsSetGlobalNumber,interfaceGlobalNumber,interfaceConditionGlobalNumber,iterationNumber, &
+      & interfaceConditionIdx
     TYPE(INTERFACE_CONDITION_TYPE), POINTER :: interfaceCondition
     TYPE(INTERFACE_TYPE), POINTER :: interface
     
@@ -1936,19 +1939,20 @@ CONTAINS
                 !DO interfaceConditionIdx=1,solverMapping%NUMBER_OF_INTERFACE_CONDITIONS
                   !interfaceCondition=>solverMapping%INTERFACE_CONDITIONS(interfaceConditionIdx)%PTR
                 equationsSetGlobalNumber=1
-                interfaceGlobalNumber=1
-                interfaceConditionGlobalNumber=1
-                interfaceCondition=>SOLVER_MAPPING%EQUATIONS_SETS(equationsSetGlobalNumber)%PTR%REGION%PARENT_REGION% &
-                  & INTERFACES%INTERFACES(interfaceGlobalNumber)%PTR%INTERFACE_CONDITIONS% &
-                  & INTERFACE_CONDITIONS(interfaceConditionGlobalNumber)%PTR
-                IF(ASSOCIATED(interfaceCondition)) THEN
-                  IF(interfaceCondition%OPERATOR==INTERFACE_CONDITION_FLS_CONTACT_REPROJECT_OPERATOR .OR. &
-                      & interfaceCondition%OPERATOR==INTERFACE_CONDITION_FLS_CONTACT_OPERATOR) THEN !Only reproject for contact operator
-                    IF(interfaceCondition%integrationType==INTERFACE_CONDITION_DATA_POINTS_INTEGRATION) THEN !Only reproject for data point interpolated field
-                      interface=>interfaceCondition%INTERFACE
-                      IF(ASSOCIATED(interface)) THEN
-                        CALL PETSC_SNESGETITERATIONNUMBER(SOLVER%NONLINEAR_SOLVER%NEWTON_SOLVER%LINESEARCH_SOLVER%SNES, &
-                          & iterationNumber,ERR,ERROR,*999)
+                DO interfaceConditionIdx=1,2
+                  interfaceGlobalNumber=interfaceConditionIdx
+                  interfaceConditionGlobalNumber=1
+                  interfaceCondition=>SOLVER_MAPPING%EQUATIONS_SETS(equationsSetGlobalNumber)%PTR%REGION%PARENT_REGION% &
+                    & INTERFACES%INTERFACES(interfaceGlobalNumber)%PTR%INTERFACE_CONDITIONS% &
+                    & INTERFACE_CONDITIONS(interfaceConditionGlobalNumber)%PTR
+                  IF(ASSOCIATED(interfaceCondition)) THEN
+                    IF(interfaceCondition%OPERATOR==INTERFACE_CONDITION_FLS_CONTACT_REPROJECT_OPERATOR .OR. &
+                        & interfaceCondition%OPERATOR==INTERFACE_CONDITION_FLS_CONTACT_OPERATOR) THEN !Only reproject for contact operator
+                      IF(interfaceCondition%integrationType==INTERFACE_CONDITION_DATA_POINTS_INTEGRATION) THEN !Only reproject for data point interpolated field
+                        interface=>interfaceCondition%INTERFACE
+                        IF(ASSOCIATED(interface)) THEN
+                          CALL PETSC_SNESGETITERATIONNUMBER(SOLVER%NONLINEAR_SOLVER%NEWTON_SOLVER%LINESEARCH_SOLVER%SNES, &
+                            & iterationNumber,ERR,ERROR,*999)
                           IF(SOLVER%SOLVERS%CONTROL_LOOP%PROBLEM%SUBTYPE==PROBLEM_FE_CONTACT_TRANSFORM_REPROJECT_SUBTYPE .OR. &
                               & SOLVER%SOLVERS%CONTROL_LOOP%PROBLEM%SUBTYPE==PROBLEM_FE_CONTACT_REPROJECT_SUBTYPE .OR.  &
                               & SOLVER%SOLVERS%CONTROL_LOOP%PROBLEM%SUBTYPE==PROBLEM_FE_CONTACT_TRANSFORM_REPROJECT_CELLML_SUBTYPE &
@@ -1956,29 +1960,31 @@ CONTAINS
 !                            CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"********************  Reproject! ***************",ERR,ERROR,*999)
                             CALL InterfacePointsConnectivity_DataReprojection(interface,interfaceCondition,err,error,*999)
                           ENDIF
-                        ! iteration+1 since iterationNumber is counting the iterations completed
-                        CALL FrictionlessContact_contactMetricsCalculate(interfaceCondition,iterationNumber+1,err,error,*999)
-!                        CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"********************  Contact residual! ***********",ERR,ERROR,*999)
-                        !\todo: generalise when LHS mapping is in place
-                        CALL EQUATIONS_SET_RESIDUAL_CONTACT_UPDATE_STATIC_FEM(SOLVER_MAPPING% &
-                          & EQUATIONS_SETS(equationsSetGlobalNumber)%PTR,ERR,ERROR,*999)
-!                        CALL SolverEquations_ResidualVectorGet(SOLVER_EQUATIONS,residualVectorDis,err,error,*999)
-                        CALL DISTRIBUTED_VECTOR_DATA_GET(SOLVER_EQUATIONS%solver_matrices%residual,residualVector,err,error,*999)
-                        
-                        !\todo Temporarily commented out INTERFACE_CONDITION_ASSEMBLE as the interface matrices are not
-                        ! required for the single region contact problem. Needs to generalised.
-                        !CALL INTERFACE_CONDITION_ASSEMBLE(interfaceCondition,err,error,*999)
-                      ELSE
-                        CALL FLAG_ERROR("Interface is not associated for nonlinear solver equations mapping.", &
-                          & err,error,*999)
+                          ! iteration+1 since iterationNumber is counting the iterations completed
+                          CALL FrictionlessContact_contactMetricsCalculate(interfaceCondition,iterationNumber+1,err,error,*999)
+  !                        CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"********************  Contact residual! ***********",ERR,ERROR,*999)
+                          IF(interfaceConditionIdx==2) THEN
+                          !\todo: generalise when LHS mapping is in place
+                          CALL EQUATIONS_SET_RESIDUAL_CONTACT_UPDATE_STATIC_FEM(SOLVER_MAPPING% &
+                            & EQUATIONS_SETS(equationsSetGlobalNumber)%PTR,ERR,ERROR,*999)
+  !                        CALL SolverEquations_ResidualVectorGet(SOLVER_EQUATIONS,residualVectorDis,err,error,*999)
+                          CALL DISTRIBUTED_VECTOR_DATA_GET(SOLVER_EQUATIONS%solver_matrices%residual,residualVector,err,error,*999)
+                          ENDIF ! only call residual evaluate once
+                          
+                          !\todo Temporarily commented out INTERFACE_CONDITION_ASSEMBLE as the interface matrices are not
+                          ! required for the single region contact problem. Needs to generalised.
+                          !CALL INTERFACE_CONDITION_ASSEMBLE(interfaceCondition,err,error,*999)
+                        ELSE
+                          CALL FLAG_ERROR("Interface is not associated for nonlinear solver equations mapping.", &
+                            & err,error,*999)
+                        ENDIF
                       ENDIF
                     ENDIF
+                  ELSE
+                    CALL FLAG_ERROR("Interface condition is not associated for nonlinear solver equations mapping.", &
+                      & err,error,*999)
                   ENDIF
-                ELSE
-                  CALL FLAG_ERROR("Interface condition is not associated for nonlinear solver equations mapping.", &
-                    & err,error,*999)
-                ENDIF
-              !ENDDO !interfaceConditionIdx
+                ENDDO !interfaceConditionIdx
 
                 !\todo Temporarily comment out the looping through of interface conditions added to the solver as these are not
                 !present in the single region contact problem. Needs to generalised.
@@ -2052,7 +2058,7 @@ CONTAINS
     INTEGER(INTG) :: bodyIdx,equationSetNumber,interfaceGlobalNumber,interfaceConditionGlobalNumber
     INTEGER(INTG) :: globalDataPointNum,elementNum,connectedFace,fieldComponent,meshComp, &
       & decompositionFaceNumber,localFaceNodeIdx,faceLocalElemNode,globalNode,faceDerivative,derivative,versionNumber, &
-      & residualVariableIdx,dofIdx
+      & residualVariableIdx,dofIdx,interfaceConditionIdx
     INTEGER(INTG) :: contactStiffness,ContPtElementNum,penaltyPtDof,previousFaceNo,elemParameterNo
     REAL(DP) :: residualValue,phi,contactForce,coefficient
     REAL(DP) :: xiReduced(2), xi(3) !\todo generalise xi allocations for 1D,2D and 3D points connectivity
@@ -2086,8 +2092,8 @@ CONTAINS
             nonlinearMatrices=>equationsMatrices%NONLINEAR_MATRICES
             !nonlinearResidual=>nonlinearMatrices%RESIDUAL
             nonlinearMapping=>equations%EQUATIONS_MAPPING%NONLINEAR_MAPPING
-
-            interfaceGlobalNumber=1
+            DO interfaceConditionIdx=1,2
+            interfaceGlobalNumber=interfaceConditionIdx
             interfaceConditionGlobalNumber=1
             interface=>EQUATIONS_SET%REGION%PARENT_REGION%INTERFACES%INTERFACES(interfaceGlobalNumber)%PTR
             interfaceCondition=>interface%INTERFACE_CONDITIONS%INTERFACE_CONDITIONS(interfaceConditionGlobalNumber)%PTR
@@ -2227,6 +2233,7 @@ CONTAINS
             !IF(EQUATIONS%OUTPUT_TYPE>=EQUATIONS_MATRIX_OUTPUT) THEN
             ! CALL EQUATIONS_MATRICES_OUTPUT(GENERAL_OUTPUT_TYPE,EQUATIONS_MATRICES,ERR,ERROR,*999)
             !ENDIF
+            ENDDO ! interfaceConditionIdx
           ELSE
             CALL FLAG_ERROR("Equations matrices is not associated",err,error,*999)
           ENDIF

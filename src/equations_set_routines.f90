@@ -5057,14 +5057,14 @@ CONTAINS
   
     CALL ENTERS("EQUATIONS_SET_JACOBIAN_EVALUATE_STATIC_FEM",ERR,ERROR,*999)
     
-    directory="results_iter/"
-    INQUIRE(FILE=CHAR(directory),EXIST=dirExists)
-    IF(.NOT.dirExists) THEN
-      CALL SYSTEM(CHAR("mkdir "//directory))
-    ENDIF
-    
-    filenameOutput=directory//"elementResidual.exdata"
-    OPEN(UNIT=IUNIT,FILE=filenameOutput,STATUS="UNKNOWN",ACTION="WRITE",IOSTAT=ERR)
+!    directory="results_iter/"
+!    INQUIRE(FILE=CHAR(directory),EXIST=dirExists)
+!    IF(.NOT.dirExists) THEN
+!      CALL SYSTEM(CHAR("mkdir "//directory))
+!    ENDIF
+!    
+!    filenameOutput=directory//"elementResidual.exdata"
+!    OPEN(UNIT=IUNIT,FILE=filenameOutput,STATUS="UNKNOWN",ACTION="WRITE",IOSTAT=ERR)
 
     IF(ASSOCIATED(EQUATIONS_SET)) THEN
       DEPENDENT_FIELD=>EQUATIONS_SET%DEPENDENT%DEPENDENT_FIELD

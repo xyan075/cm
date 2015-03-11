@@ -2845,7 +2845,7 @@ CONTAINS
         PIOLA_TENSOR=(1.0_DP-C(5))*C(1)*C(2)*EXP(C(2)*(AZL(1,1)+AZL(2,2)+AZL(3,3)-3.0_DP))*IDENTITY*2.0_DP+2.0_DP*P*AZU
         ! add fibre contribution to T11
         lambda=sqrt(AZL(1,1))
-        PIOLA_TENSOR(1,1)=PIOLA_TENSOR(1,1)+C(5)*C(3)*C(4)*2.0_DP*(lambda-1.0_DP)/lambda*EXP(C(4)*(lambda-1.0_DP)*(lambda-1.0_DP))
+        PIOLA_TENSOR(1,1)=PIOLA_TENSOR(1,1)+C(5)*C(3)*C(4)*2.0_DP*((lambda-1.0_DP)/lambda)*EXP(C(4)*(lambda-1.0_DP)*(lambda-1.0_DP))
       ELSEIF(C(6)==2.0_DP) THEN !use isotropic exponential law
         PIOLA_TENSOR=C(1)*C(2)*EXP(C(2)*(AZL(1,1)+AZL(2,2)+AZL(3,3)-3.0_DP))*IDENTITY*2.0_DP+2.0_DP*P*AZU
       ELSE!use Mooney-Rivlin law
