@@ -1347,12 +1347,7 @@ CONTAINS
                   !Assemble the equations for linear problems
                   
                   
-                  
-                  
                   CALL EQUATIONS_SET_JACOBIAN_EVALUATE(EQUATIONS_SET,ERR,ERROR,*999)
-                  
-                  
-                  
                   
                   
                   
@@ -1360,23 +1355,23 @@ CONTAINS
 !                  EQUATIONS_SET%EQUATIONS%EQUATIONS_MAPPING%NONLINEAR_MAPPING%RESIDUAL_VARIABLES(1)%PTR%NUMBER_OF_COMPONENTS=noComp
                   !\todo: XY -Modify Jacobian for contact
                   IF(SOLVER%SOLVERS%CONTROL_LOOP%PROBLEM%TYPE==PROBLEM_FINITE_ELASTICITY_CONTACT_TYPE)THEN
-                    interfaceGlobalNumber=1
-                    interfaceConditionGlobalNumber=1
-                    interfaceCondition=>EQUATIONS_SET%REGION%PARENT_REGION%INTERFACES%INTERFACES(interfaceGlobalNumber)%PTR% &
-                      & INTERFACE_CONDITIONS%INTERFACE_CONDITIONS(interfaceConditionGlobalNumber)%PTR
-                    ! rigid body-deformable body contact
-                    IF(EQUATIONS_SET%CLASS==EQUATIONS_SET_MULTI_PHYSICS_CLASS .AND.  &
-                        & EQUATIONS_SET%TYPE==EQUATIONS_SET_FINITE_ELASTICITY_RIGID_BODY_TYPE) THEN
-                      CALL PETSC_SNESGETITERATIONNUMBER(SOLVER%NONLINEAR_SOLVER%NEWTON_SOLVER%LINESEARCH_SOLVER%SNES, &
-                        & iterationNumber,ERR,ERROR,*999)
-                      CALL EquationsSet_JacobianRigidBodyContactUpdateStaticFEM(EQUATIONS_SET,iterationNumber,ERR,ERROR,*999)
-!                      IF(iterationNumber<=interfaceCondition%interfaceContactMetrics%iterationGeometricTerm) THEN
-                        CALL EquationsSet_JacobianRigidBodyContactPerturb(EQUATIONS_SET,iterationNumber,ERR,ERROR,*999)
-!                      ENDIF
-                    ! deformable-deformable body contact
-                    ELSEIF(EQUATIONS_SET%TYPE==EQUATIONS_SET_FINITE_ELASTICITY_TYPE) THEN
-                      CALL EQUATIONS_SET_JACOBIAN_CONTACT_UPDATE_STATIC_FEM(EQUATIONS_SET,ERR,ERROR,*999)
-                    ENDIF !Rigid or deformable contact
+                    DO interfaceGlobalNumber=1,2
+                      interfaceConditionGlobalNumber=1
+                      interfaceCondition=>EQUATIONS_SET%REGION%PARENT_REGION%INTERFACES%INTERFACES(interfaceGlobalNumber)%PTR% &
+                        & INTERFACE_CONDITIONS%INTERFACE_CONDITIONS(interfaceConditionGlobalNumber)%PTR
+                      ! rigid body-deformable body contact
+                      IF(interfaceGlobalNumber==1) THEN
+                        CALL PETSC_SNESGETITERATIONNUMBER(SOLVER%NONLINEAR_SOLVER%NEWTON_SOLVER%LINESEARCH_SOLVER%SNES, &
+                          & iterationNumber,ERR,ERROR,*999)
+                        CALL EquationsSet_JacobianRigidBodyContactUpdateStaticFEM(EQUATIONS_SET,iterationNumber,ERR,ERROR,*999)
+  !                      IF(iterationNumber<=interfaceCondition%interfaceContactMetrics%iterationGeometricTerm) THEN
+                          CALL EquationsSet_JacobianRigidBodyContactPerturb(EQUATIONS_SET,iterationNumber,ERR,ERROR,*999)
+  !                      ENDIF
+                      ! deformable-deformable body contact
+                      ELSE
+                        CALL EQUATIONS_SET_JACOBIAN_CONTACT_UPDATE_STATIC_FEM(EQUATIONS_SET,ERR,ERROR,*999)
+                      ENDIF !Rigid or deformable contact
+                    ENDDO!interfaceGlobalNumber
                   ENDIF !contact problem
                 ENDDO !equations_set_idx
                 !Update interface matrices
@@ -1450,7 +1445,7 @@ CONTAINS
       & rowMeshComp,colMeshComp,rowDecompositionFaceNumber,colDecompositionFaceNumber, &
       & rowLocalFaceNodeIdx,colLocalFaceNodeIdx,rowFaceLocalElemNode,colFaceLocalElemNode,rowGlobalNode,colGlobalNode, &
       & rowFaceDerivative,colFaceDerivative,rowDerivative,colDerivative,rowVersion,colVersion,rowIdx,colIdx, &
-      & subMatrix,rowBodyIdx,colBodyIdx
+      & subMatrix,rowBodyIdx,colBodyIdx,interfaceConditionIdx
     INTEGER(INTG) :: xiIdxAlpha,xiIdxBeta,xiIdxGamma,rowElemParameterNo,colElemParameterNo,rowPreviousFaceNo,colPreviousFaceNo
     REAL(DP) :: matrixValue,rowPhi,colPhi
     REAL(DP) :: coefficient,forceTerm,geometricTerm,tempA,tempB,rowDofScaleFactor,colDofScaleFactor
@@ -1483,8 +1478,9 @@ CONTAINS
           IF(ASSOCIATED(equationsMatrices)) THEN
             nonlinearMatrices=>equationsMatrices%NONLINEAR_MATRICES
             nonlinearMapping=>equations%EQUATIONS_MAPPING%NONLINEAR_MAPPING
-
-            interfaceGlobalNumber=1
+            
+            DO interfaceConditionIdx=2,2
+            interfaceGlobalNumber=interfaceConditionIdx
             interfaceConditionGlobalNumber=1
             interface=>EQUATIONS_SET%REGION%PARENT_REGION%INTERFACES%INTERFACES(interfaceGlobalNumber)%PTR
             interfaceCondition=>interface%INTERFACE_CONDITIONS%INTERFACE_CONDITIONS(interfaceConditionGlobalNumber)%PTR
@@ -1784,6 +1780,7 @@ CONTAINS
                               CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,rowIdx,colIdx,matrixValue,err,error,*999)
                               
 !                              IF(contactMetrics%inContact(globalDataPointNum)) THEN
+!                              IF(globalDataPointNum==109) THEN
 !                                WRITE(IUNIT,'('' GK(pt='',I4,'',m='',I1,'',n='',I1,'',v1='',I1,'',v2='',I1,'',n1='',I2, &
 !                                  & '',n2='',I2,'',d1='',I1,'',d2='',I1,''):'',E25.15)') &
 !                                  & globalDataPointNum,rowBodyIdx,colBodyIdx,rowFieldComp,colFieldComp,rowLocalFaceNodeIdx, &
@@ -1828,6 +1825,7 @@ CONTAINS
             !IF(EQUATIONS%OUTPUT_TYPE>=EQUATIONS_MATRIX_OUTPUT) THEN
             ! CALL EQUATIONS_MATRICES_OUTPUT(GENERAL_OUTPUT_TYPE,EQUATIONS_MATRICES,ERR,ERROR,*999)
             !ENDIF
+            ENDDO ! interfaceConditionIdx
           ELSE
             CALL FLAG_ERROR("Equations matrices is not associated",err,error,*999)
           ENDIF
@@ -2289,6 +2287,7 @@ CONTAINS
 !                    ENDIF
                   ENDDO !rowFieldComp
                   
+                  ! penalise flexion of head
                   rowIdx=defDepVariable%components(8)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
                   CALL FIELD_PARAMETER_SET_GET_CONSTANT(defDepField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE, &
                     & 8,angleX,err,error,*999)
@@ -2299,10 +2298,19 @@ CONTAINS
                     CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,rowIdx,rowIdx,forceTerm,err,error,*999)
                   ENDIF
                   
-                  
+                  ! penalise asynclitic of head
                   rowIdx=defDepVariable%components(9)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
                   CALL FIELD_PARAMETER_SET_GET_CONSTANT(defDepField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE, &
                     & 9,angleX,err,error,*999)
+!                  CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"angle Jacobian = ",angleX,err,error,*999)  
+                  forceTerm=contactPointMetrics%contactStiffness(2)*contactPointMetrics%contactStiffness(3)* &
+                    & EXP(contactPointMetrics%contactStiffness(3)*angleX)
+                  CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,rowIdx,rowIdx,forceTerm,err,error,*999)
+
+                  ! penalise bending of head
+                  rowIdx=defDepVariable%components(10)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
+                  CALL FIELD_PARAMETER_SET_GET_CONSTANT(defDepField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE, &
+                    & 10,angleX,err,error,*999)
 !                  CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"angle Jacobian = ",angleX,err,error,*999)  
                   forceTerm=contactPointMetrics%contactStiffness(2)*contactPointMetrics%contactStiffness(3)* &
                     & EXP(contactPointMetrics%contactStiffness(3)*angleX)
@@ -2758,19 +2766,15 @@ CONTAINS
                 !\todo Temporarily comment out the looping through of interface conditions added to the solver as these are not
                 !present in the single region contact problem. Needs to generalised.
                 !DO interfaceConditionIdx=1,solverMapping%NUMBER_OF_INTERFACE_CONDITIONS
-                  !interfaceCondition=>solverMapping%INTERFACE_CONDITIONS(interfaceConditionIdx)%PTR
-                IF(SOLVER%SOLVERS%CONTROL_LOOP%PROBLEM%TYPE==PROBLEM_FINITE_ELASTICITY_CONTACT_TYPE)THEN
-                  equationsSetGlobalNumber=1
-                  rigidBodyRegionNumber=2
-                  interfaceGlobalNumber=1
+                !interfaceCondition=>solverMapping%INTERFACE_CONDITIONS(interfaceConditionIdx)%PTR
+                equationsSetGlobalNumber=1
+                rigidBodyRegionNumber=2
+
+                DO interfaceGlobalNumber=1,2
                   interfaceConditionGlobalNumber=1
                   interfaceCondition=>SOLVER_MAPPING%EQUATIONS_SETS(equationsSetGlobalNumber)%PTR%REGION%PARENT_REGION% &
                     & INTERFACES%INTERFACES(interfaceGlobalNumber)%PTR%INTERFACE_CONDITIONS% &
                     & INTERFACE_CONDITIONS(interfaceConditionGlobalNumber)%PTR
-                    
-!                    SOLVER_MAPPING%equations_sets(1)%ptr%region%parent_region%sub_regions(2)%ptr%equations_sets%equations_sets(1)%ptr
-                    
-                  
                   IF(ASSOCIATED(interfaceCondition)) THEN
                     IF(interfaceCondition%OPERATOR==INTERFACE_CONDITION_FLS_CONTACT_REPROJECT_OPERATOR .OR. &
                         & interfaceCondition%OPERATOR==INTERFACE_CONDITION_FLS_CONTACT_OPERATOR) THEN !Only reproject for contact operator
@@ -2779,44 +2783,29 @@ CONTAINS
                         IF(ASSOCIATED(interface)) THEN
                           CALL PETSC_SNESGETITERATIONNUMBER(SOLVER%NONLINEAR_SOLVER%NEWTON_SOLVER%LINESEARCH_SOLVER%SNES, &
                             & iterationNumber,ERR,ERROR,*999)
-                          reproject=.FALSE.
-                          IF(iterationNumber==0) THEN
-                            reproject=.TRUE.
-                          ELSE
-                            IF(SOLVER%SOLVERS%CONTROL_LOOP%PROBLEM%SUBTYPE==PROBLEM_FE_CONTACT_TRANSFORM_REPROJECT_SUBTYPE .OR. &
-                                & SOLVER%SOLVERS%CONTROL_LOOP%PROBLEM%SUBTYPE==PROBLEM_FE_CONTACT_REPROJECT_SUBTYPE) THEN
-!                              IF(iterationNumber<10) 
-                              reproject=.TRUE.
-                            ENDIF
-                          ENDIF  
-                          IF(EQUATIONS_SET%CLASS==EQUATIONS_SET_MULTI_PHYSICS_CLASS .AND.  &
-                              & EQUATIONS_SET%TYPE==EQUATIONS_SET_FINITE_ELASTICITY_RIGID_BODY_TYPE) THEN !Rigid-deformable contact
+                          IF(interfaceGlobalNumber==1) THEN !Rigid-deformable contact
                             equationSetRigidNodal=>SOLVER_MAPPING%EQUATIONS_SETS(equationsSetGlobalNumber)%PTR%REGION% &
                               & PARENT_REGION%SUB_REGIONS(rigidBodyRegionNumber)%PTR%EQUATIONS_SETS%EQUATIONS_SETS(1)%PTR
                             CALL RigidBody_ApplyTransformation(EQUATIONS_SET,equationSetRigidNodal,err,error,*999)
                           ENDIF
-                          IF(reproject) THEN
-!                              CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"********************  Reproject! ***************", &
-!                                & ERR,ERROR,*999)
-                            CALL InterfacePointsConnectivity_DataReprojection(interface,interfaceCondition,err,error,*999)
-                          ENDIF
+
+                          CALL InterfacePointsConnectivity_DataReprojection(interface,interfaceCondition,err,error,*999)
                           ! iteration+1 since iterationNumber is counting the iterations completed
                           CALL FrictionlessContact_contactMetricsCalculate(interfaceCondition,iterationNumber+1,err,error,*999)
   !                        CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"********************  Contact residual! ***********",ERR,ERROR,*999)
                           !\todo: generalise when LHS mapping is in place
-                          IF(EQUATIONS_SET%CLASS==EQUATIONS_SET_MULTI_PHYSICS_CLASS .AND.  &
-                             & EQUATIONS_SET%TYPE==EQUATIONS_SET_FINITE_ELASTICITY_RIGID_BODY_TYPE) THEN !Rigid-deformable contact
+                          IF(interfaceGlobalNumber==1) THEN !Rigid-deformable contact
                             !Modify residual for rigid-deformable contact
                             CALL EquationsSet_ResidualRigidBodyContactUpdateStaticFEM(SOLVER_MAPPING% &
                               & EQUATIONS_SETS(equationsSetGlobalNumber)%PTR,.FALSE.,ERR,ERROR,*999)
-                          ELSEIF(EQUATIONS_SET%TYPE==EQUATIONS_SET_FINITE_ELASTICITY_TYPE) THEN !Deformable-deformable contact
+                          ELSE !Deformable-deformable contact
                             !Modify residual for deformable bodies contact
+                            !\todo: generalise when LHS mapping is in place
                             CALL EQUATIONS_SET_RESIDUAL_CONTACT_UPDATE_STATIC_FEM(SOLVER_MAPPING% &
                               & EQUATIONS_SETS(equationsSetGlobalNumber)%PTR,ERR,ERROR,*999)
                           ENDIF
   !                        CALL SolverEquations_ResidualVectorGet(SOLVER_EQUATIONS,residualVectorDis,err,error,*999)
-                          CALL DISTRIBUTED_VECTOR_DATA_GET(SOLVER_EQUATIONS%solver_matrices%residual,residualVector,err,error,*999)
-                          
+!                          CALL DISTRIBUTED_VECTOR_DATA_GET(SOLVER_EQUATIONS%solver_matrices%residual,residualVector,err,error,*999)
                           !\todo Temporarily commented out INTERFACE_CONDITION_ASSEMBLE as the interface matrices are not
                           ! required for the single region contact problem. Needs to generalised.
                           !CALL INTERFACE_CONDITION_ASSEMBLE(interfaceCondition,err,error,*999)
@@ -2830,7 +2819,8 @@ CONTAINS
                     CALL FLAG_ERROR("Interface condition is not associated for nonlinear solver equations mapping.", &
                       & err,error,*999)
                   ENDIF 
-                ENDIF !problemType==contact
+                ENDDO !interfaceConditionIdx
+
               !ENDDO !interfaceConditionIdx
 
                 !\todo Temporarily comment out the looping through of interface conditions added to the solver as these are not
@@ -2904,7 +2894,7 @@ CONTAINS
     INTEGER(INTG) :: bodyIdx,equationSetNumber,interfaceGlobalNumber,interfaceConditionGlobalNumber
     INTEGER(INTG) :: globalDataPointNum,elementNum,connectedFace,fieldComponent,meshComp, &
       & decompositionFaceNumber,localFaceNodeIdx,faceLocalElemNode,globalNode,faceDerivative,derivative,versionNumber, &
-      & residualVariableIdx,dofIdx
+      & residualVariableIdx,dofIdx,interfaceConditionIdx
     INTEGER(INTG) :: contactStiffness,ContPtElementNum,penaltyPtDof,previousFaceNo,elemParameterNo
     REAL(DP) :: residualValue,phi,contactForce,coefficient
     REAL(DP) :: xiReduced(2), xi(3) !\todo generalise xi allocations for 1D,2D and 3D points connectivity
@@ -2938,8 +2928,8 @@ CONTAINS
             nonlinearMatrices=>equationsMatrices%NONLINEAR_MATRICES
             !nonlinearResidual=>nonlinearMatrices%RESIDUAL
             nonlinearMapping=>equations%EQUATIONS_MAPPING%NONLINEAR_MAPPING
-
-            interfaceGlobalNumber=1
+            DO interfaceConditionIdx=2,2
+            interfaceGlobalNumber=interfaceConditionIdx
             interfaceConditionGlobalNumber=1
             interface=>EQUATIONS_SET%REGION%PARENT_REGION%INTERFACES%INTERFACES(interfaceGlobalNumber)%PTR
             interfaceCondition=>interface%INTERFACE_CONDITIONS%INTERFACE_CONDITIONS(interfaceConditionGlobalNumber)%PTR
@@ -3020,6 +3010,8 @@ CONTAINS
                             & NODES(globalNode)%DERIVATIVES(derivative)%VERSIONS(versionNumber)
                           ! See Jae's thesis equation 4.34
                           residualValue=-coefficient*phi*contactPointMetrics%normal(fieldComponent)*contactPointMetrics%contactForce
+                          
+                          
                           !Get the face parameter index in the element
 !                          elemParameterNo=domainFace%BASIS%ELEMENT_PARAMETER_INDEX(faceDerivative,localFaceNodeIdx)
                           elemParameterNo=dependentBasis%ELEMENT_PARAMETER_INDEX(derivative,faceLocalElemNode)
@@ -3031,7 +3023,6 @@ CONTAINS
                             & PTR%SCALE_FACTORS(elemParameterNo,fieldComponent)
                           residualValue=residualValue*contactPointMetrics%Jacobian*interface%DATA_POINTS% &
                             & DATA_POINTS(globalDataPointNum)%WEIGHTS(1)
-                            
                             
                             
                             
@@ -3074,6 +3065,7 @@ CONTAINS
             !IF(EQUATIONS%OUTPUT_TYPE>=EQUATIONS_MATRIX_OUTPUT) THEN
             ! CALL EQUATIONS_MATRICES_OUTPUT(GENERAL_OUTPUT_TYPE,EQUATIONS_MATRICES,ERR,ERROR,*999)
             !ENDIF
+            ENDDO ! interfaceConditionIdx
           ELSE
             CALL FLAG_ERROR("Equations matrices is not associated",err,error,*999)
           ENDIF
@@ -3351,6 +3343,25 @@ CONTAINS
                 CALL DISTRIBUTED_VECTOR_VALUES_ADD(nonlinearMatrices%RESIDUAL,dofIdx,residualValue,err,error,*999)
                 CALL DISTRIBUTED_VECTOR_VALUES_ADD(nonlinearMatrices%contactRESIDUAL,dofIdx,residualValue,err,error,*999)
               ENDIF
+
+              ! penalise bending of head
+              CALL FIELD_PARAMETER_SET_GET_CONSTANT(defDepField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE,10, &
+                & angleX,err,error,*999)
+              IF(angleX>=0.0_DP) THEN
+                residualValue=contactPointMetrics%contactStiffness(2)*(EXP(angleX*contactPointMetrics%contactStiffness(3))-1.0_DP)
+              ELSE
+                residualValue=-contactPointMetrics%contactStiffness(2)*(EXP(-angleX*contactPointMetrics%contactStiffness(3))-1.0_DP)
+              ENDIF
+              
+              dofIdx=residualVariable%components(10)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
+              IF(perburbation) THEN
+                contactMetrics%residualPerturbed(dofIdx)=contactMetrics%residualPerturbed(dofIdx)+residualValue
+              ELSE
+                contactMetrics%residualOriginal(dofIdx)=contactMetrics%residualOriginal(dofIdx)+residualValue
+                CALL DISTRIBUTED_VECTOR_VALUES_ADD(nonlinearMatrices%RESIDUAL,dofIdx,residualValue,err,error,*999)
+                CALL DISTRIBUTED_VECTOR_VALUES_ADD(nonlinearMatrices%contactRESIDUAL,dofIdx,residualValue,err,error,*999)
+              ENDIF
+
               
               ! output to screen
 !              CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"******************** COM ******************",ERR,ERROR,*999)
@@ -4714,7 +4725,9 @@ CONTAINS
 #ifdef TAUPROF
       CALL TAU_STATIC_PHASE_START('Pre solve')
 #endif
-     CALL PROBLEM_SOLVER_PRE_SOLVE(SOLVER,ERR,ERROR,*999)
+     IF(SOLVER%SOLVE_TYPE/=SOLVER_GEOMETRIC_TRANSFORMATION_TYPE) THEN
+       CALL PROBLEM_SOLVER_PRE_SOLVE(SOLVER,ERR,ERROR,*999)
+     ENDIF
 #ifdef TAUPROF
       CALL TAU_STATIC_PHASE_STOP('Pre solve')
       
@@ -5303,7 +5316,8 @@ CONTAINS
                     reproject=.FALSE.
                   ENDIF
                 CASE(PROBLEM_LE_CONTACT_TRANSFORM_REPROJECT_SUBTYPE,PROBLEM_LE_CONTACT_REPROJECT_SUBTYPE, &
-                    & PROBLEM_FE_CONTACT_TRANSFORM_REPROJECT_SUBTYPE,PROBLEM_FE_CONTACT_REPROJECT_SUBTYPE)
+                    & PROBLEM_FE_CONTACT_TRANSFORM_REPROJECT_SUBTYPE,PROBLEM_FE_CONTACT_REPROJECT_SUBTYPE, &
+                    & PROBLEM_FE_CONTACT_TRANSFORM_REPROJECT_CELLML_SUBTYPE)
                   reproject=.TRUE.
                 CASE DEFAULT
                   localError="The problem subtype of "//TRIM(NUMBER_TO_VSTRING(problem%SUBTYPE,"*",err,error))//" &
@@ -6532,11 +6546,11 @@ SUBROUTINE ProblemSolver_ConvergenceTestPetsc(snes,iterationNumber,xnorm,gnorm,f
               
               
               
-  !            DO i=1,SIZE(array,1)
-  !              WRITE(IUNIT,'(E25.15)') array(i)
-  !            ENDDO        
-  !            OPEN(UNIT=IUNIT)            
-  !            CALL EXIT(0)
+!              DO i=1,SIZE(farray,1)
+!                WRITE(IUNIT,'(E25.15)') farray(i)
+!              ENDDO        
+!              OPEN(UNIT=IUNIT)            
+!              CALL EXIT(0)
               IF(newtonSolver%convergenceTest%converged) THEN
                 reason=PETSC_SNES_CONVERGED_FNORM_ABS
                 newtonSolver%convergenceTest%energyFirstIter=0.0_DP
@@ -6610,7 +6624,7 @@ SUBROUTINE ProblemSolver_ShellLineSearchPetsc(lineSearch,ctx,err)
   LOGICAL :: parabolaFail
   TYPE(VARYING_STRING) :: error,localError
   
-  ! ----------------------  XY: for debugging only, output reduced stiffness matrix -------------------
+! ----------------------  XY: for debugging only, output reduced stiffness matrix -------------------
 !  TYPE(PETSC_MAT_TYPE) :: aMatrix
 !  REAL(DP), POINTER :: aMatrixReal(:,:)
 !  REAL(DP) :: matrixValue
@@ -6662,12 +6676,12 @@ SUBROUTINE ProblemSolver_ShellLineSearchPetsc(lineSearch,ctx,err)
               ! calculating initial energy
               CALL ProblemSolver_ConvergenceTest(newtonSolver,iterationNumber,fArray,yArray,lambda,err,error,*999)
               CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"initialE ",newtonSolver%convergenceTest%energyFirstIter,err,error,*999)  
+              ! XY - output line search direction (yArray), residual (fArray)
 !              DO i=1,SIZE(yArray,1)
 !                WRITE(IUNIT,'(E25.15)') yArray(i)
 !              ENDDO
 !              OPEN(UNIT=IUNIT)
 !              CALL EXIT(0)   
-
 
 !----------------------  XY: for debugging only, output reduced stiffness matrix -------------------
 !              CALL PETSC_SNESGETJACOBIAN(lineSearchSolver%SNES,aMatrix,err,error,*999)

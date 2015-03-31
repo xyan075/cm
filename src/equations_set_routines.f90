@@ -58,6 +58,7 @@ MODULE EQUATIONS_SET_ROUTINES
   USE DISTRIBUTED_MATRIX_VECTOR
   USE DOMAIN_MAPPINGS
   USE ELASTICITY_ROUTINES
+  USE FINITE_ELASTICITY_ROUTINES
   USE EQUATIONS_ROUTINES
   USE EQUATIONS_SET_CONSTANTS
   USE EQUATIONS_MATRICES_ROUTINES
@@ -74,6 +75,7 @@ MODULE EQUATIONS_SET_ROUTINES
   USE NODE_ROUTINES
   USE RIGID_BODY_ROUTINES
   USE STRINGS
+  USE SOLVER_ROUTINES
   USE TIMER
   USE TYPES
 
@@ -3039,6 +3041,7 @@ CONTAINS
     TYPE(FIELD_VARIABLE_TYPE), POINTER :: rowVariable,columnVariable
     TYPE(ELEMENT_VECTOR_TYPE) :: elementVector
     TYPE(BOUNDARY_CONDITIONS_DIRICHLET_TYPE), POINTER :: dirichletBC
+!    TYPE(SOLVER_TYPE), POINTER :: SOLVER,CELLML_SOLVER
     INTEGER(INTG) :: componentIdx,localNy,version,derivativeIdx,derivative,nodeIdx,node,column
     INTEGER(INTG) :: componentInterpolationType
     INTEGER(INTG) :: numberOfRows,numberOfComponents
@@ -3053,7 +3056,7 @@ CONTAINS
     CHARACTER(LEN=100) :: filenameOutput
 
     CALL ENTERS("EquationsSet_FiniteElementJacobianEvaluateFD",err,error,*999)
-    
+!    
 !    directory="results_iter/"
 !    INQUIRE(FILE=CHAR(directory),EXIST=dirExists)
 !    IF(.NOT.dirExists) THEN
@@ -3104,7 +3107,9 @@ CONTAINS
           dirichletBC=>equationsSet%BOUNDARY_CONDITIONS%BOUNDARY_CONDITIONS_VARIABLES(1)%PTR%DIRICHLET_BOUNDARY_CONDITIONS
           noDofFixed=equationsSet%BOUNDARY_CONDITIONS%BOUNDARY_CONDITIONS_VARIABLES(1)%PTR%NUMBER_OF_DIRICHLET_CONDITIONS
             
-            
+          ! get the CellML solver
+!          SOLVER=>equationsSet%BOUNDARY_CONDITIONS%SOLVER_EQUATIONS%SOLVER
+!          CELLML_SOLVER=>SOLVER%NONLINEAR_SOLVER%NEWTON_SOLVER%CELLML_EVALUATOR_SOLVER
             
             
             
@@ -3166,45 +3171,76 @@ CONTAINS
                     ! XY multiply delta by scale factor
   !                  CALL DISTRIBUTED_VECTOR_VALUES_SET(parameters,localNy,origDepVar+delta*scaleFactor,err,error,*999)
                     nonlinearMatrices%ELEMENT_RESIDUAL%VECTOR=0.0_DP ! must remember to flush existing results, otherwise they're added
-                    CALL EQUATIONS_SET_FINITE_ELEMENT_RESIDUAL_EVALUATE(equationsSet,elementNumber,err,error,*999)
-                    CALL DISTRIBUTED_VECTOR_VALUES_SET(parameters,localNy,origDepVar,err,error,*999)
                     
+                    
+!                    CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"********************  Jacobian! ***************",ERR,ERROR,*999)
+                    ! evaluate green strain with the perturbed dof
+!                    CALL FINITE_ELASTICITY_FINITE_ELEMENT_PRE_RESIDUAL_EVALUATE(equationsSet,ERR,ERROR,*999)
+                    ! evalute 2nd PK stress
+!                    IF(ASSOCIATED(CELLML_SOLVER)) THEN
+!                      CALL SOLVER_SOLVE(CELLML_SOLVER,ERR,ERROR,*999)
+!                    ENDIF
+                    
+!                    CALL EQUATIONS_SET_FINITE_ELEMENT_RESIDUAL_EVALUATE(equationsSet,elementNumber,err,error,*999)
+                    CALL FINITE_ELASTICITY_FINITE_ELEMENT_RESIDUAL_EVALUATE(equationsSet,elementNumber,err,error,*999,.TRUE.)
+                    CALL DISTRIBUTED_VECTOR_VALUES_SET(parameters,localNy,origDepVar,err,error,*999)
                     nonlinearMatrices%JACOBIANS(jacobianNumber)%PTR%ELEMENT_JACOBIAN%MATRIX(1:numberOfRows,column)= &
                         & (nonlinearMatrices%ELEMENT_RESIDUAL%VECTOR(1:numberOfRows)-elementVector%VECTOR(1:numberOfRows))/delta
                     
                     !XY output perturbation dof    
 !                    IF(elementNumber==10) THEN
 !                    WRITE(IUNIT,'('' ******* ZE( '',I2,'','',I1,'')=   '',1X,E25.15,1X,''Perturbation='',E25.15)') &
-!                      & elemParameterNo,componentIdx,origDepVar*scaleFactor,delta*scaleFactor
+!                      & elemParameterNo,componentIdx,origDepVar+delta,delta*scaleFactor
 !                    ENDIF
 !                  
                     ! XY output purturbed element residual
-!                    IF((elementNumber==5)) THEN
-!                      DO i=1,200
-!                        WRITE(IUNIT,'(1X,3E25.15)') nonlinearMatrices%ELEMENT_RESIDUAL%VECTOR(I)
+!                    IF((elementNumber==1)) THEN
+!                      DO i=1,193
+!                        WRITE(IUNIT,'(1X,3E25.15)') nonlinearMatrices%ELEMENT_RESIDUAL%VECTOR(i)
 !                      ENDDO
 !                    ENDIF
 
-
-
                   ENDIF !freeDof
-                  
-                  
-                  
                   
                 ENDDO !derivativeIdx
               ENDDO !nodeIdx
             CASE (FIELD_ELEMENT_BASED_INTERPOLATION)
               localNy=columnVariable%COMPONENTS(componentIdx)%PARAM_TO_DOF_MAP%ELEMENT_PARAM2DOF_MAP%ELEMENTS(elementNumber)
+              ! XY get the dof scale factor
+              IF(componentIdx<4) THEN
+                scaleFactor=equations%INTERPOLATION%GEOMETRIC_INTERP_PARAMETERS(FIELD_U_VARIABLE_TYPE)%PTR% &
+                  & SCALE_FACTORS(elemParameterNo,componentIdx)
+              ELSE ! hydrostatic pressure
+                scaleFactor=1.0_DP
+              ENDIF
               ! one-sided finite difference
               CALL DISTRIBUTED_VECTOR_VALUES_GET(parameters,localNy,origDepVar,err,error,*999)
               CALL DISTRIBUTED_VECTOR_VALUES_SET(parameters,localNy,origDepVar+delta,err,error,*999)
               nonlinearMatrices%ELEMENT_RESIDUAL%VECTOR=0.0_DP ! must remember to flush existing results, otherwise they're added
+              
+              
+              ! evaluate green strain with the perturbed dof
+!              CALL FINITE_ELASTICITY_FINITE_ELEMENT_PRE_RESIDUAL_EVALUATE(equationsSet,ERR,ERROR,*999)
+!              ! evalute 2nd PK stress
+!              IF(ASSOCIATED(CELLML_SOLVER)) THEN
+!                CALL SOLVER_SOLVE(CELLML_SOLVER,ERR,ERROR,*999)
+!              ENDIF
+              
+              
               CALL EQUATIONS_SET_FINITE_ELEMENT_RESIDUAL_EVALUATE(equationsSet,elementNumber,err,error,*999)
               CALL DISTRIBUTED_VECTOR_VALUES_SET(parameters,localNy,origDepVar,err,error,*999)
               column=column+1
               nonlinearMatrices%JACOBIANS(jacobianNumber)%PTR%ELEMENT_JACOBIAN%MATRIX(1:numberOfRows,column)= &
                   & (nonlinearMatrices%ELEMENT_RESIDUAL%VECTOR(1:numberOfRows)-elementVector%VECTOR(1:numberOfRows))/delta
+              
+              !XY output perturbation dof    
+!              WRITE(IUNIT,'('' ******* ZE( '',I2,'','',I1,'')=   '',1X,E25.15,1X,''Perturbation='',E25.15)') &
+!                & elemParameterNo,componentIdx,origDepVar*scaleFactor,delta*scaleFactor
+
+              ! XY output purturbed element residual
+!              DO i=1,193
+!                WRITE(IUNIT,'(1X,3E25.15)') nonlinearMatrices%ELEMENT_RESIDUAL%VECTOR(i)
+!              ENDDO
             CASE DEFAULT
               CALL FLAG_ERROR("Unsupported type of interpolation.",err,error,*999)
             END SELECT
@@ -3212,28 +3248,33 @@ CONTAINS
           
 !          ! XY output reference element residual
 !          IF(elementNumber==5) THEN
-!            DO i=1,200
+!            DO i=1,193
 !              WRITE(IUNIT,'(1X,3E25.15)') elementVector%VECTOR(i)
 !            ENDDO
 !          ENDIF
 
           ! XY output element stiffness matrix
-!          IF(elementNumber==1) THEN
-!            CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"rows: ", &
-!              & nonlinearMatrices%JACOBIANS(jacobianNumber)%PTR%ELEMENT_JACOBIAN%NUMBER_OF_ROWS,ERR,ERROR,*999)
-!            CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"cols: ", &
-!              & nonlinearMatrices%JACOBIANS(jacobianNumber)%PTR%ELEMENT_JACOBIAN%NUMBER_OF_COLUMNS,ERR,ERROR,*999)
-              
-!            DO i=1,193!nonlinearMatrices%JACOBIANS(jacobianNumber)%PTR%ELEMENT_JACOBIAN%NUMBER_OF_ROWS
-!              DO j=1,193!nonlinearMatrices%JACOBIANS(jacobianNumber)%PTR%ELEMENT_JACOBIAN%NUMBER_OF_COLUMNS
+!          IF(elementNumber==2) THEN
+!          
+!            directory="results_iter/"
+!            INQUIRE(FILE=CHAR(directory),EXIST=dirExists)
+!            IF(.NOT.dirExists) THEN
+!              CALL SYSTEM(CHAR("mkdir "//directory))
+!            ENDIF
+!            
+!            filenameOutput=directory//"elementResidual.exdata"
+!            OPEN(UNIT=IUNIT,FILE=filenameOutput,STATUS="UNKNOWN",ACTION="WRITE",IOSTAT=ERR)
+!    
+!            DO i=1,nonlinearMatrices%JACOBIANS(jacobianNumber)%PTR%ELEMENT_JACOBIAN%NUMBER_OF_ROWS
+!              DO j=1,nonlinearMatrices%JACOBIANS(jacobianNumber)%PTR%ELEMENT_JACOBIAN%NUMBER_OF_COLUMNS
 !                WRITE(IUNIT,'(1X,3E25.15)') nonlinearMatrices%JACOBIANS(jacobianNumber)%PTR%ELEMENT_JACOBIAN%MATRIX(i,j)
 !              ENDDO !j
 !            ENDDO !i
+!            OPEN(UNIT=IUNIT)
+!            CALL EXIT(0)
+!            
 !          ENDIF
-!          
-!          
-!          
-!          OPEN(UNIT=IUNIT)
+          
           
           ! put the original residual back in
           nonlinearMatrices%ELEMENT_RESIDUAL=elementVector
@@ -5018,8 +5059,22 @@ CONTAINS
     TYPE(EQUATIONS_TYPE), POINTER :: EQUATIONS
     TYPE(EQUATIONS_MATRICES_TYPE), POINTER :: EQUATIONS_MATRICES
     TYPE(FIELD_TYPE), POINTER :: DEPENDENT_FIELD
+    
+    TYPE(VARYING_STRING) :: directory
+    LOGICAL :: dirExists,freeDof
+    INTEGER(INTG) :: IUNIT,i,j,countDof,noDofFixed
+    CHARACTER(LEN=100) :: filenameOutput
   
     CALL ENTERS("EQUATIONS_SET_JACOBIAN_EVALUATE_STATIC_FEM",ERR,ERROR,*999)
+    
+!    directory="results_iter/"
+!    INQUIRE(FILE=CHAR(directory),EXIST=dirExists)
+!    IF(.NOT.dirExists) THEN
+!      CALL SYSTEM(CHAR("mkdir "//directory))
+!    ENDIF
+!    
+!    filenameOutput=directory//"elementResidual.exdata"
+!    OPEN(UNIT=IUNIT,FILE=filenameOutput,STATUS="UNKNOWN",ACTION="WRITE",IOSTAT=ERR)
 
     IF(ASSOCIATED(EQUATIONS_SET)) THEN
       DEPENDENT_FIELD=>EQUATIONS_SET%DEPENDENT%DEPENDENT_FIELD
@@ -5057,12 +5112,30 @@ CONTAINS
             !Loop over the internal elements
             DO element_idx=ELEMENTS_MAPPING%INTERNAL_START,ELEMENTS_MAPPING%INTERNAL_FINISH
               ne=ELEMENTS_MAPPING%DOMAIN_LIST(element_idx)
+              
+              
               NUMBER_OF_TIMES=NUMBER_OF_TIMES+1
               CALL EQUATIONS_MATRICES_ELEMENT_CALCULATE(EQUATIONS_MATRICES,ne,ERR,ERROR,*999)
               CALL EQUATIONS_SET_FINITE_ELEMENT_JACOBIAN_EVALUATE(EQUATIONS_SET,ne,ERR,ERROR,*999)
+              
+
+              ! XY - output element stiffness
+              
+!              DO i=1,EQUATIONS_MATRICES%NONLINEAR_MATRICES%JACOBIANS(1)%PTR%ELEMENT_JACOBIAN%NUMBER_OF_ROWS
+!                DO j=1,EQUATIONS_MATRICES%NONLINEAR_MATRICES%JACOBIANS(1)%PTR%ELEMENT_JACOBIAN%NUMBER_OF_COLUMNS
+!                  WRITE(IUNIT,'(1X,3E25.15)') EQUATIONS_MATRICES%NONLINEAR_MATRICES%JACOBIANS(1)%PTR%ELEMENT_JACOBIAN%MATRIX(i,j)
+!                ENDDO !j
+!              ENDDO !i
+!              CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"  ELEMENT_NUMBER = ",ne,ERR,ERROR,*999)
+!!              CALL EXIT(0)
+!              IF(ne==73) THEN
+!                OPEN(UNIT=IUNIT)
+!                CALL EXIT(0)
+!              ENDIF
+              
               CALL EQUATIONS_MATRICES_JACOBIAN_ELEMENT_ADD(EQUATIONS_MATRICES,ERR,ERROR,*999)
-            ENDDO !element_idx         
-!            call exit(0)         
+            ENDDO !element_idx   
+!            CALL EXIT(0)               
             !Output timing information if required
             IF(EQUATIONS%OUTPUT_TYPE>=EQUATIONS_TIMING_OUTPUT) THEN
               CALL CPU_TIMER(USER_CPU,USER_TIME3,ERR,ERROR,*999)
@@ -5469,7 +5542,7 @@ CONTAINS
     TYPE(EQUATIONS_TYPE), POINTER :: EQUATIONS
     TYPE(EQUATIONS_MATRICES_TYPE), POINTER :: EQUATIONS_MATRICES
     TYPE(FIELD_TYPE), POINTER :: DEPENDENT_FIELD
- 
+    
     CALL ENTERS("EQUATIONS_SET_RESIDUAL_EVALUATE_DYNAMIC_FEM",ERR,ERROR,*999)
 
     NULLIFY(ELEMENTS_MAPPING)
@@ -5600,7 +5673,7 @@ CONTAINS
     ELSE
       CALL FLAG_ERROR("Equations set is not associated.",ERR,ERROR,*999)
     ENDIF
-       
+    
     CALL EXITS("EQUATIONS_SET_RESIDUAL_EVALUATE_DYNAMIC_FEM")
     RETURN
 999 CALL ERRORS("EQUATIONS_SET_RESIDUAL_EVALUATE_DYNAMIC_FEM",ERR,ERROR)
@@ -5628,6 +5701,21 @@ CONTAINS
     TYPE(EQUATIONS_TYPE), POINTER :: EQUATIONS
     TYPE(EQUATIONS_MATRICES_TYPE), POINTER :: EQUATIONS_MATRICES
     TYPE(FIELD_TYPE), POINTER :: DEPENDENT_FIELD
+    
+!    TYPE(VARYING_STRING) :: directory
+!    LOGICAL :: dirExists
+!    INTEGER(INTG) :: IUNIT,i,j
+!    CHARACTER(LEN=100) :: filenameOutput
+
+!    
+!    directory="results_iter/"
+!    INQUIRE(FILE=CHAR(directory),EXIST=dirExists)
+!    IF(.NOT.dirExists) THEN
+!      CALL SYSTEM(CHAR("mkdir "//directory))
+!    ENDIF
+!    
+!    filenameOutput=directory//"elementResidualAll.txt"
+!    OPEN(UNIT=IUNIT,FILE=filenameOutput,STATUS="UNKNOWN",ACTION="WRITE",IOSTAT=ERR)
  
     CALL ENTERS("EQUATIONS_SET_RESIDUAL_EVALUATE_STATIC_FEM",ERR,ERROR,*999)
 
@@ -5667,11 +5755,18 @@ CONTAINS
             !Loop over the internal elements
             DO element_idx=ELEMENTS_MAPPING%INTERNAL_START,ELEMENTS_MAPPING%INTERNAL_FINISH
               ne=ELEMENTS_MAPPING%DOMAIN_LIST(element_idx)
+!              CALL WRITE_STRING_VALUE(DIAGNOSTIC_OUTPUT_TYPE,"  ELEMENT_NUMBER = ",ne,ERR,ERROR,*999)
               NUMBER_OF_TIMES=NUMBER_OF_TIMES+1
               CALL EQUATIONS_MATRICES_ELEMENT_CALCULATE(EQUATIONS_MATRICES,ne,ERR,ERROR,*999)
               CALL EQUATIONS_SET_FINITE_ELEMENT_RESIDUAL_EVALUATE(EQUATIONS_SET,ne,ERR,ERROR,*999)
+              ! XY output element residual
+!              DO i=1,193
+!                WRITE(IUNIT,'(1X,3E25.15)') EQUATIONS_MATRICES%NONLINEAR_MATRICES%ELEMENT_RESIDUAL%VECTOR(i)
+!              ENDDO              
               CALL EQUATIONS_MATRICES_ELEMENT_ADD(EQUATIONS_MATRICES,ERR,ERROR,*999)
             ENDDO !element_idx
+!            OPEN(UNIT=IUNIT)
+!            CALL EXIT(0)
             !Output timing information if required
             IF(EQUATIONS%OUTPUT_TYPE>=EQUATIONS_TIMING_OUTPUT) THEN
               CALL CPU_TIMER(USER_CPU,USER_TIME3,ERR,ERROR,*999)
@@ -5754,7 +5849,7 @@ CONTAINS
     ELSE
       CALL FLAG_ERROR("Equations set is not associated.",ERR,ERROR,*999)
     ENDIF
-       
+    
     CALL EXITS("EQUATIONS_SET_RESIDUAL_EVALUATE_STATIC_FEM")
     RETURN
 999 CALL ERRORS("EQUATIONS_SET_RESIDUAL_EVALUATE_STATIC_FEM",ERR,ERROR)

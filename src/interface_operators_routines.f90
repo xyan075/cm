@@ -1332,13 +1332,15 @@ CONTAINS
                         !\todo: XY -rigid deformable contact, temporarily store contact points evaluated on rigid body (relative to centre
                         ! of mass) in the 3-components Lagrange field
                         LagrangeField=>interfaceCondition%LAGRANGE%LAGRANGE_FIELD
-                        ! Store the new relative position of the contact points on the master body
-                        DO componentIdx=1,noGeoComp
-                          !contactPtIdx is the same as global number
-                          CALL Field_ParameterSetUpdateDataPoint(LagrangeField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE, &
-                            & contactPtIdx,componentIdx,interpolatedPointMaster%VALUES(componentIdx,NO_PART_DERIV)- &
-                            & centreOfMass(componentIdx),ERR,ERROR,*999) 
-                        ENDDO !componentIdx
+                        IF(LagrangeField%VARIABLE_TYPE_MAP(FIELD_U_VARIABLE_TYPE)%PTR%NUMBER_OF_COMPONENTS==noGeoComp) THEN
+                          ! Store the new relative position of the contact points on the master body
+                          DO componentIdx=1,noGeoComp
+                            !contactPtIdx is the same as global number
+                            CALL Field_ParameterSetUpdateDataPoint(LagrangeField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE, &
+                              & contactPtIdx,componentIdx,interpolatedPointMaster%VALUES(componentIdx,NO_PART_DERIV)- &
+                              & centreOfMass(componentIdx),ERR,ERROR,*999) 
+                          ENDDO !componentIdx
+                        ENDIF
                           
                         !#############################################################################################################
                         
