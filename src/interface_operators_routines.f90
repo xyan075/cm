@@ -80,7 +80,7 @@ MODULE INTERFACE_OPERATORS_ROUTINES
   PUBLIC InterfaceContactMetrics_IterationAddGeoTermSet
   
   PUBLIC InterfaceContactMetrics_RigidBodySet
-
+  
   PUBLIC SolidFluidOperator_FiniteElementCalculate
 
 CONTAINS

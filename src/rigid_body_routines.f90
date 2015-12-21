@@ -783,7 +783,7 @@ CONTAINS
               DO componentIdx=1,noGeoComp
               ! for position between two nodes
                 temp=0.0_DP
-                userNodeNumber=1110
+                userNodeNumber=1111
                 CALL FIELD_PARAMETER_SET_GET_NODE(geometricField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE,1,1, &
                   & userNodeNumber,componentIdx,centreOfMass(componentIdx),ERR,ERROR,*999)
                   

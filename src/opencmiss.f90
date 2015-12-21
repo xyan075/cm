@@ -3119,6 +3119,11 @@ MODULE OPENCMISS
     MODULE PROCEDURE CMISSEquationsSet_AnalyticUserParamSetNumber
     MODULE PROCEDURE CMISSEquationsSet_AnalyticUserParamSetObj
   END INTERFACE
+  
+  !>Evaluate the stress and strain field for the equation set
+  INTERFACE CMISSEquationsSet_StressStrainEvaluate
+    MODULE PROCEDURE CMISSEquationsSet_StressStrainEvaluateObj
+  END INTERFACE
 
   PUBLIC CMISSEquationsSet_AnalyticCreateFinish,CMISSEquationsSet_AnalyticCreateStart
 
@@ -3165,6 +3170,8 @@ MODULE OPENCMISS
   PUBLIC CMISSEquationsSet_StrainInterpolateXi
 
   PUBLIC CMISSEquationsSet_AnalyticUserParamSet,CMISSEquationsSet_AnalyticUserParamGet
+  
+  PUBLIC CMISSEquationsSet_StressStrainEvaluate
 
 !!==================================================================================================================================
 !!
@@ -4613,6 +4620,11 @@ MODULE OPENCMISS
   INTERFACE CMISSInterfaceCondition_RigidBodySet
     MODULE PROCEDURE CMISSInterfaceCondition_RigidBodySetObj
   END INTERFACE !CMISSInterfaceCondition_RigidBodySet
+  
+  !>Get the forces and moments from a rigid body
+  INTERFACE CMISSInterfaceCondition_ForceMomentCalculate
+    MODULE PROCEDURE CMISSInterfaceCondition_ForceMomentCalculateObj
+  END INTERFACE !CMISSInterfaceCondition_ForceMomentCalculate
 
   !>Returns the sparsity for interface equations.
   INTERFACE CMISSInterfaceEquations_SparsityGet
@@ -4670,6 +4682,8 @@ MODULE OPENCMISS
   PUBLIC CMISSInterfaceCondition_OperatorGet,CMISSInterfaceCondition_OperatorSet
   
   PUBLIC CMISSInterfaceCondition_RigidBodySet
+  
+  PUBLIC CMISSInterfaceCondition_ForceMomentCalculate
 
   PUBLIC CMISSInterfaceEquations_SparsityGet,CMISSInterfaceEquations_SparsitySet
 
@@ -6785,6 +6799,8 @@ MODULE OPENCMISS
   PUBLIC CMISSSolverEquations_VectorGet
 
   PUBLIC CMISSSolverEquations_ResidualVectorGet
+  
+  PUBLIC CMISSEquationsSet_ResidualVectorGet
 
   PUBLIC CMISSSolverEquations_RhsVectorGet
 
@@ -26060,6 +26076,31 @@ CONTAINS
     RETURN
 
   END SUBROUTINE CMISSEquationsSet_StrainInterpolateXiObj
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Calculate the strain tensor at a given element xi location, for an equations set identified by an object.
+  SUBROUTINE CMISSEquationsSet_StressStrainEvaluateObj(equationsSet,stressStrainField,err)
+
+    !Argument variables
+    TYPE(CMISSEquationsSetType), INTENT(IN) :: equationsSet !<A pointer to the equations set to interpolate strain for.
+    TYPE(CMISSFieldType), INTENT(INOUT) :: stressStrainField !<The field to store the strain and stress in.
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code.
+
+    CALL Enters("CMISSEquationsSet_StressStrainEvaluateObj",err,error,*999)
+
+    CALL EquationsSet_StressStrainEvaluate(equationsSet%equations_set,stressStrainField%field,err,error,*999)
+
+    CALL Exits("CMISSEquationsSet_StressStrainEvaluateObj")
+    RETURN
+999 CALL Errors("CMISSEquationsSet_StressStrainEvaluateObj",err,error)
+    CALL Exits("CMISSEquationsSet_StressStrainEvaluateObj")
+    CALL CmissHandleError(err,error)
+    RETURN
+
+  END SUBROUTINE CMISSEquationsSet_StressStrainEvaluateObj
 
 !!==================================================================================================================================
 !!
@@ -41676,6 +41717,33 @@ CONTAINS
     RETURN
 
   END SUBROUTINE CMISSInterfaceCondition_RigidBodySetObj
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Sets/changes the rigid body external forces and moments for an interface condition identified by an object.
+  SUBROUTINE CMISSInterfaceCondition_ForceMomentCalculateObj(interfaceCondition,forceMoment,err)
+
+    !Argument variables
+    TYPE(CMISSInterfaceConditionType), INTENT(IN) :: interfaceCondition !<The interface condition to set the operator for.
+    REAL(DP), INTENT(OUT) :: forceMoment(:) !<The rigid body forces
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code.
+    !Local variables
+
+    CALL ENTERS("CMISSInterfaceCondition_ForceMomentCalculateObj",err,error,*999)
+
+    CALL InterfaceContactMetrics_ForceMomentCalculate(interfaceCondition%INTERFACE_CONDITION,forceMoment, &
+      & err,error,*999)
+
+    CALL EXITS("CMISSInterfaceCondition_ForceMomentCalculateObj")
+    RETURN
+999 CALL ERRORS("CMISSInterfaceCondition_ForceMomentCalculateObj",err,error)
+    CALL EXITS("CMISSInterfaceCondition_ForceMomentCalculateObj")
+    CALL CMISS_HANDLE_ERROR(err,error)
+    RETURN
+
+  END SUBROUTINE CMISSInterfaceCondition_ForceMomentCalculateObj
 
   !
   !================================================================================================================================
@@ -56935,6 +57003,34 @@ CONTAINS
     RETURN
 
   END SUBROUTINE CMISSSolverEquations_ResidualVectorGet
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Get the residual vector from the solver equations for nonlinear problems
+  SUBROUTINE CMISSEquationsSet_ResidualVectorGet(equationsSet,residualVector,boundaryCondition,noDirichlet,err)
+
+    !Argument variables
+    TYPE(CMISSEquationsSetType), INTENT(IN) :: equationsSet !<The solver equations to get the residual vector for
+    TYPE(CMISSDistributedVectorType), INTENT(INOUT) :: residualVector !<On return, the solver residual vector
+    INTEGER(INTG), INTENT(OUT) :: boundaryCondition(:) !<The list of nodes on the surface to be returned.
+    INTEGER(INTG), INTENT(OUT) :: noDirichlet !<The list of nodes on the surface to be returned.
+    INTEGER(INTG), INTENT(OUT) :: err !<The error code
+
+    CALL Enters("CMISSEquationsSet_ResidualVectorGet",err,error,*999)
+
+    CALL EquationsSet_ResidualVectorGet(equationsSet%equations_set,residualVector%distributedVector,boundaryCondition, &
+      & noDirichlet,err,error,*999)
+
+    CALL Exits("CMISSEquationsSet_ResidualVectorGet")
+    RETURN
+999 CALL Errors("CMISSEquationsSet_ResidualVectorGet",err,error)
+    CALL Exits("CMISSEquationsSet_ResidualVectorGet")
+    CALL CMISSHandleError(err,error)
+    RETURN
+
+  END SUBROUTINE CMISSEquationsSet_ResidualVectorGet
 
   !
   !================================================================================================================================

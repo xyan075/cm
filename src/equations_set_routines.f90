@@ -150,6 +150,8 @@ MODULE EQUATIONS_SET_ROUTINES
   PUBLIC EQUATIONS_SET_LOAD_INCREMENT_APPLY
   
   PUBLIC EQUATIONS_SET_ANALYTIC_USER_PARAM_SET,EQUATIONS_SET_ANALYTIC_USER_PARAM_GET
+  
+  PUBLIC EquationsSet_ResidualVectorGet
 
 CONTAINS
 
@@ -7721,6 +7723,87 @@ CONTAINS
     CALL EXITS("EquationsSet_ResidualEvaluateStaticNodal")
     RETURN 1
   END SUBROUTINE EquationsSet_ResidualEvaluateStaticNodal
+  
+  !
+  !================================================================================================================================
+  !
+
+  !>Get the residual vector from the solver equations for nonlinear problems
+  SUBROUTINE EquationsSet_ResidualVectorGet(equationsSet,residualVector,boundaryCondition,noDirichlet,err,error,*)
+
+    !Argument variables
+    TYPE(EQUATIONS_SET_TYPE), POINTER, INTENT(IN) :: equationsSet !< The solver equations to get the residual vector for
+    TYPE(DISTRIBUTED_VECTOR_TYPE), POINTER, INTENT(INOUT) :: residualVector !< On return, the solver residual vector
+    INTEGER(INTG), INTENT(OUT) :: boundaryCondition (:) !<The nodes on the specified surface
+    INTEGER(INTG), INTENT(OUT) :: noDirichlet  !<The nodes on the specified surface
+    INTEGER(INTG), INTENT(OUT) :: err !< The error code
+    TYPE(VARYING_STRING), INTENT(OUT) :: error !<The error string
+    !Local variables
+    TYPE(SOLVER_MATRICES_TYPE), POINTER :: solverMatrices
+    TYPE(EQUATIONS_TYPE), POINTER :: EQUATIONS
+    TYPE(EQUATIONS_MATRICES_TYPE), POINTER :: EQUATIONS_MATRICES
+    TYPE(EQUATIONS_MATRICES_NONLINEAR_TYPE), POINTER :: NONLINEAR_MATRICES
+    TYPE(DISTRIBUTED_VECTOR_TYPE), POINTER :: RESIDUAL_VECTOR
+    INTEGER(INTG) :: i
+
+    CALL Enters("EquationsSet_ResidualVectorGet",err,error,*999)
+
+    IF(ASSOCIATED(equationsSet)) THEN
+      EQUATIONS=>equationsSet%EQUATIONS
+      IF(ASSOCIATED(EQUATIONS)) THEN
+        EQUATIONS_MATRICES=>EQUATIONS%EQUATIONS_MATRICES
+        IF(ASSOCIATED(EQUATIONS_MATRICES)) THEN
+          NONLINEAR_MATRICES=>EQUATIONS_MATRICES%NONLINEAR_MATRICES
+          IF(ASSOCIATED(NONLINEAR_MATRICES)) THEN
+            RESIDUAL_VECTOR=>NONLINEAR_MATRICES%RESIDUAL
+            IF(ASSOCIATED(RESIDUAL_VECTOR)) THEN
+              residualVector=>RESIDUAL_VECTOR
+              noDirichlet=equationsSet%boundary_conditions%boundary_conditions_variables(1)%ptr%number_of_dirichlet_conditions
+                IF(noDirichlet>SIZE(boundaryCondition)) THEN
+                  CALL FlagError("Boundary condition array size is not enough.",err,error,*999)
+                ELSE
+                  DO i=1,noDirichlet
+                    boundaryCondition(i)=equationsSet%boundary_conditions%boundary_conditions_variables(1)% &
+                      & ptr%dirichlet_boundary_conditions%dirichlet_dof_indices(i)
+                  ENDDO
+                ENDIF
+            ELSE
+              CALL FlagError("Residual vector is not associated.",err,error,*999)
+            ENDIF
+          ELSE
+            CALL FlagError("Nonlinear matrices is not associated.",err,error,*999)
+          ENDIF
+        ELSE
+          CALL FlagError("Equation matrices is not associated.",err,error,*999)
+        ENDIF
+      ELSE
+        CALL FlagError("Equations is not associated.",err,error,*999)
+      ENDIF
+!      solverMatrices=>equationsSet%solver_matrices
+!      IF(ASSOCIATED(solverMatrices)) THEN
+!        IF(.NOT.ASSOCIATED(residualVector)) THEN
+!          IF(ASSOCIATED(solverMatrices%residual)) THEN
+!            residualVector=>solverMatrices%residual
+!          ELSE
+!            CALL FlagError("The solver matrices residual vector is not associated.",err,error,*999)
+!          END IF
+!        ELSE
+!          CALL FlagError("The residual vector is already associated.",err,error,*999)
+!        END IF
+!      ELSE
+!        CALL FlagError("Solver equations solver matrices are not associated.",err,error,*999)
+!      END IF
+    ELSE
+      CALL FlagError("Equations set is not associated.",err,error,*999)
+    ENDIF
+
+    CALL Exits("EquationsSet_ResidualVectorGet")
+    RETURN
+999 CALL Errors("EquationsSet_ResidualVectorGet",err,error)
+    CALL Exits("EquationsSet_ResidualVectorGet")
+    RETURN
+
+  END SUBROUTINE EquationsSet_ResidualVectorGet
 
   !
   !================================================================================================================================
