@@ -26065,7 +26065,7 @@ CONTAINS
 
     CALL Enters("CMISSEquationsSet_StrainInterpolateXiObj",err,error,*999)
 
-    CALL EquationsSet_StrainInterpolateXi(equationsSet%equations_set,userElementNumber,xi, &
+    CALL FiniteElasticity_StrainInterpolateXi(equationsSet%equations_set,userElementNumber,xi, &
       & values,err,error,*999)
 
     CALL Exits("CMISSEquationsSet_StrainInterpolateXiObj")
