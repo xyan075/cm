@@ -259,28 +259,28 @@ CONTAINS
               & (EXP(angleX*interfaceCondition%interfaceContactMetrics%contactPointMetrics(1)%contactStiffness(3)) &
               & -1.0_DP)
           ENDIF
-          IF(angleY>=0.0_DP) THEN
-            forceMoment(5)=forceMoment(5)+ &
-              & interfaceCondition%interfaceContactMetrics%contactPointMetrics(1)%contactStiffness(2)* &
-              & (EXP(angleY*interfaceCondition%interfaceContactMetrics%contactPointMetrics(1)%contactStiffness(3)) &
-              & -1.0_DP)
-          ELSE
-            forceMoment(5)=forceMoment(5)- &
-              & interfaceCondition%interfaceContactMetrics%contactPointMetrics(1)%contactStiffness(2)* &
-              & (EXP(-angleY*interfaceCondition%interfaceContactMetrics%contactPointMetrics(1)%contactStiffness(3)) &
-              & -1.0_DP)
-          ENDIF
-          IF(angleZ>=0.0_DP) THEN
-            forceMoment(6)=forceMoment(6)+ &
-              & interfaceCondition%interfaceContactMetrics%contactPointMetrics(1)%contactStiffness(2)* &
-              & (EXP(angleZ*interfaceCondition%interfaceContactMetrics%contactPointMetrics(1)%contactStiffness(3)) &
-              & -1.0_DP)
-          ELSE
-            forceMoment(6)=forceMoment(6)- &
-              & interfaceCondition%interfaceContactMetrics%contactPointMetrics(1)%contactStiffness(2)* &
-              & (EXP(-angleZ*interfaceCondition%interfaceContactMetrics%contactPointMetrics(1)%contactStiffness(3)) &
-              & -1.0_DP)  
-          ENDIF
+!          IF(angleY>=0.0_DP) THEN
+!            forceMoment(5)=forceMoment(5)+ &
+!              & interfaceCondition%interfaceContactMetrics%contactPointMetrics(1)%contactStiffness(2)* &
+!              & (EXP(angleY*interfaceCondition%interfaceContactMetrics%contactPointMetrics(1)%contactStiffness(3)) &
+!              & -1.0_DP)
+!          ELSE
+!            forceMoment(5)=forceMoment(5)- &
+!              & interfaceCondition%interfaceContactMetrics%contactPointMetrics(1)%contactStiffness(2)* &
+!              & (EXP(-angleY*interfaceCondition%interfaceContactMetrics%contactPointMetrics(1)%contactStiffness(3)) &
+!              & -1.0_DP)
+!          ENDIF
+!          IF(angleZ>=0.0_DP) THEN
+!            forceMoment(6)=forceMoment(6)+ &
+!              & interfaceCondition%interfaceContactMetrics%contactPointMetrics(1)%contactStiffness(2)* &
+!              & (EXP(angleZ*interfaceCondition%interfaceContactMetrics%contactPointMetrics(1)%contactStiffness(3)) &
+!              & -1.0_DP)
+!          ELSE
+!            forceMoment(6)=forceMoment(6)- &
+!              & interfaceCondition%interfaceContactMetrics%contactPointMetrics(1)%contactStiffness(2)* &
+!              & (EXP(-angleZ*interfaceCondition%interfaceContactMetrics%contactPointMetrics(1)%contactStiffness(3)) &
+!              & -1.0_DP)  
+!          ENDIF
           
           CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"force 1 = ",forceMoment(1),err,error,*999)
           CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"force 2 = ",forceMoment(2),err,error,*999)
@@ -327,7 +327,8 @@ CONTAINS
     
     IF(ASSOCIATED(equationsSet)) THEN
       IF(ASSOCIATED(stressStrainField)) THEN
-        CALL FiniteElasticity_StressStrainCalculate(equationsSet,stressStrainField,FIELD_U1_VARIABLE_TYPE,err,error,*999)
+        CALL FiniteElasticity_StressStrainCalculate(equationsSet,stressStrainField,FIELD_U1_VARIABLE_TYPE, &
+          & err,error,*999)
       ELSE
         CALL FLAG_ERROR("Stress strain field is not associated.",err,error,*999)
       ENDIF
@@ -2077,7 +2078,7 @@ CONTAINS
       & colDofScaleFactor,colPhi,centreOfMass(3),theta(3),rigidBodyPhi(6)
     REAL(DP) :: kappa(2,2),TRow(2),TCol(2),NRow(2),NCol(2),DRow(2),DCol(2), &
       & tempA,tempB,geometricTerm,matrixValue,junk1,junk2,junk3,angleX
-    REAL(DP) :: scaling=0.01_DP
+    REAL(DP) :: scaling=1.0_DP
     TYPE(VARYING_STRING) :: localError
     
 !    TYPE(VARYING_STRING) :: directory
@@ -2431,10 +2432,10 @@ CONTAINS
                         
                         forceTerm=-rowPhi*contactPointMetrics%normal(rowFieldComp)*rigidBodyPhi(colFieldComp+3)* &
                             & contactPointMetrics%contactStiffness(1)*rowDofScaleFactor* &
-                            & contactPointMetrics%Jacobian*interface%DATA_POINTS%DATA_POINTS(globalDataPointNum)%WEIGHTS(1)!*scaling
+                            & contactPointMetrics%Jacobian*interface%DATA_POINTS%DATA_POINTS(globalDataPointNum)%WEIGHTS(1)*scaling
                           CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,colIdx,rowIdx,forceTerm,err,error,*999)
 !                          IF (iterationNumber>contactMetrics%iterationGeometricTerm) THEN
-!                            CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,rowIdx,colIdx,-forceTerm,err,error,*999)
+                            CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,rowIdx,colIdx,-forceTerm,err,error,*999)
 !                          ENDIF
                       ENDDO !colFieldComp
                     ENDDO !rowFaceDerivative
@@ -2459,23 +2460,23 @@ CONTAINS
                       forceTerm=rowPhi*colPhi*contactPointMetrics%contactStiffness(1)*contactPointMetrics%Jacobian* &
                         & interface%DATA_POINTS%DATA_POINTS(globalDataPointNum)%WEIGHTS(1)
                       IF(rowFieldComp>3) THEN
-                        forceTerm=forceTerm!*scaling
+                        forceTerm=forceTerm*scaling
                       ENDIF
                       CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,rowIdx,colIdx,forceTerm,err,error,*999)
                     ENDDO !colFieldComp
                     
 !                    IF(iterationNumber>contactMetrics%iterationGeometricTerm) THEN
-!                      DO colFieldComp=4,6
-!                        colIdx=defDepVariable%components(4+colFieldComp)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
-!                        if(colFieldComp<4) THEN
-!                          colPhi=rigidBodyPhi(colFieldComp)
-!                        ELSE
-!                          colPhi=-rigidBodyPhi(colFieldComp)
-!                        ENDIF
-!                        forceTerm=rowPhi*colPhi*contactPointMetrics%contactStiffness(1)*contactPointMetrics%Jacobian* &
-!                          & interface%DATA_POINTS%DATA_POINTS(globalDataPointNum)%WEIGHTS(1)
-!                        CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,rowIdx,colIdx,forceTerm,err,error,*999)
-!                      ENDDO !colFieldComp
+                      DO colFieldComp=4,6
+                        colIdx=defDepVariable%components(4+colFieldComp)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
+                        if(colFieldComp<4) THEN
+                          colPhi=rigidBodyPhi(colFieldComp)
+                        ELSE
+                          colPhi=-rigidBodyPhi(colFieldComp)
+                        ENDIF
+                        forceTerm=rowPhi*colPhi*contactPointMetrics%contactStiffness(1)*contactPointMetrics%Jacobian* &
+                          & interface%DATA_POINTS%DATA_POINTS(globalDataPointNum)%WEIGHTS(1)
+                        CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,rowIdx,colIdx,forceTerm,err,error,*999)
+                      ENDDO !colFieldComp
 !                    ENDIF
                   ENDDO !rowFieldComp
                   
@@ -2486,7 +2487,7 @@ CONTAINS
 !                  CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"angle Jacobian = ",angleX,err,error,*999)  
                   IF(angleX>=0.0_DP) THEN
                     forceTerm=contactPointMetrics%contactStiffness(2)*contactPointMetrics%contactStiffness(3)* &
-                      & EXP(contactPointMetrics%contactStiffness(3)*angleX)!*scaling
+                      & EXP(contactPointMetrics%contactStiffness(3)*angleX)*scaling
                     CALL DISTRIBUTED_MATRIX_VALUES_ADD(jacobian,rowIdx,rowIdx,forceTerm,err,error,*999)
                   ENDIF
                   
@@ -3318,7 +3319,7 @@ CONTAINS
       & rigidBodyDofCompIdx,dummyCompIdx
     REAL(DP) :: residualValue,phi,angleX
     REAL(DP) :: xi(3),xiReduced(2),rigidBodyMatrix(3,3),contactPtPosition(3),junkPos(3) !\todo generalise xi allocations for 1D,2D and 3D points connectivity
-    REAL(DP) :: scaling=0.01_DP
+    REAL(DP) :: scaling=1.0_DP
     TYPE(VARYING_STRING) :: localError
 
     CALL ENTERS("EquationsSet_ResidualRigidBodyContactUpdateStaticFEM",ERR,ERROR,*999)
@@ -3476,7 +3477,7 @@ CONTAINS
                     DO dummyCompIdx=1,3
                       residualValue=residualValue+rigidBodyMatrix(fieldComponent,dummyCompIdx)* &
                         & contactPointMetrics%normal(dummyCompIdx)*contactPointMetrics%contactForce* &
-                        & contactPointMetrics%Jacobian*interface%DATA_POINTS%DATA_POINTS(globalDataPointNum)%WEIGHTS(1)!*scaling
+                        & contactPointMetrics%Jacobian*interface%DATA_POINTS%DATA_POINTS(globalDataPointNum)%WEIGHTS(1)*scaling
                     ENDDO !dummyCompIdx
                     IF(perburbation) THEN
                       contactMetrics%residualPerturbed(dofIdx)=contactMetrics%residualPerturbed(dofIdx)+residualValue
@@ -3516,7 +3517,7 @@ CONTAINS
                 & angleX,err,error,*999)
               IF(angleX>=0.0_DP) THEN
                 residualValue=contactPointMetrics%contactStiffness(2)*(EXP(angleX*contactPointMetrics%contactStiffness(3))-1.0_DP) &
-                  & !*scaling
+                  & *scaling
               ELSE
                 residualValue=0.0_DP
               ENDIF
@@ -3568,15 +3569,15 @@ CONTAINS
 
               ! output to screen
 !              CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"******************** COM ******************",ERR,ERROR,*999)
-!              DO fieldComponent=2,2
-!                CALL FIELD_PARAMETER_SET_GET_CONSTANT(defDepField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE,fieldComponent+7, &
-!                  & angleX,err,error,*999)
-!                IF(perburbation) THEN
-!                  CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"p angle = ",angleX,err,error,*999)
-!                else
-!                 CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"angle = ",angleX,err,error,*999)
-!                endif
-!              ENDDO !fieldComponent
+              DO fieldComponent=1,3
+                CALL FIELD_PARAMETER_SET_GET_CONSTANT(defDepField,FIELD_U_VARIABLE_TYPE,FIELD_VALUES_SET_TYPE,fieldComponent+7, &
+                  & angleX,err,error,*999)
+                IF(perburbation) THEN
+                  CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"p angle = ",angleX,err,error,*999)
+                else
+                 CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"Angle = ",angleX,err,error,*999)
+                endif
+              ENDDO !fieldComponent
 
 !              CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"******************** force ******************",ERR,ERROR,*999)
 !              DO fieldComponent=1,2
@@ -3591,17 +3592,17 @@ CONTAINS
 !                CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"******************** torque ******************",ERR,ERROR,*999)
               ENDIF
               
-!              DO fieldComponent=2,2
-!                dofIdx=residualVariable%components(7+fieldComponent)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
-!                IF(perburbation) THEN
-!                  residualValue=contactMetrics%residualPerturbed(dofIdx)
-!                  CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"p torque = ",residualValue,err,error,*999)
-!                ELSE
-!                  CALL DISTRIBUTED_VECTOR_VALUES_GET(nonlinearMatrices%RESIDUAL,dofIdx,residualValue,err,error,*999)
-!                  CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"torque = ",residualValue,err,error,*999)
-!                ENDIF
+              DO fieldComponent=1,3
+                dofIdx=residualVariable%components(7+fieldComponent)%PARAM_TO_DOF_MAP%CONSTANT_PARAM2DOF_MAP
+                IF(perburbation) THEN
+                  residualValue=contactMetrics%residualPerturbed(dofIdx)
+                  CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"p torque = ",residualValue,err,error,*999)
+                ELSE
+                  CALL DISTRIBUTED_VECTOR_VALUES_GET(nonlinearMatrices%RESIDUAL,dofIdx,residualValue,err,error,*999)
+                  CALL WRITE_STRING_VALUE(GENERAL_OUTPUT_TYPE,"Torque = ",residualValue,err,error,*999)
+                ENDIF
 !                
-!              ENDDO !fieldComponent
+              ENDDO !fieldComponent
 !              
 !              CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"******************** torque ******************",ERR,ERROR,*999)
 !              DO fieldComponent=1,3
@@ -5507,7 +5508,8 @@ CONTAINS
                 IF(solver%SOLVE_TYPE==SOLVER_NONLINEAR_TYPE) THEN
                   nonlinearSolver=>solver%NONLINEAR_SOLVER
                   IF(ASSOCIATED(nonlinearSolver)) THEN
-                    CALL Problem_SolverNewtonFieldsOutput(solver,iterationNumber,err,error,*999)
+                    ! XY: output mesh at iterations
+!                    CALL Problem_SolverNewtonFieldsOutput(solver,iterationNumber,err,error,*999)
                   ENDIF
                 ENDIF
               CASE(PROBLEM_LINEAR_ELASTICITY_CONTACT_TYPE,PROBLEM_FINITE_ELASTICITY_CONTACT_TYPE)
@@ -5579,7 +5581,8 @@ CONTAINS
                 IF(solver%SOLVE_TYPE==SOLVER_NONLINEAR_TYPE) THEN
                   nonlinearSolver=>solver%NONLINEAR_SOLVER
                   IF(ASSOCIATED(nonlinearSolver)) THEN
-                    CALL Problem_SolverNewtonFieldsOutput(solver,iterationNumber,err,error,*999)
+                    ! XY: output mesh at iterations
+!                    CALL Problem_SolverNewtonFieldsOutput(solver,iterationNumber,err,error,*999)
                   ENDIF
                 ENDIF
               CASE DEFAULT

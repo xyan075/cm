@@ -1225,10 +1225,10 @@ CONTAINS
             ENDIF !NUMBER_OF_DIMENSIONS
             
             
-            IF(DIAGNOSTICS1) THEN
+!            IF(DIAGNOSTICS1) THEN
               CALL WRITE_STRING_VALUE(DIAGNOSTIC_OUTPUT_TYPE,"  ELEMENT_NUMBER = ",ELEMENT_NUMBER,ERR,ERROR,*999)
               CALL WRITE_STRING_VALUE(DIAGNOSTIC_OUTPUT_TYPE,"  gauss_idx = ",gauss_idx,ERR,ERROR,*999)
-            ENDIF
+!            ENDIF
             
           enddo
           
@@ -2538,6 +2538,8 @@ CONTAINS
           
           !Loop over gauss points
           DO gauss_idx=1,DEPENDENT_NUMBER_OF_GAUSS_POINTS
+!            CALL WRITE_STRING_VALUE(DIAGNOSTIC_OUTPUT_TYPE,"  ELEMENT_NUMBER = ",ne,ERR,ERROR,*999)
+!              CALL WRITE_STRING_VALUE(DIAGNOSTIC_OUTPUT_TYPE,"  gauss_idx = ",gauss_idx,ERR,ERROR,*999)
             !Interpolate dependent, geometric, fibre fields
             CALL FIELD_INTERPOLATE_GAUSS(FIRST_PART_DERIV,BASIS_DEFAULT_QUADRATURE_SCHEME,gauss_idx, &
               & DEPENDENT_INTERPOLATED_POINT,ERR,ERROR,*999)
@@ -2547,16 +2549,19 @@ CONTAINS
               & GEOMETRIC_INTERPOLATED_POINT,ERR,ERROR,*999)
             CALL FIELD_INTERPOLATED_POINT_METRICS_CALCULATE(GEOMETRIC_BASIS%NUMBER_OF_XI,GEOMETRIC_INTERPOLATED_POINT_METRICS, &
               & ERR,ERROR,*999)
+!            CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"**************** geometric! ****************",ERR,ERROR,*999)
             CALL FIELD_INTERPOLATE_GAUSS(NO_PART_DERIV,BASIS_DEFAULT_QUADRATURE_SCHEME,gauss_idx, &
               & MATERIALS_INTERPOLATED_POINT,ERR,ERROR,*999)
+!            CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"**************** material! ****************",ERR,ERROR,*999)
             IF(ASSOCIATED(FIBRE_FIELD)) THEN
               CALL FIELD_INTERPOLATE_GAUSS(FIRST_PART_DERIV,BASIS_DEFAULT_QUADRATURE_SCHEME,gauss_idx, &
                 & FIBRE_INTERPOLATED_POINT,ERR,ERROR,*999)
             END IF
-
+!            CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"**************** fibre! ****************",ERR,ERROR,*999)
             !Calculate F=dZ/dNU, the deformation gradient tensor at the gauss point
             CALL FiniteElasticityGaussDeformationGradientTensor(DEPENDENT_INTERPOLATED_POINT_METRICS, &
               & GEOMETRIC_INTERPOLATED_POINT_METRICS,FIBRE_INTERPOLATED_POINT,DZDNU,Jxxi,ERR,ERROR,*999)
+!            CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"**************** deformation gra! ****************",ERR,ERROR,*999)
 
             IF(DIAGNOSTICS1) THEN
               CALL WRITE_STRING_VALUE(DIAGNOSTIC_OUTPUT_TYPE,"  ELEMENT_NUMBER = ",ne,ERR,ERROR,*999)
@@ -2578,7 +2583,6 @@ CONTAINS
             CALL FINITE_ELASTICITY_GAUSS_CAUCHY_TENSOR(equationsSet,DEPENDENT_INTERPOLATED_POINT, &
               & MATERIALS_INTERPOLATED_POINT,DARCY_DEPENDENT_INTERPOLATED_POINT, &
               & INDEPENDENT_INTERPOLATED_POINT,stressTensor,Jznu,DZDNU,ne,gauss_idx,ERR,ERROR,*999)
-              
               
               
               
@@ -3296,8 +3300,9 @@ CONTAINS
 
     SELECT CASE(EQUATIONS_SET_SUBTYPE) !AZL = C, right cauchy
     CASE(EQUATIONS_SET_PELVIC_FLOOR_SUBTYPE)
-      CALL FIELD_PARAMETER_SET_GET_ELEMENT(EQUATIONS_SET%materials%materials_field,FIELD_V_VARIABLE_TYPE, &
+      CALL FIELD_PARAMETER_SET_GET_ELEMENT_INTG_LOCAL(EQUATIONS_SET%materials%materials_field,FIELD_V_VARIABLE_TYPE, &
         & FIELD_VALUES_SET_TYPE,ELEMENT_NUMBER,1,materialType,ERR,ERROR,*999)
+      
       SELECT CASE(materialType) ! use transversely isotropic material law
       CASE(1)
         ! ground matrix
@@ -3335,15 +3340,15 @@ CONTAINS
       CASE(5) ! anococcygeal ligament, Neohookean ground matrix with linear fibre
         ! ground matrix
         PIOLA_TENSOR=(1.0_DP-C(3))*C(1)*IDENTITY*2.0_DP+2.0_DP*P*AZU
-        ! add fibre contribution to T11
+        ! add fibre contribution to T33
         lambda=sqrt(AZL(3,3))
         PIOLA_TENSOR(3,3)=PIOLA_TENSOR(3,3)+C(3)*C(2)*2.0_DP*(1.0-1.0/lambda)
       CASE(6) ! the muscle element anterior-caudally, the external sphincter elements
         ! ground matrix
         PIOLA_TENSOR=(1.0_DP-C(5))*C(1)*C(2)*EXP(C(2)*(AZL(1,1)+AZL(2,2)+AZL(3,3)-3.0_DP))*IDENTITY*2.0_DP+2.0_DP*P*AZU
-        ! add fibre contribution to T11
+        ! add fibre contribution to T22
         lambda=sqrt(AZL(2,2))
-        PIOLA_TENSOR(1,1)=PIOLA_TENSOR(1,1)+C(5)*C(3)*C(4)*2.0_DP*((lambda-1.0_DP)/lambda)*EXP(C(4)*(lambda-1.0_DP)*(lambda-1.0_DP))
+        PIOLA_TENSOR(2,2)=PIOLA_TENSOR(2,2)+C(5)*C(3)*C(4)*2.0_DP*((lambda-1.0_DP)/lambda)*EXP(C(4)*(lambda-1.0_DP)*(lambda-1.0_DP))
       CASE DEFAULT
         LOCAL_ERROR="Material type "//TRIM(NUMBER_TO_VSTRING(materialType,"*",ERR,ERROR))// &
           & " is not valid for a pelvic floor."
