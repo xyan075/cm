@@ -1544,12 +1544,12 @@ CONTAINS
 !                  EQUATIONS_SET%EQUATIONS%EQUATIONS_MAPPING%NONLINEAR_MAPPING%RESIDUAL_VARIABLES(1)%PTR%NUMBER_OF_COMPONENTS=noComp
                   !\todo: XY -Modify Jacobian for contact
                   IF(SOLVER%SOLVERS%CONTROL_LOOP%PROBLEM%TYPE==PROBLEM_FINITE_ELASTICITY_CONTACT_TYPE)THEN
-                    DO interfaceGlobalNumber=1,2
+                    DO interfaceGlobalNumber=1,1
                       interfaceConditionGlobalNumber=1
                       interfaceCondition=>EQUATIONS_SET%REGION%PARENT_REGION%INTERFACES%INTERFACES(interfaceGlobalNumber)%PTR% &
                         & INTERFACE_CONDITIONS%INTERFACE_CONDITIONS(interfaceConditionGlobalNumber)%PTR
                       ! rigid body-deformable body contact
-                      IF(interfaceGlobalNumber==1) THEN
+                      IF(interfaceGlobalNumber==3) THEN
                         CALL PETSC_SNESGETITERATIONNUMBER(SOLVER%NONLINEAR_SOLVER%NEWTON_SOLVER%LINESEARCH_SOLVER%SNES, &
                           & iterationNumber,ERR,ERROR,*999)
                         CALL EquationsSet_JacobianRigidBodyContactUpdateStaticFEM(EQUATIONS_SET,iterationNumber,ERR,ERROR,*999)
@@ -1558,7 +1558,7 @@ CONTAINS
   !                      ENDIF
                       ! deformable-deformable body contact
                       ELSE
-                        CALL EQUATIONS_SET_JACOBIAN_CONTACT_UPDATE_STATIC_FEM(EQUATIONS_SET,ERR,ERROR,*999)
+                        CALL EQUATIONS_SET_JACOBIAN_CONTACT_UPDATE_STATIC_FEM(EQUATIONS_SET,interfaceGlobalNumber,ERR,ERROR,*999)
                       ENDIF !Rigid or deformable contact
                     ENDDO!interfaceGlobalNumber
                   ENDIF !contact problem
@@ -1601,10 +1601,11 @@ CONTAINS
   !
 
   !>Evaluates the Jacobian for a static equations set with contact using the finite element method
-  SUBROUTINE EQUATIONS_SET_JACOBIAN_CONTACT_UPDATE_STATIC_FEM(EQUATIONS_SET,ERR,ERROR,*)
+  SUBROUTINE EQUATIONS_SET_JACOBIAN_CONTACT_UPDATE_STATIC_FEM(EQUATIONS_SET,interfaceGlobalNumber,ERR,ERROR,*)
 
     !Argument variables
     TYPE(EQUATIONS_SET_TYPE), POINTER :: EQUATIONS_SET !<A pointer to the equations set to evaluate the Jacobian for
+    INTEGER(INTG), INTENT(IN) :: interfaceGlobalNumber !<The error code
     INTEGER(INTG), INTENT(OUT) :: ERR !<The error code
     TYPE(VARYING_STRING), INTENT(OUT) :: ERROR !<The error string
     !Local Variables
@@ -1628,7 +1629,7 @@ CONTAINS
     !TYPE(FIELD_VARIABLE_TYPE), POINTER :: residualVariable
     !TYPE(FIELD_PARAMETER_SET_TYPE), POINTER :: residualParameterSet
     TYPE(VARYING_STRING) :: localError
-    INTEGER(INTG) :: jacobianNumber,bodyIdx,equationSetNumber,interfaceGlobalNumber,interfaceConditionGlobalNumber
+    INTEGER(INTG) :: jacobianNumber,bodyIdx,equationSetNumber,interfaceConditionGlobalNumber
     INTEGER(INTG) :: globalDataPointNum,rowElementNum,colElementNum, &
       & rowConnectedFace,colConnectedFace,rowFieldComp, colFieldComp, &
       & rowMeshComp,colMeshComp,rowDecompositionFaceNumber,colDecompositionFaceNumber, &
@@ -1668,8 +1669,8 @@ CONTAINS
             nonlinearMatrices=>equationsMatrices%NONLINEAR_MATRICES
             nonlinearMapping=>equations%EQUATIONS_MAPPING%NONLINEAR_MAPPING
             
-            DO interfaceConditionIdx=2,2
-            interfaceGlobalNumber=interfaceConditionIdx
+!            DO interfaceConditionIdx=1,2
+
             interfaceConditionGlobalNumber=1
             interface=>EQUATIONS_SET%REGION%PARENT_REGION%INTERFACES%INTERFACES(interfaceGlobalNumber)%PTR
             interfaceCondition=>interface%INTERFACE_CONDITIONS%INTERFACE_CONDITIONS(interfaceConditionGlobalNumber)%PTR
@@ -2014,7 +2015,7 @@ CONTAINS
             !IF(EQUATIONS%OUTPUT_TYPE>=EQUATIONS_MATRIX_OUTPUT) THEN
             ! CALL EQUATIONS_MATRICES_OUTPUT(GENERAL_OUTPUT_TYPE,EQUATIONS_MATRICES,ERR,ERROR,*999)
             !ENDIF
-            ENDDO ! interfaceConditionIdx
+!            ENDDO ! interfaceConditionIdx
           ELSE
             CALL FLAG_ERROR("Equations matrices is not associated",err,error,*999)
           ENDIF
@@ -2967,7 +2968,7 @@ CONTAINS
                 equationsSetGlobalNumber=1
                 rigidBodyRegionNumber=2
 
-                DO interfaceGlobalNumber=1,2
+                DO interfaceGlobalNumber=1,1
                   interfaceConditionGlobalNumber=1
                   interfaceCondition=>SOLVER_MAPPING%EQUATIONS_SETS(equationsSetGlobalNumber)%PTR%REGION%PARENT_REGION% &
                     & INTERFACES%INTERFACES(interfaceGlobalNumber)%PTR%INTERFACE_CONDITIONS% &
@@ -2980,7 +2981,7 @@ CONTAINS
                         IF(ASSOCIATED(interface)) THEN
                           CALL PETSC_SNESGETITERATIONNUMBER(SOLVER%NONLINEAR_SOLVER%NEWTON_SOLVER%LINESEARCH_SOLVER%SNES, &
                             & iterationNumber,ERR,ERROR,*999)
-                          IF(interfaceGlobalNumber==1) THEN !Rigid-deformable contact
+                          IF(interfaceGlobalNumber==3) THEN !Rigid-deformable contact
                             equationSetRigidNodal=>SOLVER_MAPPING%EQUATIONS_SETS(equationsSetGlobalNumber)%PTR%REGION% &
                               & PARENT_REGION%SUB_REGIONS(rigidBodyRegionNumber)%PTR%EQUATIONS_SETS%EQUATIONS_SETS(1)%PTR
                             CALL RigidBody_ApplyTransformation(EQUATIONS_SET,equationSetRigidNodal,err,error,*999)
@@ -2989,9 +2990,9 @@ CONTAINS
                           CALL InterfacePointsConnectivity_DataReprojection(interface,interfaceCondition,err,error,*999)
                           ! iteration+1 since iterationNumber is counting the iterations completed
                           CALL FrictionlessContact_contactMetricsCalculate(interfaceCondition,iterationNumber+1,err,error,*999)
-  !                        CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"********************  Contact residual! ***********",ERR,ERROR,*999)
+!                          CALL WRITE_STRING(GENERAL_OUTPUT_TYPE,"******************  Contact residual! ***********",ERR,ERROR,*999)
                           !\todo: generalise when LHS mapping is in place
-                          IF(interfaceGlobalNumber==1) THEN !Rigid-deformable contact
+                          IF(interfaceGlobalNumber==3) THEN !Rigid-deformable contact
                             !Modify residual for rigid-deformable contact
                             CALL EquationsSet_ResidualRigidBodyContactUpdateStaticFEM(SOLVER_MAPPING% &
                               & EQUATIONS_SETS(equationsSetGlobalNumber)%PTR,.FALSE.,ERR,ERROR,*999)
@@ -2999,7 +3000,7 @@ CONTAINS
                             !Modify residual for deformable bodies contact
                             !\todo: generalise when LHS mapping is in place
                             CALL EQUATIONS_SET_RESIDUAL_CONTACT_UPDATE_STATIC_FEM(SOLVER_MAPPING% &
-                              & EQUATIONS_SETS(equationsSetGlobalNumber)%PTR,ERR,ERROR,*999)
+                              & EQUATIONS_SETS(equationsSetGlobalNumber)%PTR,interfaceGlobalNumber,ERR,ERROR,*999)
                           ENDIF
   !                        CALL SolverEquations_ResidualVectorGet(SOLVER_EQUATIONS,residualVectorDis,err,error,*999)
 !                          CALL DISTRIBUTED_VECTOR_DATA_GET(SOLVER_EQUATIONS%solver_matrices%residual,residualVector,err,error,*999)
@@ -3064,10 +3065,11 @@ CONTAINS
   !
 
   !>Updates the equation set residual for a static equations set which includes contact using the finite element method
-  SUBROUTINE EQUATIONS_SET_RESIDUAL_CONTACT_UPDATE_STATIC_FEM(EQUATIONS_SET,err,error,*)
+  SUBROUTINE EQUATIONS_SET_RESIDUAL_CONTACT_UPDATE_STATIC_FEM(EQUATIONS_SET,interfaceGlobalNumber,err,error,*)
 
     !Argument variables
     TYPE(EQUATIONS_SET_TYPE), POINTER :: EQUATIONS_SET !<A pointer to the equations set to evaluate the residual for
+    INTEGER(INTG), INTENT(IN) :: interfaceGlobalNumber !<The error code
     INTEGER(INTG), INTENT(OUT) :: err !<The error code
     TYPE(VARYING_STRING), INTENT(OUT) :: error !<The error string
     !Local Variables
@@ -3088,7 +3090,7 @@ CONTAINS
     TYPE(InterfaceContactMetricsType), POINTER :: contactMetrics 
     TYPE(InterfaceContactPointMetricsType), POINTER :: contactPointMetrics
     TYPE(VARYING_STRING) :: localError
-    INTEGER(INTG) :: bodyIdx,equationSetNumber,interfaceGlobalNumber,interfaceConditionGlobalNumber
+    INTEGER(INTG) :: bodyIdx,equationSetNumber,interfaceConditionGlobalNumber
     INTEGER(INTG) :: globalDataPointNum,elementNum,connectedFace,fieldComponent,meshComp, &
       & decompositionFaceNumber,localFaceNodeIdx,faceLocalElemNode,globalNode,faceDerivative,derivative,versionNumber, &
       & residualVariableIdx,dofIdx,interfaceConditionIdx
@@ -3125,8 +3127,7 @@ CONTAINS
             nonlinearMatrices=>equationsMatrices%NONLINEAR_MATRICES
             !nonlinearResidual=>nonlinearMatrices%RESIDUAL
             nonlinearMapping=>equations%EQUATIONS_MAPPING%NONLINEAR_MAPPING
-            DO interfaceConditionIdx=2,2
-            interfaceGlobalNumber=interfaceConditionIdx
+!            DO interfaceConditionIdx=1,1
             interfaceConditionGlobalNumber=1
             interface=>EQUATIONS_SET%REGION%PARENT_REGION%INTERFACES%INTERFACES(interfaceGlobalNumber)%PTR
             interfaceCondition=>interface%INTERFACE_CONDITIONS%INTERFACE_CONDITIONS(interfaceConditionGlobalNumber)%PTR
@@ -3262,7 +3263,7 @@ CONTAINS
             !IF(EQUATIONS%OUTPUT_TYPE>=EQUATIONS_MATRIX_OUTPUT) THEN
             ! CALL EQUATIONS_MATRICES_OUTPUT(GENERAL_OUTPUT_TYPE,EQUATIONS_MATRICES,ERR,ERROR,*999)
             !ENDIF
-            ENDDO ! interfaceConditionIdx
+!            ENDDO ! interfaceConditionIdx
           ELSE
             CALL FLAG_ERROR("Equations matrices is not associated",err,error,*999)
           ENDIF
