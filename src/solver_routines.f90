@@ -7854,6 +7854,9 @@ CONTAINS
               ! Calculate the new transformation matrix by multiplying the old matrix with the new translation matrix
               transformationMatrix=MATMUL(solver%geometricTransformationSolver%transformationMatrices(:,:,incrementIdx), &
                 & translationMatrix(1:1+numberOfGeomComp,1:1+numberOfGeomComp))
+              CALL WRITE_STRING_VALUE(DIAGNOSTIC_OUTPUT_TYPE,"  translation1 = ",transformationMatrix(1,4),ERR,ERROR,*999)
+              CALL WRITE_STRING_VALUE(DIAGNOSTIC_OUTPUT_TYPE,"  translation2 = ",transformationMatrix(2,4),ERR,ERROR,*999)
+              CALL WRITE_STRING_VALUE(DIAGNOSTIC_OUTPUT_TYPE,"  translation3 = ",transformationMatrix(3,4),ERR,ERROR,*999)
               ! Store the new transformation matrix
               solver%geometricTransformationSolver%transformationMatrices(:,:,incrementIdx)= &
                 & transformationMatrix(1:1+numberOfGeomComp,1:1+numberOfGeomComp)

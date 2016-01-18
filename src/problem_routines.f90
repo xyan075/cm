@@ -1544,14 +1544,14 @@ CONTAINS
 !                  EQUATIONS_SET%EQUATIONS%EQUATIONS_MAPPING%NONLINEAR_MAPPING%RESIDUAL_VARIABLES(1)%PTR%NUMBER_OF_COMPONENTS=noComp
                   !\todo: XY -Modify Jacobian for contact
                   IF(SOLVER%SOLVERS%CONTROL_LOOP%PROBLEM%TYPE==PROBLEM_FINITE_ELASTICITY_CONTACT_TYPE)THEN
-                    DO interfaceGlobalNumber=1,1
+                    DO interfaceGlobalNumber=1,2
                       interfaceConditionGlobalNumber=1
                       interfaceCondition=>EQUATIONS_SET%REGION%PARENT_REGION%INTERFACES%INTERFACES(interfaceGlobalNumber)%PTR% &
                         & INTERFACE_CONDITIONS%INTERFACE_CONDITIONS(interfaceConditionGlobalNumber)%PTR
+                      CALL PETSC_SNESGETITERATIONNUMBER(SOLVER%NONLINEAR_SOLVER%NEWTON_SOLVER%LINESEARCH_SOLVER%SNES, &
+                          & iterationNumber,ERR,ERROR,*999)
                       ! rigid body-deformable body contact
                       IF(interfaceGlobalNumber==3) THEN
-                        CALL PETSC_SNESGETITERATIONNUMBER(SOLVER%NONLINEAR_SOLVER%NEWTON_SOLVER%LINESEARCH_SOLVER%SNES, &
-                          & iterationNumber,ERR,ERROR,*999)
                         CALL EquationsSet_JacobianRigidBodyContactUpdateStaticFEM(EQUATIONS_SET,iterationNumber,ERR,ERROR,*999)
   !                      IF(iterationNumber<=interfaceCondition%interfaceContactMetrics%iterationGeometricTerm) THEN
 !                          CALL EquationsSet_JacobianRigidBodyContactPerturb(EQUATIONS_SET,iterationNumber,ERR,ERROR,*999)
@@ -2968,7 +2968,7 @@ CONTAINS
                 equationsSetGlobalNumber=1
                 rigidBodyRegionNumber=2
 
-                DO interfaceGlobalNumber=1,1
+                DO interfaceGlobalNumber=1,2
                   interfaceConditionGlobalNumber=1
                   interfaceCondition=>SOLVER_MAPPING%EQUATIONS_SETS(equationsSetGlobalNumber)%PTR%REGION%PARENT_REGION% &
                     & INTERFACES%INTERFACES(interfaceGlobalNumber)%PTR%INTERFACE_CONDITIONS% &
@@ -3208,7 +3208,6 @@ CONTAINS
                             & NODES(globalNode)%DERIVATIVES(derivative)%VERSIONS(versionNumber)
                           ! See Jae's thesis equation 4.34
                           residualValue=-coefficient*phi*contactPointMetrics%normal(fieldComponent)*contactPointMetrics%contactForce
-                          
                           
                           !Get the face parameter index in the element
 !                          elemParameterNo=domainFace%BASIS%ELEMENT_PARAMETER_INDEX(faceDerivative,localFaceNodeIdx)
@@ -5745,20 +5744,20 @@ CONTAINS
             
             ! \todo: XY- rigid -deformable contact, output rigid body dependent field.
             ! This is redundent need to be removed 
-            region2=>region%PARENT_REGION%SUB_REGIONS(2)%PTR
-            IF(ASSOCIATED(region2))THEN
-              NULLIFY(fields)
-              fields=>region2%FIELDS
-              fileName=directory//"mesh"//TRIM(NUMBER_TO_VSTRING(2,"*",err,error))// &
-                & "_solveCall"//TRIM(NUMBER_TO_VSTRING(solve_call,"*",err,error))// &
-                & "_load"//TRIM(NUMBER_TO_VSTRING(load_step,"*",err,error))// &
-                & "_iter"//TRIM(NUMBER_TO_VSTRING(iterationNumber,"*",err,error))
-              method="FORTRAN"
-              CALL FIELD_IO_ELEMENTS_EXPORT(fields,fileName,method,err,error,*999)
-              CALL FIELD_IO_NODES_EXPORT(fields,fileName,method,err,error,*999)
-            ELSE
-              CALL FLAG_ERROR("Region2 - rigid body - is not associated.",err,error,*999)
-            ENDIF
+!            region2=>region%PARENT_REGION%SUB_REGIONS(2)%PTR
+!            IF(ASSOCIATED(region2))THEN
+!              NULLIFY(fields)
+!              fields=>region2%FIELDS
+!              fileName=directory//"mesh"//TRIM(NUMBER_TO_VSTRING(2,"*",err,error))// &
+!                & "_solveCall"//TRIM(NUMBER_TO_VSTRING(solve_call,"*",err,error))// &
+!                & "_load"//TRIM(NUMBER_TO_VSTRING(load_step,"*",err,error))// &
+!                & "_iter"//TRIM(NUMBER_TO_VSTRING(iterationNumber,"*",err,error))
+!              method="FORTRAN"
+!              CALL FIELD_IO_ELEMENTS_EXPORT(fields,fileName,method,err,error,*999)
+!              CALL FIELD_IO_NODES_EXPORT(fields,fileName,method,err,error,*999)
+!            ELSE
+!              CALL FLAG_ERROR("Region2 - rigid body - is not associated.",err,error,*999)
+!            ENDIF
             
           !ENDIF
 
@@ -5993,7 +5992,7 @@ CONTAINS
           nonlinearMatrices=>solverMapping%EQUATIONS_SETS(equationsSetGlobalNumber)%PTR%EQUATIONS%EQUATIONS_MATRICES% &
             & NONLINEAR_MATRICES
           DO dofIdx=1,nonlinearMatrices%RESIDUAL%CMISS%DATA_SIZE
-            CALL DISTRIBUTED_VECTOR_VALUES_GET(nonlinearMatrices%RESIDUAL,dofIdx,residualValue,err,error,*999)
+            CALL DISTRIBUTED_VECTOR_VALUES_GET(nonlinearMatrices%contactRESIDUAL,dofIdx,residualValue,err,error,*999)
             WRITE(IUNIT,'(1X,3E25.15)') residualValue
           ENDDO !dofIdx
           
